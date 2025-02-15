@@ -1,0 +1,29 @@
+name = "chat"
+version = "0.1.0"
+description = "chat actor for LLM chat application"
+component_path = "/Users/colinrozzi/work/actors/chat/target/wasm32-unknown-unknown/release/chat.wasm"
+init_data = "/Users/colinrozzi/work/actors/chat/assets/init.json"
+
+[interface]
+implements = "ntwk:theater/single-actor"
+requires = []
+
+[[handlers]]
+type = "runtime"
+config = {}
+
+[[handlers]]
+type = "filesystem"
+config = { path = "/Users/colinrozzi/work/actors/chat/assets"}
+
+[[handlers]]
+type = "http-server"
+config = { port = 8084}
+
+[[handlers]]
+type = "websocket-server"
+config = { port = 8085}
+
+[[handlers]]
+type = "http-client"
+config = {}
