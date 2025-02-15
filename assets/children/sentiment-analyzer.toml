@@ -1,0 +1,10 @@
+[metadata]
+name = "Sentiment Analyzer"
+description = "Analyzes the sentiment of chat messages"
+
+[interface]
+implements = "ntwk:theater/actor" # Base actor interface
+requires = []  # No additional requirements
+
+[component]
+path = "sentiment-analyzer.wasm"

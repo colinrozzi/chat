@@ -1,4 +1,6 @@
 mod bindings;
+mod children;
+use children::{ChildInfo, scan_available_children};
 
 use bindings::exports::ntwk::theater::actor::Guest as ActorGuest;
 use bindings::exports::ntwk::theater::http_server::Guest as HttpGuest;
@@ -90,7 +92,7 @@ enum Action {
 
 impl State {
     fn start_child(&mut self, manifest_name: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let manifest_path = format!("{}/{}.toml", "children", manifest_name);
+        let manifest_path = format!("{}/{}.toml", "assets/children", manifest_name);
 
         // Spawn the child actor
         let actor_id = spawn(&manifest_path);
@@ -406,15 +408,15 @@ impl WebSocketGuest for Component {
                     if let Ok(command) = serde_json::from_str::<Value>(&text) {
                         match command["type"].as_str() {
                             Some("get_available_children") => {
-                                // Read directory and get available manifests
-                                let available_children = vec![
-                                    // Temporary hardcoded example
-                                    json!({
-                                        "name": "Example Child",
-                                        "description": "An example child actor",
-                                        "manifest_name": "example-child"
-                                    }),
-                                ];
+                                // Scan for available child actors
+                                let available_children = scan_available_children()
+                                    .into_iter()
+                                    .map(|child| json!({
+                                        "name": child.name,
+                                        "description": child.description,
+                                        "manifest_name": child.manifest_name
+                                    }))
+                                    .collect::<Vec<Value>>();
 
                                 return (
                                     serde_json::to_vec(&current_state).unwrap(),
