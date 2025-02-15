@@ -14,6 +14,7 @@ use bindings::ntwk::theater::filesystem::{path_exists, read_file};
 use bindings::ntwk::theater::http_client::{send_http, HttpRequest};
 use bindings::ntwk::theater::message_server_host::{request, send};
 use bindings::ntwk::theater::runtime::log;
+use bindings::ntwk::theater::runtime::spawn;
 use bindings::ntwk::theater::types::Json;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -56,6 +57,12 @@ impl Message {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct ChildActor {
+    actor_id: String,
+    manifest_name: String,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct State {
     chat: Chat,
@@ -63,6 +70,8 @@ struct State {
     connected_clients: HashMap<String, bool>,
     store_id: String,
     websocket_port: u16,
+    children: HashMap<String, ChildActor>, // new field
+    last_child_results: Option<HashMap<String, Vec<u8>>>, // new field
 }
 
 // Import the Request/Action types - we'll need to define these since we can't import from store actor
@@ -80,7 +89,45 @@ enum Action {
 }
 
 impl State {
-    fn save_message(&self, msg: &Message) -> Result<String, Box<dyn std::error::Error>> {
+    fn start_child(&mut self, manifest_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let manifest_path = format!("{}/{}.toml", "children", manifest_name);
+
+        // Spawn the child actor
+        let actor_id = spawn(&manifest_path);
+
+        // Add to our children map
+        self.children.insert(
+            actor_id.clone(),
+            ChildActor {
+                actor_id: actor_id.clone(),
+                manifest_name: manifest_name.to_string(),
+            },
+        );
+
+        Ok(actor_id)
+    }
+
+    fn notify_children(&mut self, head_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let mut results = HashMap::new();
+
+        for (actor_id, _child) in &self.children {
+            // Notify each child of the new head
+            if let Ok(response) = request(
+                actor_id,
+                &serde_json::to_vec(&json!({
+                    "head_id": head_id
+                }))?,
+            ) {
+                results.insert(actor_id.clone(), response);
+            }
+        }
+
+        self.last_child_results = Some(results);
+        Ok(())
+    }
+
+    fn save_message(&mut self, msg: &Message) -> Result<String, Box<dyn std::error::Error>> {
+        // First save the message
         let req = Request {
             _type: "request".to_string(),
             data: Action::Put(serde_json::to_vec(&msg)?),
@@ -91,10 +138,17 @@ impl State {
 
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
-            response["key"]
+            let msg_id = response["key"]
                 .as_str()
                 .map(|s| s.to_string())
-                .ok_or("No key in response".into())
+                .ok_or("No key in response")?;
+
+            // Notify all children of the new head and collect their responses
+            if let Err(e) = self.notify_children(&msg_id) {
+                log(&format!("Error notifying children: {}", e));
+            }
+
+            Ok(msg_id)
         } else {
             Err("Failed to save message".into())
         }
@@ -195,13 +249,14 @@ struct InitData {
     store_id: String,
     head: Option<String>,
     websocket_port: u16,
+    children_dir: String, // new field - path to directory containing child manifests
 }
 
 struct Component;
 
 impl ActorGuest for Component {
     fn init(data: Option<Vec<u8>>) -> Vec<u8> {
-        log("Initializing single chat actor");
+        log("Initializing chat actor with children");
         let data = data.unwrap();
         log(&format!("Data: {:?}", data));
 
@@ -236,6 +291,8 @@ impl ActorGuest for Component {
             connected_clients: HashMap::new(),
             store_id: init_data.store_id,
             websocket_port: init_data.websocket_port,
+            children: HashMap::new(), // Initialize empty children map
+            last_child_results: None, // Initialize with no results
         };
 
         log("State initialized");
@@ -349,6 +406,132 @@ impl WebSocketGuest for Component {
                 if let Some(text) = msg.text {
                     if let Ok(command) = serde_json::from_str::<Value>(&text) {
                         match command["type"].as_str() {
+                            Some("get_available_children") => {
+                                // Read directory and get available manifests
+                                let available_children = vec![
+                                    // Temporary hardcoded example
+                                    json!({
+                                        "name": "Example Child",
+                                        "description": "An example child actor",
+                                        "manifest_name": "example-child"
+                                    }),
+                                ];
+
+                                return (
+                                    serde_json::to_vec(&current_state).unwrap(),
+                                    WebsocketResponse {
+                                        messages: vec![WebsocketMessage {
+                                            ty: MessageType::Text,
+                                            text: Some(
+                                                serde_json::json!({
+                                                    "type": "children_update",
+                                                    "available_children": available_children
+                                                })
+                                                .to_string(),
+                                            ),
+                                            data: None,
+                                        }],
+                                    },
+                                );
+                            }
+                            Some("get_running_children") => {
+                                let running_children: Vec<Value> = current_state
+                                    .children
+                                    .iter()
+                                    .map(|(actor_id, child)| {
+                                        json!({
+                                            "actor_id": actor_id,
+                                            "manifest_name": child.manifest_name
+                                        })
+                                    })
+                                    .collect();
+
+                                return (
+                                    serde_json::to_vec(&current_state).unwrap(),
+                                    WebsocketResponse {
+                                        messages: vec![WebsocketMessage {
+                                            ty: MessageType::Text,
+                                            text: Some(
+                                                serde_json::json!({
+                                                    "type": "children_update",
+                                                    "running_children": running_children
+                                                })
+                                                .to_string(),
+                                            ),
+                                            data: None,
+                                        }],
+                                    },
+                                );
+                            }
+                            Some("start_child") => {
+                                if let Some(manifest_name) = command["manifest_name"].as_str() {
+                                    if let Ok(actor_id) = current_state.start_child(manifest_name) {
+                                        // Send updated running children list
+                                        let running_children: Vec<Value> = current_state
+                                            .children
+                                            .iter()
+                                            .map(|(actor_id, child)| {
+                                                json!({
+                                                    "actor_id": actor_id,
+                                                    "manifest_name": child.manifest_name
+                                                })
+                                            })
+                                            .collect();
+
+                                        return (
+                                            serde_json::to_vec(&current_state).unwrap(),
+                                            WebsocketResponse {
+                                                messages: vec![WebsocketMessage {
+                                                    ty: MessageType::Text,
+                                                    text: Some(
+                                                        serde_json::json!({
+                                                            "type": "children_update",
+                                                            "running_children": running_children
+                                                        })
+                                                        .to_string(),
+                                                    ),
+                                                    data: None,
+                                                }],
+                                            },
+                                        );
+                                    }
+                                }
+                            }
+                            Some("stop_child") => {
+                                if let Some(actor_id) = command["actor_id"].as_str() {
+                                    // Remove the child from our state
+                                    current_state.children.remove(actor_id);
+
+                                    // Send updated running children list
+                                    let running_children: Vec<Value> = current_state
+                                        .children
+                                        .iter()
+                                        .map(|(actor_id, child)| {
+                                            json!({
+                                                "actor_id": actor_id,
+                                                "manifest_name": child.manifest_name
+                                            })
+                                        })
+                                        .collect();
+
+                                    return (
+                                        serde_json::to_vec(&current_state).unwrap(),
+                                        WebsocketResponse {
+                                            messages: vec![WebsocketMessage {
+                                                ty: MessageType::Text,
+                                                text: Some(
+                                                    serde_json::json!({
+                                                        "type": "children_update",
+                                                        "running_children": running_children
+                                                    })
+                                                    .to_string(),
+                                                ),
+                                                data: None,
+                                            }],
+                                        },
+                                    );
+                                }
+                            }
                             Some("send_message") => {
                                 if let Some(content) = command["content"].as_str() {
                                     // Create initial user message without ID

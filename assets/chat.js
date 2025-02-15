@@ -1,3 +1,88 @@
+        case 'children_update':
+            if (data.available_children) {
+                availableChildren = data.available_children;
+            }
+            if (data.running_children) {
+                runningChildren = data.running_children;
+            }
+            renderChildPanel();
+            break;
+        // Child actor management
+let availableChildren = [];
+let runningChildren = [];
+
+function initializeChildPanel() {
+    // Request available children list
+    sendWebSocketMessage({
+        type: 'get_available_children'
+    });
+
+    // Request running children list
+    sendWebSocketMessage({
+        type: 'get_running_children'
+    });
+}
+
+function startChild(manifestName) {
+    sendWebSocketMessage({
+        type: 'start_child',
+        manifest_name: manifestName
+    });
+}
+
+function stopChild(actorId) {
+    sendWebSocketMessage({
+        type: 'stop_child',
+        actor_id: actorId
+    });
+}
+
+function renderChildPanel() {
+    const panel = document.getElementById('childPanel');
+    panel.innerHTML = `
+        <div class="panel-header">
+            <h2>Actor Management</h2>
+            <button class="collapse-button">×</button>
+        </div>
+        <div class="panel-content">
+            <div class="section">
+                <h3>Available Actors</h3>
+                ${availableChildren.map(child => `
+                    <div class="actor-item">
+                        <div class="actor-info">
+                            <span class="actor-name">${child.name}</span>
+                            <span class="actor-description">${child.description}</span>
+                        </div>
+                        <button class="start-button" onclick="startChild('${child.manifest_name}')">
+                            Start
+                        </button>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="section">
+                <h3>Running Actors</h3>
+                ${runningChildren.map(child => `
+                    <div class="actor-item">
+                        <div class="actor-info">
+                            <span class="actor-name">${child.manifest_name}</span>
+                            <span class="actor-id">ID: ${child.actor_id}</span>
+                        </div>
+                        <button class="stop-button" onclick="stopChild('${child.actor_id}')">
+                            Stop
+                        </button>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+
+    // Add collapse button handler
+    const collapseButton = panel.querySelector('.collapse-button');
+    collapseButton.addEventListener('click', () => {
+        panel.classList.toggle('collapsed');
+    });
+}
+
 // State management
 let messageCache = new Map();
 let ws = null;
@@ -298,7 +383,12 @@ document.addEventListener('click', (event) => {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    // Connect websocket first
     connectWebSocket();
+    
+    // Then initialize child panel
+    initializeChildPanel();
+
 
     // Setup message input handling
     messageInput.addEventListener('keydown', (event) => {

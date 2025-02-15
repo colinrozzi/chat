@@ -1,0 +1,12 @@
+name = "example-child"
+version = "0.1.0"
+description = "An example child actor that processes chat messages"
+component_path = "/Users/colinrozzi/work/actors/example-child/target/wasm32-wasi/release/example_child.wasm"
+
+[interface]
+implements = "ntwk:theater/actor"
+requires = []
+
+[[handlers]]
+type = "message-server"
+config = {}
