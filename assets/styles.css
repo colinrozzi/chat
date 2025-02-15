@@ -25,7 +25,6 @@ body {
 
 /* App container */
 .app-container {
-    display: flex;
     width: 100%;
     height: 100vh;
     overflow: hidden;
@@ -36,20 +35,35 @@ body {
     width: 100%;
     height: 100vh;
     display: flex;
-    justify-content: space-between;
+    align-items: stretch;
 }
 
 /* Main chat area */
 .main-chat {
-    flex: 1;
+    width: 800px;
     display: flex;
     flex-direction: column;
     background: white;
-    max-width: 800px;
     height: 100vh;
     position: relative;
     overflow: hidden;
     border-right: 1px solid var(--gray-200);
+    flex-shrink: 0;
+}
+
+/* Child panel */
+.child-panel {
+    width: 320px;
+    min-width: 320px;
+    background: white;
+    overflow-y: auto;
+    border-left: 1px solid var(--gray-200);
+    margin-left: auto;
+}
+
+.child-panel.collapsed {
+    width: 0;
+    min-width: 0;
 }
 
 /* Title bar */
@@ -74,19 +88,6 @@ body {
 .head-id {
     color: var(--gray-700);
     font-family: monospace;
-}
-
-/* Child panel */
-.child-panel {
-    width: 320px;
-    height: 100vh;
-    background: white;
-    transition: width 0.3s;
-    overflow-y: auto;
-}
-
-.child-panel.collapsed {
-    width: 0;
 }
 
 /* Connection status indicator */
@@ -163,7 +164,6 @@ body {
 .input-area {
     position: fixed;
     bottom: 0;
-    left: 0;
     width: 800px;
     padding: 1rem;
     background: white;
@@ -228,6 +228,16 @@ body {
     font-size: 1.125rem;
     font-weight: 600;
     color: var(--gray-800);
+}
+
+.collapse-button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--gray-700);
+    cursor: pointer;
+    padding: 0.25rem;
+    line-height: 1;
 }
 
 .panel-content {
@@ -300,7 +310,7 @@ body {
     background: #dc2626;
 }
 
-/* Loading overlay */
+/* Loading and message actions */
 .loading-overlay {
     position: absolute;
     inset: 0;
@@ -314,7 +324,6 @@ body {
     display: flex;
 }
 
-/* Message actions and other existing styles... */
 .message-actions {
     display: none;
     margin-top: 0.5rem;
@@ -330,10 +339,19 @@ body {
 /* Responsive design */
 @media (max-width: 1200px) {
     .main-chat {
-        max-width: 600px;
+        width: 600px;
     }
     
     .input-area {
         width: 600px;
     }
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    color: var(--gray-700);
+    padding: 2rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
 }
