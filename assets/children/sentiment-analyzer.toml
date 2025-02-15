@@ -1,10 +1,12 @@
-[metadata]
-name = "Sentiment Analyzer"
+name = "sentiment-analyzer"
+version = "0.1.0"
 description = "Analyzes the sentiment of chat messages"
+component_path = "/Users/colinrozzi/work/actors/sentiment-analyzer/target/wasm32-wasi/release/sentiment_analyzer.wasm"
 
 [interface]
-implements = "ntwk:theater/actor" # Base actor interface
-requires = []  # No additional requirements
+implements = "ntwk:theater/actor"
+requires = []
 
-[component]
-path = "sentiment-analyzer.wasm"
+[[handlers]]
+type = "message-server"
+config = {}
