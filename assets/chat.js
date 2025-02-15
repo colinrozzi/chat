@@ -1,13 +1,12 @@
-        case 'children_update':
-            if (data.available_children) {
-                availableChildren = data.available_children;
-            }
-            if (data.running_children) {
-                runningChildren = data.running_children;
-            }
-            renderChildPanel();
-            break;
-        // Child actor management
+// State management
+let messageCache = new Map();
+let ws = null;
+let reconnectAttempts = 0;
+let selectedMessageId = null;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const WEBSOCKET_URL = 'ws://localhost:{{WEBSOCKET_PORT}}/';
+
+// Child actor management
 let availableChildren = [];
 let runningChildren = [];
 
@@ -83,14 +82,6 @@ function renderChildPanel() {
     });
 }
 
-// State management
-let messageCache = new Map();
-let ws = null;
-let reconnectAttempts = 0;
-let selectedMessageId = null;
-const MAX_RECONNECT_ATTEMPTS = 5;
-const WEBSOCKET_URL = 'ws://localhost:{{WEBSOCKET_PORT}}/';
-
 // UI Elements
 const messageInput = document.getElementById('messageInput');
 const messageArea = document.getElementById('messageArea');
@@ -126,8 +117,6 @@ function updateConnectionStatus(status) {
 
 function connectWebSocket() {
     updateConnectionStatus('connecting');
-    
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     
     ws = new WebSocket(WEBSOCKET_URL);
     
@@ -175,24 +164,37 @@ function sendWebSocketMessage(message) {
 }
 
 function handleWebSocketMessage(data) {
-    if (data.type === 'message_update' && data.messages) {
-        // Update message cache with new messages
-        data.messages.forEach(msg => {
-            messageCache.set(msg.id, msg);
-        });
-        
-        // Remove any temporary messages
-        for (const [id, msg] of messageCache.entries()) {
-            if (id.startsWith('temp-')) {
-                messageCache.delete(id);
+    switch(data.type) {
+        case 'message_update':
+            if (data.messages) {
+                // Update message cache with new messages
+                data.messages.forEach(msg => {
+                    messageCache.set(msg.id, msg);
+                });
+                
+                // Remove any temporary messages
+                for (const [id, msg] of messageCache.entries()) {
+                    if (id.startsWith('temp-')) {
+                        messageCache.delete(id);
+                    }
+                }
+                
+                // Render messages without typing indicator
+                renderMessages(Array.from(messageCache.values()), false);
+                
+                // Update head ID if present
+                updateHeadId(Array.from(messageCache.values()));
             }
-        }
-        
-        // Render messages without typing indicator
-        renderMessages(Array.from(messageCache.values()), false);
-        
-        // Update head ID if present
-        updateHeadId(Array.from(messageCache.values()));
+            break;
+        case 'children_update':
+            if (data.available_children) {
+                availableChildren = data.available_children;
+            }
+            if (data.running_children) {
+                runningChildren = data.running_children;
+            }
+            renderChildPanel();
+            break;
     }
 }
 
@@ -388,7 +390,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Then initialize child panel
     initializeChildPanel();
-
 
     // Setup message input handling
     messageInput.addEventListener('keydown', (event) => {
