@@ -249,7 +249,6 @@ struct InitData {
     store_id: String,
     head: Option<String>,
     websocket_port: u16,
-    children_dir: String, // new field - path to directory containing child manifests
 }
 
 struct Component;

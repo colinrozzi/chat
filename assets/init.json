@@ -1,6 +1,5 @@
 {
-    "store_id": "",
+    "store_id": "897b2086-6f00-4240-8a3b-0cdf31097851",
     "head": null,
     "websocket_port": 8085,
-    "children_dir": "/Users/colinrozzi/work/actors/chat/children"
 }
