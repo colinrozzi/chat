@@ -1,6 +1,6 @@
 mod bindings;
 mod children;
-use children::{ChildInfo, scan_available_children};
+use children::{scan_available_children, ChildInfo};
 
 use bindings::exports::ntwk::theater::actor::Guest as ActorGuest;
 use bindings::exports::ntwk::theater::http_server::Guest as HttpGuest;
@@ -92,7 +92,11 @@ enum Action {
 
 impl State {
     fn start_child(&mut self, manifest_name: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let manifest_path = format!("{}/{}.toml", "assets/children", manifest_name);
+        // Convert our relative path to full path for the runtime
+        let manifest_path = format!(
+            "/Users/colinrozzi/work/actors/chat/assets/children/{}.toml",
+            manifest_name
+        );
 
         // Spawn the child actor
         let actor_id = spawn(&manifest_path);
@@ -411,11 +415,13 @@ impl WebSocketGuest for Component {
                                 // Scan for available child actors
                                 let available_children = scan_available_children()
                                     .into_iter()
-                                    .map(|child| json!({
-                                        "name": child.name,
-                                        "description": child.description,
-                                        "manifest_name": child.manifest_name
-                                    }))
+                                    .map(|child| {
+                                        json!({
+                                            "name": child.name,
+                                            "description": child.description,
+                                            "manifest_name": child.manifest_name
+                                        })
+                                    })
                                     .collect::<Vec<Value>>();
 
                                 return (
@@ -638,8 +644,8 @@ impl WebSocketGuest for Component {
 impl MessageServerClientGuest for Component {
     fn handle_send(msg: Vec<u8>, state: Json) -> Json {
         log("Handling message server client send");
-        let msg_str = String::from_utf8(msg).unwrap();
-        log(&msg_str);
+        //let msg_str = String::from_utf8(msg).unwrap();
+        //log(&msg_str);
         state
     }
 

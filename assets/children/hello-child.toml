@@ -1,0 +1,13 @@
+name = "hello-child"
+version = "0.1.0"
+description = "A simple hello world child actor for the chat system"
+component_path = "/Users/colinrozzi/work/actors/hello-child/target/wasm32-unknown-unknown/release/hello_child.wasm"
+
+[interface]
+implements = "ntwk:theater/actor"
+requires = []
+
+[[handlers]]
+type = "runtime"
+config = {}
+

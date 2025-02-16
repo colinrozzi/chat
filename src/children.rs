@@ -12,12 +12,12 @@ pub struct ChildInfo {
 pub fn scan_available_children() -> Vec<ChildInfo> {
     let mut children = Vec::new();
     
-    // List all files in the children directory in assets
-    if let Ok(files) = list_files("assets/children") {
+    // List all files in the children directory relative to our assets root
+    if let Ok(files) = list_files("children") {
         for file in files {
             // Only process .toml files
             if file.ends_with(".toml") {
-                if let Ok(content) = read_file(&format!("assets/children/{}", file)) {
+                if let Ok(content) = read_file(&format!("children/{}", file)) {
                     if let Ok(content_str) = String::from_utf8(content) {
                         if let Ok(manifest) = toml::from_str::<toml::Value>(&content_str) {
                             // Get base name without .toml extension for manifest_name
