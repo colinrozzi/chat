@@ -124,6 +124,11 @@ impl State {
                     "head_id": head_id
                 }))?,
             ) {
+                log(&format!(
+                    "Child {} response: {:?}",
+                    actor_id,
+                    String::from_utf8(response.clone()).unwrap()
+                ));
                 results.insert(actor_id.clone(), response);
             }
         }
@@ -248,6 +253,39 @@ impl State {
 
         Err("Failed to generate response".into())
     }
+}
+
+fn make_user_message(content: &str, mut state: State) -> (Message, State) {
+    let mut children_responses = "";
+
+    if let Some(last_child_results) = &state.last_child_results {
+        for (actor_id, response) in last_child_results {
+            if let Ok(response_str) = String::from_utf8(response.clone()) {
+                let children_response = children_responses.to_owned()
+                    + &format!(
+                        "<actor-response id={}>{}</actor-response>\n",
+                        actor_id, response_str
+                    );
+            }
+        }
+    }
+
+    if !children_responses.is_empty() {
+        children_responses = &format!(
+            "<children-responses>\n{}</children-responses>\n",
+            children_responses
+        );
+    }
+
+    let user_str = children_responses.to_owned() + content;
+
+    let user_msg = Message::new(
+        "user".to_string(),
+        content.to_string(),
+        state.chat.head.clone(),
+    );
+
+    (user_msg, state)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -547,6 +585,9 @@ impl WebSocketGuest for Component {
                                         content.to_string(),
                                         current_state.chat.head.clone(),
                                     );
+
+                                    let (user_msg, mut current_state) =
+                                        make_user_message(content, current_state.clone());
 
                                     // Save message and get its ID
                                     if let Ok(msg_id) = current_state.save_message(&user_msg) {
