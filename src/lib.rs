@@ -72,8 +72,8 @@ struct State {
     connected_clients: HashMap<String, bool>,
     store_id: String,
     websocket_port: u16,
-    children: HashMap<String, ChildActor>, // new field
-    last_child_results: Option<HashMap<String, Vec<u8>>>, // new field
+    children: HashMap<String, ChildActor>,
+    actor_messages: HashMap<String, Vec<u8>>,
 }
 
 // Import the Request/Action types - we'll need to define these since we can't import from store actor
@@ -110,6 +110,29 @@ impl State {
             },
         );
 
+        match request(
+            &actor_id,
+            &serde_json::to_vec(&json!({
+                "msg_type": "introduction",
+                "data": {
+                "store_id": self.store_id.clone()
+            }
+            }))?,
+        ) {
+            Ok(response) => {
+                log(&format!(
+                    "Child {} response: {:?}",
+                    actor_id,
+                    String::from_utf8(response.clone()).unwrap()
+                ));
+
+                self.actor_messages.insert(actor_id.clone(), response);
+            }
+            Err(e) => {
+                log(&format!("Error starting child: {}", e));
+            }
+        }
+
         Ok(actor_id)
     }
 
@@ -121,7 +144,10 @@ impl State {
             if let Ok(response) = request(
                 actor_id,
                 &serde_json::to_vec(&json!({
-                    "head_id": head_id
+                    "msg_type": "head-update",
+                    "data": {
+                        "head_id": head_id
+                }
                 }))?,
             ) {
                 log(&format!(
@@ -133,7 +159,7 @@ impl State {
             }
         }
 
-        self.last_child_results = Some(results);
+        self.actor_messages = results;
         Ok(())
     }
 
@@ -256,34 +282,32 @@ impl State {
 }
 
 fn make_user_message(content: &str, mut state: State) -> (Message, State) {
-    let mut children_responses = "";
+    let mut children_responses = String::new();
 
-    if let Some(last_child_results) = &state.last_child_results {
-        for (actor_id, response) in last_child_results {
-            if let Ok(response_str) = String::from_utf8(response.clone()) {
-                let children_response = children_responses.to_owned()
-                    + &format!(
-                        "<actor-response id={}>{}</actor-response>\n",
-                        actor_id, response_str
-                    );
+    for (actor_id, response) in state.actor_messages {
+        if let Ok(response_str) = String::from_utf8(response.clone()) {
+            if let Ok(response_value) = serde_json::from_str::<Value>(&response_str) {
+                children_responses.push_str(&format!(
+                    "<actor id=\"{}\">{}</actor>\n",
+                    actor_id,
+                    response_value["message"].as_str().unwrap_or("No message")
+                ));
             }
         }
     }
 
-    if !children_responses.is_empty() {
-        children_responses = &format!(
-            "<children-responses>\n{}</children-responses>\n",
-            children_responses
-        );
-    }
+    let final_content = if !children_responses.is_empty() {
+        format!(
+            "<child-msgs>\n{}</child-msgs>\n{}",
+            children_responses, content
+        )
+    } else {
+        content.to_string()
+    };
 
-    let user_str = children_responses.to_owned() + content;
+    let user_msg = Message::new("user".to_string(), final_content, state.chat.head.clone());
 
-    let user_msg = Message::new(
-        "user".to_string(),
-        content.to_string(),
-        state.chat.head.clone(),
-    );
+    state.actor_messages = HashMap::new();
 
     (user_msg, state)
 }
@@ -334,8 +358,8 @@ impl ActorGuest for Component {
             connected_clients: HashMap::new(),
             store_id: init_data.store_id,
             websocket_port: init_data.websocket_port,
-            children: HashMap::new(), // Initialize empty children map
-            last_child_results: None, // Initialize with no results
+            children: HashMap::new(),
+            actor_messages: HashMap::new(),
         };
 
         log("State initialized");
