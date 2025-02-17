@@ -103,6 +103,79 @@ function renderChildPanel() {
     }
 }
 
+// Updated message rendering in chat.js:
+function renderMessageTree(messages) {
+    // Build a map of message IDs to their children
+    const messageChildren = new Map();
+    messages.forEach(msg => {
+        if (msg.parent) {
+            if (!messageChildren.has(msg.parent)) {
+                messageChildren.set(msg.parent, []);
+            }
+            messageChildren.get(msg.parent).push(msg);
+        }
+    });
+
+    // Find root messages (ones without parents or whose parents don't exist)
+    const rootMessages = messages.filter(msg => 
+        !msg.parent || !messages.find(m => m.id === msg.parent)
+    );
+
+    // Recursively render message trees
+    return rootMessages.map(msg => renderMessageTreeNode(msg, messageChildren)).join('');
+}
+
+function renderMessageTreeNode(message, messageChildren) {
+    const children = messageChildren.get(message.id) || [];
+    const isRollup = message.type === 'rollup';
+    
+    if (isRollup) {
+        // Render rollup message differently
+        const childResponses = message.child_responses || [];
+        return `
+            <div class="message-tree">
+                <div class="rollup-message">
+                    Processed by ${childResponses.length} actor${childResponses.length !== 1 ? 's' : ''}
+                </div>
+                ${childResponses.map(response => {
+                    const childMsg = messageCache.get(response.message_id);
+                    if (!childMsg) return '';
+                    return `
+                        <div class="child-response">
+                            <div class="child-response-header">
+                                <span>Actor: ${response.child_id}</span>
+                                <span>ID: ${response.message_id.slice(0, 8)}...</span>
+                            </div>
+                            <div class="child-response-content">
+                                ${formatMessage(childMsg.content)}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
+    return `
+        <div class="message-tree">
+            <div class="message ${message.role} ${message.id === selectedMessageId ? 'selected' : ''}" 
+                 data-id="${message.id}">
+                ${formatMessage(message.content)}
+                <div class="message-actions">
+                    <button class="message-action-button copy-button">
+                        Copy ID
+                    </button>
+                </div>
+            </div>
+            ${children.length > 0 ? `
+                <div class="child-responses">
+                    ${children.map(child => renderMessageTreeNode(child, messageChildren)).join('')}
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
 // UI Elements
 const messageInput = document.getElementById('messageInput');
 const messageArea = document.getElementById('messageArea');
@@ -123,17 +196,7 @@ function renderMessages(messages, isTyping = false) {
 
     messageArea.innerHTML = `
         <div class="message-container">
-            ${messages.map(msg => `
-                <div class="message ${msg.role} ${msg.id === selectedMessageId ? 'selected' : ''}" 
-                     data-id="${msg.id}">
-                    ${formatMessage(msg.content)}
-                    <div class="message-actions">
-                        <button class="message-action-button copy-button">
-                            Copy ID
-                        </button>
-                    </div>
-                </div>
-            `).join('')}
+            ${renderMessageTree(messages)}
             ${isTyping ? `
                 <div class="typing-indicator">
                     <span></span>
@@ -318,6 +381,10 @@ function handleWebSocketMessage(data) {
                 console.log("Updating message cache with new messages:", data.messages);
                 // Update message cache with new messages
                 data.messages.forEach(msg => {
+                    // Check if the message is a rollup
+                    if (msg.child_responses) {
+                        msg.type = 'rollup';  // Mark as rollup message
+                    }
                     messageCache.set(msg.id, msg);
                 });
                 

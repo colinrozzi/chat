@@ -1,6 +1,6 @@
 mod bindings;
 mod children;
-use children::{scan_available_children, ChildInfo};
+use children::scan_available_children;
 
 use bindings::exports::ntwk::theater::actor::Guest as ActorGuest;
 use bindings::exports::ntwk::theater::http_server::Guest as HttpGuest;
@@ -12,9 +12,9 @@ use bindings::exports::ntwk::theater::websocket_server::Guest as WebSocketGuest;
 use bindings::exports::ntwk::theater::websocket_server::{
     MessageType, WebsocketMessage, WebsocketResponse,
 };
-use bindings::ntwk::theater::filesystem::{path_exists, read_file};
+use bindings::ntwk::theater::filesystem::read_file;
 use bindings::ntwk::theater::http_client::{send_http, HttpRequest};
-use bindings::ntwk::theater::message_server_host::{request, send};
+use bindings::ntwk::theater::message_server_host::request;
 use bindings::ntwk::theater::runtime::log;
 use bindings::ntwk::theater::runtime::spawn;
 use bindings::ntwk::theater::types::Json;
@@ -42,21 +42,19 @@ struct Chat {
     head: Option<String>,
 }
 
-impl Message {
-    fn new(role: String, content: String, parent: Option<String>) -> Self {
-        Self {
-            role,
-            content,
-            parent,
-            id: None, // No ID until stored
-        }
-    }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type")]
+enum StoredMessage {
+    Message(Message),
+    Rollup(RollupMessage),
+}
 
-    // Helper to create a message with ID (for after storage)
-    fn with_id(mut self, id: String) -> Self {
-        self.id = Some(id);
-        self
-    }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct RollupMessage {
+    original_message_id: String,
+    child_responses: Vec<ChildResponse>,
+    parent: Option<String>,
+    id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -88,6 +86,33 @@ enum Action {
     Get(String),
     Put(Vec<u8>),
     All(()),
+}
+
+// Add new message type for child responses
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct ChildResponse {
+    child_id: String,
+    message_id: String,
+}
+
+impl Message {
+    fn new(role: String, content: String, parent: Option<String>) -> Self {
+        Self {
+            role,
+            content,
+            parent,
+            id: None, // No ID until stored
+        }
+    }
+}
+
+impl StoredMessage {
+    fn parent(&self) -> Option<String> {
+        match self {
+            StoredMessage::Message(m) => m.parent.clone(),
+            StoredMessage::Rollup(r) => r.parent.clone(),
+        }
+    }
 }
 
 impl State {
@@ -136,35 +161,167 @@ impl State {
         Ok(actor_id)
     }
 
-    fn notify_children(&mut self, head_id: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let mut results = HashMap::new();
+    fn notify_children(
+        &mut self,
+        head_id: &str,
+    ) -> Result<Vec<ChildResponse>, Box<dyn std::error::Error>> {
+        let mut responses = Vec::new();
 
         for (actor_id, _child) in &self.children {
             // Notify each child of the new head
-            if let Ok(response) = request(
+            if let Ok(response_bytes) = request(
                 actor_id,
                 &serde_json::to_vec(&json!({
                     "msg_type": "head-update",
                     "data": {
                         "head_id": head_id
-                }
+                    }
                 }))?,
             ) {
-                log(&format!(
-                    "Child {} response: {:?}",
-                    actor_id,
-                    String::from_utf8(response.clone()).unwrap()
-                ));
-                results.insert(actor_id.clone(), response);
+                if let Ok(response) = serde_json::from_slice::<Value>(&response_bytes) {
+                    if response["status"] == "ok" {
+                        if let Some(message_id) = response["message_id"].as_str() {
+                            responses.push(ChildResponse {
+                                child_id: actor_id.clone(),
+                                message_id: message_id.to_string(),
+                            });
+                        }
+                    }
+                }
             }
         }
 
-        self.actor_messages = results;
-        Ok(())
+        Ok(responses)
     }
 
-    fn save_message(&mut self, msg: &Message) -> Result<String, Box<dyn std::error::Error>> {
-        // First save the message
+    fn handle_send_message(
+        &mut self,
+        content: &str,
+    ) -> Result<Vec<StoredMessage>, Box<dyn std::error::Error>> {
+        // Process user message and get rollup ID
+        let user_rollup_id = self.process_message(content, "user", self.chat.head.clone())?;
+
+        // Generate AI response using message history
+        let messages = self.get_message_history()?;
+        let ai_response = self.generate_response(messages)?;
+
+        // Process assistant message with user rollup as parent
+        let assistant_rollup_id =
+            self.process_message(&ai_response, "assistant", Some(user_rollup_id.clone()))?;
+
+        // Return all new messages
+        let mut new_messages = Vec::new();
+
+        // Load user message chain
+        if let Ok(user_msg) = self.load_message(&user_rollup_id) {
+            new_messages.push(user_msg);
+        }
+
+        // Get and add user's child responses
+        if let Ok(user_children) = self.get_child_responses(&user_rollup_id) {
+            new_messages.extend(user_children);
+        }
+
+        // Load assistant message chain
+        if let Ok(assistant_msg) = self.load_message(&assistant_rollup_id) {
+            new_messages.push(assistant_msg);
+        }
+
+        // Get and add assistant's child responses
+        if let Ok(assistant_children) = self.get_child_responses(&assistant_rollup_id) {
+            new_messages.extend(assistant_children);
+        }
+
+        Ok(new_messages)
+    }
+    // Update WebSocket handler for get_messages
+    fn handle_get_messages(&self) -> Result<WebsocketResponse, Box<dyn std::error::Error>> {
+        if let Ok(messages) = self.get_full_message_tree() {
+            Ok(WebsocketResponse {
+                messages: vec![WebsocketMessage {
+                    ty: MessageType::Text,
+                    text: Some(
+                        serde_json::json!({
+                            "type": "message_update",
+                            "messages": messages
+                        })
+                        .to_string(),
+                    ),
+                    data: None,
+                }],
+            })
+        } else {
+            Err("Failed to load messages".into())
+        }
+    }
+
+    fn get_full_message_tree(&self) -> Result<Vec<StoredMessage>, Box<dyn std::error::Error>> {
+        let mut messages = Vec::new();
+        let mut current_id = self.chat.head.clone();
+
+        while let Some(id) = current_id {
+            let stored_msg = self.load_message(&id)?;
+            current_id = stored_msg.parent();
+            messages.push(stored_msg);
+        }
+
+        // Return messages in reverse order (oldest first)
+        messages.reverse();
+        Ok(messages)
+    }
+
+    fn get_child_responses(
+        &self,
+        message_id: &str,
+    ) -> Result<Vec<StoredMessage>, Box<dyn std::error::Error>> {
+        if let StoredMessage::Rollup(rollup) = self.load_message(message_id)? {
+            let mut responses = Vec::new();
+            for child_response in rollup.child_responses {
+                if let Ok(msg) = self.load_message(&child_response.message_id) {
+                    responses.push(msg);
+                }
+            }
+            Ok(responses)
+        } else {
+            Ok(vec![])
+        }
+    }
+
+    fn process_message(
+        &mut self,
+        content: &str,
+        role: &str,
+        parent_id: Option<String>,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        // Create and save initial message
+        let msg = Message::new(role.to_string(), content.to_string(), parent_id);
+
+        // Save message and get its ID
+        let msg_id = self.save_message(&StoredMessage::Message(msg))?;
+
+        // Notify children and collect their responses
+        let child_responses = self.notify_children(&msg_id)?;
+
+        // Create and save rollup message if there are any child responses
+        if !child_responses.is_empty() {
+            let rollup = RollupMessage {
+                original_message_id: msg_id.clone(),
+                child_responses,
+                parent: Some(msg_id.clone()),
+                id: None,
+            };
+            let rollup_id = self.save_message(&StoredMessage::Rollup(rollup))?;
+            // Update head to rollup
+            self.update_head(rollup_id.clone())?;
+            Ok(rollup_id)
+        } else {
+            // If no child responses, just return the message ID
+            self.update_head(msg_id.clone())?;
+            Ok(msg_id)
+        }
+    }
+
+    fn save_message(&mut self, msg: &StoredMessage) -> Result<String, Box<dyn std::error::Error>> {
         let req = Request {
             _type: "request".to_string(),
             data: Action::Put(serde_json::to_vec(&msg)?),
@@ -175,23 +332,16 @@ impl State {
 
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
-            let msg_id = response["key"]
+            Ok(response["key"]
                 .as_str()
                 .map(|s| s.to_string())
-                .ok_or("No key in response")?;
-
-            // Notify all children of the new head and collect their responses
-            if let Err(e) = self.notify_children(&msg_id) {
-                log(&format!("Error notifying children: {}", e));
-            }
-
-            Ok(msg_id)
+                .ok_or("No key in response")?)
         } else {
             Err("Failed to save message".into())
         }
     }
 
-    fn load_message(&self, id: &str) -> Result<Message, Box<dyn std::error::Error>> {
+    fn load_message(&self, id: &str) -> Result<StoredMessage, Box<dyn std::error::Error>> {
         let req = Request {
             _type: "request".to_string(),
             data: Action::Get(id.to_string()),
@@ -203,15 +353,20 @@ impl State {
         let response: Value = serde_json::from_slice(&response_bytes)?;
         if response["status"].as_str() == Some("ok") {
             if let Some(value) = response.get("value") {
-                // The value should be an array of bytes that we can directly deserialize
                 let bytes = value
                     .as_array()
                     .ok_or("Expected byte array")?
                     .iter()
                     .map(|v| v.as_u64().unwrap_or(0) as u8)
                     .collect::<Vec<u8>>();
-                let mut msg: Message = serde_json::from_slice(&bytes)?;
-                msg.id = Some(id.to_string());
+                let mut msg: StoredMessage = serde_json::from_slice(&bytes)?;
+
+                // Add ID to the correct variant
+                match &mut msg {
+                    StoredMessage::Message(m) => m.id = Some(id.to_string()),
+                    StoredMessage::Rollup(r) => r.id = Some(id.to_string()),
+                }
+
                 return Ok(msg);
             }
         }
@@ -220,15 +375,24 @@ impl State {
 
     fn get_message_history(&self) -> Result<Vec<Message>, Box<dyn std::error::Error>> {
         let mut messages = Vec::new();
+        let mut stored_messages = Vec::new();
         let mut current_id = self.chat.head.clone();
 
         while let Some(id) = current_id {
-            let msg = self.load_message(&id)?;
-            messages.push(msg.clone());
-            current_id = msg.parent.clone();
+            let stored_msg = self.load_message(&id)?;
+            current_id = stored_msg.parent();
+            stored_messages.push(stored_msg);
         }
 
-        messages.reverse(); // Oldest first
+        // Process stored messages into regular messages
+        for stored_msg in stored_messages.iter().rev() {
+            // Reverse to get oldest first
+            match stored_msg {
+                StoredMessage::Message(msg) => messages.push(msg.clone()),
+                StoredMessage::Rollup(_) => continue, // Skip rollup messages in history
+            }
+        }
+
         Ok(messages)
     }
 
@@ -279,37 +443,6 @@ impl State {
 
         Err("Failed to generate response".into())
     }
-}
-
-fn make_user_message(content: &str, mut state: State) -> (Message, State) {
-    let mut children_responses = String::new();
-
-    for (actor_id, response) in state.actor_messages {
-        if let Ok(response_str) = String::from_utf8(response.clone()) {
-            if let Ok(response_value) = serde_json::from_str::<Value>(&response_str) {
-                children_responses.push_str(&format!(
-                    "<actor id=\"{}\">{}</actor>\n",
-                    actor_id,
-                    response_value["message"].as_str().unwrap_or("No message")
-                ));
-            }
-        }
-    }
-
-    let final_content = if !children_responses.is_empty() {
-        format!(
-            "<child-msgs>\n{}</child-msgs>\n{}",
-            children_responses, content
-        )
-    } else {
-        content.to_string()
-    };
-
-    let user_msg = Message::new("user".to_string(), final_content, state.chat.head.clone());
-
-    state.actor_messages = HashMap::new();
-
-    (user_msg, state)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -422,7 +555,8 @@ impl HttpGuest for Component {
 
             ("GET", "/api/messages") => {
                 let current_state: State = serde_json::from_slice(&state).unwrap();
-                match current_state.get_message_history() {
+                // Create a new function to get the full message history including rollups
+                match current_state.get_full_message_tree() {
                     Ok(messages) => (
                         HttpResponse {
                             status: 200,
@@ -450,7 +584,6 @@ impl HttpGuest for Component {
                     ),
                 }
             }
-
             // Default 404 response
             _ => (
                 HttpResponse {
@@ -534,7 +667,8 @@ impl WebSocketGuest for Component {
                             }
                             Some("start_child") => {
                                 if let Some(manifest_name) = command["manifest_name"].as_str() {
-                                    if let Ok(actor_id) = current_state.start_child(manifest_name) {
+                                    if let Ok(_actor_id) = current_state.start_child(manifest_name)
+                                    {
                                         // Send updated running children list
                                         let running_children: Vec<Value> = current_state
                                             .children
@@ -603,90 +737,31 @@ impl WebSocketGuest for Component {
                             }
                             Some("send_message") => {
                                 if let Some(content) = command["content"].as_str() {
-                                    // Create initial user message without ID
-                                    let user_msg = Message::new(
-                                        "user".to_string(),
-                                        content.to_string(),
-                                        current_state.chat.head.clone(),
-                                    );
-
-                                    let (user_msg, mut current_state) =
-                                        make_user_message(content, current_state.clone());
-
-                                    // Save message and get its ID
-                                    if let Ok(msg_id) = current_state.save_message(&user_msg) {
-                                        if current_state.update_head(msg_id.clone()).is_ok() {
-                                            // Create final message with ID
-                                            let user_msg_with_id = user_msg.with_id(msg_id);
-
-                                            // Get message history for context
-                                            if let Ok(messages) =
-                                                current_state.get_message_history()
-                                            {
-                                                // Generate AI response
-                                                if let Ok(ai_response) =
-                                                    current_state.generate_response(messages)
-                                                {
-                                                    let ai_msg = Message::new(
-                                                        "assistant".to_string(),
-                                                        ai_response,
-                                                        user_msg_with_id.id.clone(),
-                                                    );
-
-                                                    // Save AI message and get its ID
-                                                    if let Ok(ai_msg_id) =
-                                                        current_state.save_message(&ai_msg)
-                                                    {
-                                                        if current_state
-                                                            .update_head(ai_msg_id.clone())
-                                                            .is_ok()
-                                                        {
-                                                            let ai_msg_with_id =
-                                                                ai_msg.with_id(ai_msg_id);
-
-                                                            // Send response with both messages
-                                                            return (
-                                                                serde_json::to_vec(&current_state).unwrap(),
-                                                                WebsocketResponse {
-                                                                    messages: vec![WebsocketMessage {
-                                                                        ty: MessageType::Text,
-                                                                        text: Some(
-                                                                            serde_json::json!({
-                                                                                "type": "message_update",
-                                                                                "messages": [user_msg_with_id, ai_msg_with_id]
-                                                                            })
-                                                                            .to_string(),
-                                                                        ),
-                                                                        data: None,
-                                                                    }],
-                                                                },
-                                                            );
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                                    if let Ok(new_messages) =
+                                        current_state.handle_send_message(content)
+                                    {
+                                        return (
+                                            serde_json::to_vec(&current_state).unwrap(),
+                                            WebsocketResponse {
+                                                messages: vec![WebsocketMessage {
+                                                    ty: MessageType::Text,
+                                                    text: Some(
+                                                        serde_json::json!({
+                                                            "type": "message_update",
+                                                            "messages": new_messages
+                                                        })
+                                                        .to_string(),
+                                                    ),
+                                                    data: None,
+                                                }],
+                                            },
+                                        );
                                     }
                                 }
                             }
                             Some("get_messages") => {
-                                if let Ok(messages) = current_state.get_message_history() {
-                                    return (
-                                        serde_json::to_vec(&current_state).unwrap(),
-                                        WebsocketResponse {
-                                            messages: vec![WebsocketMessage {
-                                                ty: MessageType::Text,
-                                                text: Some(
-                                                    serde_json::json!({
-                                                        "type": "message_update",
-                                                        "messages": messages
-                                                    })
-                                                    .to_string(),
-                                                ),
-                                                data: None,
-                                            }],
-                                        },
-                                    );
+                                if let Ok(response) = current_state.handle_get_messages() {
+                                    return (serde_json::to_vec(&current_state).unwrap(), response);
                                 }
                             }
                             _ => {
@@ -707,7 +782,7 @@ impl WebSocketGuest for Component {
 }
 
 impl MessageServerClientGuest for Component {
-    fn handle_send(msg: Vec<u8>, state: Json) -> Json {
+    fn handle_send(_msg: Vec<u8>, state: Json) -> Json {
         log("Handling message server client send");
         //let msg_str = String::from_utf8(msg).unwrap();
         //log(&msg_str);
