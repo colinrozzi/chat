@@ -138,7 +138,7 @@ body {
     max-width: 85%;
     padding: 0.75rem 1rem;
     border-radius: 1rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0;
     line-height: 1.4;
     word-wrap: break-word;
     position: relative;
@@ -354,4 +354,51 @@ body {
     padding: 2rem;
     font-size: 0.875rem;
     line-height: 1.5;
+}
+
+/* Child response styling */
+.child-responses {
+    margin: 0.5rem 0;
+    padding-left: 1rem;
+    border-left: 2px solid var(--gray-200);
+}
+
+.child-response {
+    background: var(--gray-100);
+    padding: 0.5rem;
+    margin: 0.25rem 0;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+}
+
+.child-response-header {
+    color: var(--gray-700);
+}
+
+/* Ensure message spacing remains consistent */
+.message-tree {
+    margin-bottom: 0.5rem;
+}
+
+.child-response-content {
+    color: var(--gray-800);
+}
+.message-tree::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -1rem;
+    width: 2px;
+    height: 100%;
+    background: var(--gray-300);
+}
+
+/* Rollup message styling */
+.rollup-message {
+    font-size: 0.75rem;
+    color: var(--gray-700);
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+    border-radius: 0.25rem;
+    background: var(--gray-100);
 }

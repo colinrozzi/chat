@@ -125,55 +125,49 @@ function renderMessageTree(messages) {
     return rootMessages.map(msg => renderMessageTreeNode(msg, messageChildren)).join('');
 }
 
+// Update renderMessageTreeNode to handle both message and rollup types
 function renderMessageTreeNode(message, messageChildren) {
-    const children = messageChildren.get(message.id) || [];
-    const isRollup = message.type === 'rollup';
-    
-    if (isRollup) {
-        // Render rollup message differently
-        const childResponses = message.child_responses || [];
+    // Check if this is a rollup or a regular message
+    if (message.type === 'Rollup') {
+        const rollup = message;
         return `
             <div class="message-tree">
-                <div class="rollup-message">
-                    Processed by ${childResponses.length} actor${childResponses.length !== 1 ? 's' : ''}
+                ${rollup.child_responses.length > 0 ? `
+                    <div class="child-responses">
+                        ${rollup.child_responses.map(response => `
+                            <div class="child-response">
+                                <div class="child-response-header">
+                                    <span>Actor: ${response.child_id}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+                ${messageChildren.get(message.id)?.map(child => 
+                    renderMessageTreeNode(child, messageChildren)
+                ).join('') || ''}
+            </div>
+        `;
+    } else if (message.type === 'Message') {
+        const regularMessage = message;
+        return `
+            <div class="message-tree">
+                <div class="message ${regularMessage.role} ${regularMessage.id === selectedMessageId ? 'selected' : ''}" 
+                     data-id="${regularMessage.id}">
+                    ${formatMessage(regularMessage.content)}
+                    <div class="message-actions">
+                        <button class="message-action-button copy-button">
+                            Copy ID
+                        </button>
+                    </div>
                 </div>
-                ${childResponses.map(response => {
-                    const childMsg = messageCache.get(response.message_id);
-                    if (!childMsg) return '';
-                    return `
-                        <div class="child-response">
-                            <div class="child-response-header">
-                                <span>Actor: ${response.child_id}</span>
-                                <span>ID: ${response.message_id.slice(0, 8)}...</span>
-                            </div>
-                            <div class="child-response-content">
-                                ${formatMessage(childMsg.content)}
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
+                ${messageChildren.get(regularMessage.id)?.map(child => 
+                    renderMessageTreeNode(child, messageChildren)
+                ).join('') || ''}
             </div>
         `;
     }
-
-    return `
-        <div class="message-tree">
-            <div class="message ${message.role} ${message.id === selectedMessageId ? 'selected' : ''}" 
-                 data-id="${message.id}">
-                ${formatMessage(message.content)}
-                <div class="message-actions">
-                    <button class="message-action-button copy-button">
-                        Copy ID
-                    </button>
-                </div>
-            </div>
-            ${children.length > 0 ? `
-                <div class="child-responses">
-                    ${children.map(child => renderMessageTreeNode(child, messageChildren)).join('')}
-                </div>
-            ` : ''}
-        </div>
-    `;
+    return '';
 }
 
 // UI Elements
@@ -381,10 +375,6 @@ function handleWebSocketMessage(data) {
                 console.log("Updating message cache with new messages:", data.messages);
                 // Update message cache with new messages
                 data.messages.forEach(msg => {
-                    // Check if the message is a rollup
-                    if (msg.child_responses) {
-                        msg.type = 'rollup';  // Mark as rollup message
-                    }
                     messageCache.set(msg.id, msg);
                 });
                 
@@ -396,11 +386,12 @@ function handleWebSocketMessage(data) {
                     }
                 }
                 
-                // Render messages without typing indicator
-                renderMessages(Array.from(messageCache.values()), false);
+                // Get all messages in order and render
+                const allMessages = Array.from(messageCache.values());
+                renderMessages(allMessages, false);
                 
                 // Update head ID if present
-                updateHeadId(Array.from(messageCache.values()));
+                updateHeadId(allMessages);
             }
             break;
         case 'children_update':
