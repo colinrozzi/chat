@@ -105,8 +105,14 @@ function renderMessageTreeNode(message, messageChildren) {
 }
 
 function renderActorResponsesSection(messageId, children) {
+    console.log('Rendering actor responses for message:', messageId);
+    console.log('Children:', children);
+    
     const actorResponses = children.filter(child => child.type === 'Rollup');
+    console.log('Actor responses:', actorResponses);
+    
     const totalResponses = actorResponses.reduce((sum, rollup) => {
+        console.log('Rollup child_responses:', rollup.child_responses);
         return sum + (rollup.child_responses ? rollup.child_responses.length : 0);
     }, 0);
     
@@ -118,16 +124,23 @@ function renderActorResponsesSection(messageId, children) {
         if (!rollup.child_responses) {
             return '';
         }
-        return rollup.child_responses.map(response => `
-            <div class="actor-response">
-                <div class="actor-response-content">
-                    <div class="actor-response-header">
-                        <span class="actor-name">Actor: ${response.child_id}</span>
+        
+        return rollup.child_responses.map(response => {
+            // Extract the actual response content
+            const responseContent = response.content || 'No response content';
+            const actorId = response.child_id || 'Unknown Actor';
+            
+            return `
+                <div class="actor-response">
+                    <div class="actor-response-content">
+                        <div class="actor-response-header">
+                            <span class="actor-name">Actor: ${actorId}</span>
+                        </div>
+                        ${formatMessage(responseContent)}
                     </div>
-                    ${formatMessage(response.content || 'No response content')}
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }).join('');
 
     return `
@@ -145,15 +158,46 @@ function renderActorResponsesSection(messageId, children) {
     `;
 }
 
-function toggleActorResponses(messageId) {
+async function fetchMessageContent(messageId) {
+    try {
+        console.log('Fetching content for message:', messageId);
+        sendWebSocketMessage({
+            type: 'get_message_content',
+            message_id: messageId
+        });
+        return true;
+    } catch (error) {
+        console.error('Error fetching message content:', error);
+        return false;
+    }
+}
+
+async function toggleActorResponses(messageId) {
     const wrapper = document.querySelector(`.actor-responses-wrapper[data-message-id="${messageId}"]`);
-    if (wrapper) {
-        const indicator = wrapper.querySelector('.actor-responses-indicator');
-        const responses = wrapper.querySelector('.actor-responses');
-        if (indicator && responses) {
-            indicator.classList.toggle('expanded');
-            responses.classList.toggle('expanded');
+    if (!wrapper) return;
+
+    const indicator = wrapper.querySelector('.actor-responses-indicator');
+    const responses = wrapper.querySelector('.actor-responses');
+    const loadingSpinner = wrapper.querySelector('.loading-spinner');
+    
+    if (!indicator || !responses) return;
+
+    // If we're expanding and don't have content yet (only showing loading state)
+    if (!responses.classList.contains('expanded') && responses.children.length === 0) {
+        // Show loading state
+        responses.innerHTML = '<div class="loading-spinner"></div>';
+        responses.classList.add('expanded');
+        indicator.classList.add('expanded');
+
+        // Fetch the content
+        const success = await fetchMessageContent(messageId);
+        if (!success) {
+            responses.innerHTML = '<div class="error-message">Failed to load responses</div>';
         }
+    } else {
+        // Just toggle visibility if we already have the content
+        indicator.classList.toggle('expanded');
+        responses.classList.toggle('expanded');
     }
 }
 
