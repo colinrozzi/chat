@@ -1,113 +1,178 @@
 # Chat Actor System
 
-A WebAssembly-based chat system that can manage child actors. Each child can process the chat's messages and take actions based on them, returning results that feed into future messages.
+A WebAssembly-based actor system that enables dynamic chat interactions with child actor capabilities. The system allows for real-time message processing, AI-powered responses via Claude API, and extensible child actor management.
 
-## Core Concept
+## Overview
 
-The chat actor serves as a parent that can spawn and manage child actors. When a new message becomes the head of the chat, all children are notified and can:
-- Process the message
-- Take actions
-- Return results that become part of the conversation
+The chat actor system serves as a parent actor that can:
+- Manage a conversation thread with message history
+- Interact with the Claude API for AI responses
+- Spawn and manage child actors dynamically
+- Process messages through child actors for enhanced functionality
+- Maintain real-time WebSocket connections for updates
+- Serve a web interface for user interaction
 
-## Features
+## Core Features
 
-- 🌐 Web interface for chat interaction
-- 👥 Child actor management panel
-  - View available actors
-  - Start/stop child actors
-  - Monitor running actors
-- 💬 Real-time message updates via WebSocket
-- 🤖 Integration with Claude API
-- 🔗 Linked message structure with parent/child relationships
-- 📝 Results from child actors feed into conversation
+- 🎭 **Actor System Architecture**
+  - Parent/child actor relationship model
+  - Dynamic actor spawning and management
+  - Inter-actor message passing
+
+- 💬 **Chat Functionality**
+  - Threaded message history
+  - Message rollups with child actor responses
+  - Real-time updates via WebSocket
+  - Web interface for interaction
+
+- 🤖 **Claude API Integration**
+  - Automated response generation
+  - Context-aware conversations
+  - Message history management
+
+- 👥 **Child Actor Framework**
+  - Dynamic child actor discovery
+  - Runtime actor management
+  - Extensible actor interface
+  - Message notification system
 
 ## Project Structure
 
 ```
 chat/
-├── actor.toml          # Actor manifest
-├── assets/            
-│   ├── init.json      # Initialization data
-│   ├── index.html     # Web interface
-│   ├── styles.css     # CSS styles
-│   ├── chat.js        # Frontend JavaScript
-│   └── api-key.txt    # Claude API key
-├── children/           # Child actor manifests
-│   └── example-child.toml
-└── src/
-    ├── lib.rs         # Actor implementation
-    └── bindings.rs    # Generated bindings
+├── Cargo.toml           # Rust project configuration
+├── actor.toml           # Main actor manifest
+├── assets/             
+│   ├── init.json       # Actor initialization data
+│   ├── index.html      # Web interface
+│   ├── styles.css      # UI styling
+│   ├── chat.js         # Frontend JavaScript
+│   ├── api-key.txt     # Claude API credentials
+│   └── children/       # Child actor manifests
+├── src/
+│   ├── lib.rs          # Main actor implementation
+│   ├── children.rs     # Child actor management
+│   └── bindings.rs     # Generated WIT bindings
+└── wit/                # WebAssembly interface definitions
 ```
 
-## Quick Start
+## Technical Details
+
+### Message Structure
+
+The system uses a sophisticated message structure:
+```rust
+struct Message {
+    role: String,        // "user" or "assistant"
+    content: String,     // Message content
+    parent: Option<String>, // Parent message ID
+    id: Option<String>   // Message identifier
+}
+
+enum StoredMessage {
+    Message(Message),
+    Rollup(RollupMessage)
+}
+
+struct RollupMessage {
+    original_message_id: String,
+    child_responses: Vec<ChildResponse>,
+    parent: Option<String>,
+    id: Option<String>
+}
+```
+
+### Child Actor System
+
+Child actors can:
+- Process incoming messages
+- Generate responses
+- Contribute to message rollups
+- Maintain independent state
+- Be started/stopped dynamically
+
+### Communication Channels
+
+The system implements multiple communication channels:
+- HTTP Server (Port 8084): Web interface and API endpoints
+- WebSocket Server (Port 8085): Real-time updates and commands
+- Message Server: Inter-actor communication
+- HTTP Client: Claude API interaction
+
+## Setup & Development
+
+### Prerequisites
+
+- Rust toolchain with `wasm32-unknown-unknown` target
+- Theater runtime system
+- Claude API key
+
+### Installation
 
 1. Clone the repository
-2. Create an `api-key.txt` file in the assets directory with your Claude API key
-3. Build the actor:
-```bash
-cargo build --release
-```
-4. Run using the Theater runtime:
-```bash
-theater run actor.toml
-```
-5. Open `http://localhost:8084` in your browser
+2. Set up the Claude API key:
+   ```bash
+   echo "your-api-key" > assets/api-key.txt
+   ```
+3. Build the project:
+   ```bash
+   cargo build --release
+   ```
 
-## How It Works
+### Running
 
-1. **Message Flow**
-   - User sends a message
-   - Message is saved as new head
-   - All child actors are notified
-   - Children process message and return results
-   - Results are collected for next message
-   - Claude generates response
-   - Process repeats
+1. Start the Theater runtime:
+   ```bash
+   theater run actor.toml
+   ```
+2. Access the web interface at `http://localhost:8084`
 
-2. **Child Management**
-   - Child actors are defined by manifests in the `children/` directory
-   - UI shows available and running children
-   - Children can be started/stopped through the interface
-   - Each child maintains its own state
+### Creating Child Actors
 
-3. **Communication**
-   - WebSocket for real-time updates
-   - HTTP server for web interface
-   - Message-server for parent/child communication
-   - Results feed forward into conversation
+1. Create a new manifest in `assets/children/`:
+   ```toml
+   name = "Example Actor"
+   description = "Handles specific message processing"
+   version = "0.1.0"
+   component_path = "path/to/component.wasm"
+   ```
+2. Implement the actor interface in your component
+3. Build and deploy to the children directory
 
-## Development
+## API Endpoints
 
-The project is built on the Theater actor system and uses:
-- Rust for actor implementation
-- WebAssembly for actor execution
-- Claude API for chat responses
-- Web technologies for the interface
-
-### Building
-
-```bash
-# Build the actor
-cargo build --release
-
-# Run with Theater
-theater run actor.toml
-```
+- `GET /api/messages`: Retrieve full message history
+- `WS /`: WebSocket endpoint for real-time updates
+- Commands:
+  - `get_available_children`: List available child actors
+  - `get_running_children`: List active child actors
+  - `start_child`: Launch a child actor
+  - `stop_child`: Terminate a child actor
+  - `send_message`: Send a new chat message
+  - `get_messages`: Retrieve message updates
 
 ## Current Status
 
-The system currently supports:
-- Basic chat functionality
-- Child actor management UI
-- Starting/stopping children
-- Message notification to children
+### Implemented Features
+- Basic chat functionality with AI responses
+- Child actor management system
+- Real-time WebSocket updates
+- Message rollup system
+- Web interface
+- Dynamic child actor discovery
 
-Next steps:
-- Implement directory scanning for available children
-- Add error handling for child operations
-- Enhance child result processing
-- Add example child actors
+### In Progress
+- Enhanced error handling
+- Child actor state persistence
+- Extended child actor capabilities
+- Performance optimizations
 
 ## Contributing
 
-Contributions are welcome! The project is actively developing and there are many areas for improvement.
+Contributions are welcome! Areas for improvement include:
+- Additional child actor implementations
+- Enhanced error handling
+- UI/UX improvements
+- Documentation expansion
+- Testing infrastructure
+
