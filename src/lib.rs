@@ -1,14 +1,14 @@
+mod api;
 mod bindings;
 mod children;
+mod handlers;
 mod messages;
 mod state;
-mod handlers;
-mod api;
 
 use bindings::exports::ntwk::theater::actor::Guest as ActorGuest;
 use bindings::exports::ntwk::theater::http_server::Guest as HttpGuest;
-use bindings::exports::ntwk::theater::websocket_server::Guest as WebSocketGuest;
 use bindings::exports::ntwk::theater::message_server_client::Guest as MessageServerClientGuest;
+use bindings::exports::ntwk::theater::websocket_server::Guest as WebSocketGuest;
 use bindings::ntwk::theater::filesystem::read_file;
 use bindings::ntwk::theater::runtime::log;
 use bindings::ntwk::theater::types::Json;
@@ -90,3 +90,4 @@ impl MessageServerClientGuest for Component {
 }
 
 bindings::export!(Component with_types_in bindings);
+

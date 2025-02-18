@@ -1,7 +1,7 @@
-use super::{StoredMessage};
 use crate::bindings::ntwk::theater::message_server_host::request;
+use crate::messages::ChainEntry;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Request {
@@ -16,36 +16,83 @@ pub enum Action {
     All(()),
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct PutResponse {
+    key: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct GetResponse {
+    key: String,
+    value: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct AllResponse {
+    data: Vec<GetResponse>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+enum ResponseData {
+    Put(PutResponse),
+    Get(GetResponse),
+    All(AllResponse),
+    Error(String),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Response {
+    status: String,
+    data: ResponseData,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MessageStore {
-    store_id: String,
+    pub store_id: String,
+    pub cache: HashMap<String, ChainEntry>,
 }
 
 impl MessageStore {
     pub fn new(store_id: String) -> Self {
-        Self { store_id }
+        Self {
+            store_id,
+            cache: HashMap::new(),
+        }
     }
 
-    pub fn save_message(&self, msg: &StoredMessage) -> Result<String, Box<dyn std::error::Error>> {
+    pub fn save_message(
+        &mut self,
+        mut entry: ChainEntry,
+    ) -> Result<ChainEntry, Box<dyn std::error::Error>> {
         let req = Request {
             _type: "request".to_string(),
-            data: Action::Put(serde_json::to_vec(msg)?),
+            data: Action::Put(serde_json::to_vec(&entry)?),
         };
 
         let request_bytes = serde_json::to_vec(&req)?;
         let response_bytes = request(&self.store_id, &request_bytes)?;
 
-        let response: Value = serde_json::from_slice(&response_bytes)?;
-        if response["status"].as_str() == Some("ok") {
-            Ok(response["key"]
-                .as_str()
-                .map(|s| s.to_string())
-                .ok_or("No key in response")?)
+        let response: Response = serde_json::from_slice(&response_bytes)?;
+        if response.status == "ok".to_string() {
+            match response.data {
+                ResponseData::Put(PutResponse { key }) => {
+                    entry.id = Some(key.clone());
+                    self.cache.insert(key.clone(), entry.clone());
+                    Ok(entry)
+                }
+                ResponseData::Error(e) => Err(e.into()),
+                _ => Err("Unexpected response data".into()),
+            }
         } else {
             Err("Failed to save message".into())
         }
     }
 
-    pub fn load_message(&self, id: &str) -> Result<StoredMessage, Box<dyn std::error::Error>> {
+    pub fn load_message(&mut self, id: &str) -> Result<ChainEntry, Box<dyn std::error::Error>> {
+        if let Some(msg) = self.cache.get(id) {
+            return Ok(msg.clone());
+        }
+
         let req = Request {
             _type: "request".to_string(),
             data: Action::Get(id.to_string()),
@@ -54,27 +101,17 @@ impl MessageStore {
         let request_bytes = serde_json::to_vec(&req)?;
         let response_bytes = request(&self.store_id, &request_bytes)?;
 
-        let response: Value = serde_json::from_slice(&response_bytes)?;
-        if response["status"].as_str() == Some("ok") {
-            if let Some(value) = response.get("value") {
-                let bytes = value
-                    .as_array()
-                    .ok_or("Expected byte array")?
-                    .iter()
-                    .map(|v| v.as_u64().unwrap_or(0) as u8)
-                    .collect::<Vec<u8>>();
-
-                let mut msg: StoredMessage = serde_json::from_slice(&bytes)?;
-
-                // Add ID to the correct variant
-                match &mut msg {
-                    StoredMessage::Message(m) => m.id = Some(id.to_string()),
-                    StoredMessage::Rollup(r) => r.id = Some(id.to_string()),
+        let response: Response = serde_json::from_slice(&response_bytes)?;
+        if response.status == "ok".to_string() {
+            match response.data {
+                ResponseData::Get(GetResponse { key, value }) => {
+                    let mut msg: ChainEntry = serde_json::from_slice(&value)?;
+                    msg.id = Some(key.clone());
+                    self.cache.insert(key, msg.clone());
+                    Ok(msg)
                 }
-
-                Ok(msg)
-            } else {
-                Err("No value in response".into())
+                ResponseData::Error(e) => Err(e.into()),
+                _ => Err("Unexpected response data".into()),
             }
         } else {
             Err("Failed to load message".into())

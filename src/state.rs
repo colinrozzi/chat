@@ -1,12 +1,12 @@
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use crate::messages::{Message, StoredMessage, RollupMessage};
-use crate::messages::store::MessageStore;
-use crate::messages::history::MessageHistory;
 use crate::api::claude::ClaudeClient;
-use crate::bindings::ntwk::theater::runtime::{log, spawn};
 use crate::bindings::ntwk::theater::message_server_host::request;
+use crate::bindings::ntwk::theater::runtime::{log, spawn};
+use crate::messages::store::MessageStore;
+use crate::messages::{ChainEntry, ChildMessage, Message, MessageData};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
+use std::error::Error;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChildActor {
@@ -14,17 +14,19 @@ pub struct ChildActor {
     pub manifest_name: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Chat {
-    pub head: Option<String>,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChildResponse {
+    child_id: String,
+    status: String,
+    msg: ChildMessage,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct State {
-    pub chat: Chat,
-    pub api_key: String,
+    pub head: Option<String>,
+    pub claude_client: ClaudeClient,
     pub connected_clients: HashMap<String, bool>,
-    pub store_id: String,
+    pub store: MessageStore,
     pub websocket_port: u16,
     pub children: HashMap<String, ChildActor>,
     pub actor_messages: HashMap<String, Vec<u8>>,
@@ -38,140 +40,93 @@ impl State {
         head: Option<String>,
     ) -> Self {
         Self {
-            chat: Chat { head },
-            api_key,
+            head,
+            claude_client: ClaudeClient::new(api_key.clone()),
             connected_clients: HashMap::new(),
-            store_id,
+            store: MessageStore::new(store_id.clone()),
             websocket_port,
             children: HashMap::new(),
             actor_messages: HashMap::new(),
         }
     }
 
-    pub fn handle_send_message(
-        &mut self,
-        content: &str,
-    ) -> Result<Vec<StoredMessage>, Box<dyn std::error::Error>> {
-        let store = MessageStore::new(self.store_id.clone());
-        let history = MessageHistory::new(store);
-
-        // Process user message and get rollup ID
-        log("Processing user message");
-        let user_rollup_id = self.process_message(content, "user", self.chat.head.clone())?;
-
-        // Wait a moment for actor responses to be processed
-        log("Waiting for actor responses...");
-        std::thread::sleep(std::time::Duration::from_millis(100));
-
-        // Get updated message history including actor responses
-        log("Getting updated message history");
-        let messages = history.get_message_history(Some(user_rollup_id.clone()))?;
-
-        // Generate AI response using updated message history
-        log("Generating AI response");
-        let claude = ClaudeClient::new(self.api_key.clone());
-        let ai_response = claude.generate_response(messages)?;
-
-        // Process assistant message with user rollup as parent
-        log("Processing assistant message");
-        let assistant_rollup_id =
-            self.process_message(&ai_response, "assistant", Some(user_rollup_id.clone()))?;
-
-        // Return all new messages
-        let mut new_messages = Vec::new();
-        let store = MessageStore::new(self.store_id.clone());
-
-        // Load user message chain
-        if let Ok(user_msg) = store.load_message(&user_rollup_id) {
-            new_messages.push(user_msg);
-        }
-
-        // Get and add user's child responses
-        if let Ok(user_children) = history.get_child_responses(&user_rollup_id) {
-            new_messages.extend(user_children);
-        }
-
-        // Load assistant message chain
-        if let Ok(assistant_msg) = store.load_message(&assistant_rollup_id) {
-            new_messages.push(assistant_msg);
-        }
-
-        // Get and add assistant's child responses
-        if let Ok(assistant_children) = history.get_child_responses(&assistant_rollup_id) {
-            new_messages.extend(assistant_children);
-        }
-
-        Ok(new_messages)
+    pub fn add_to_chain(&mut self, data: MessageData) -> ChainEntry {
+        let entry = ChainEntry {
+            parent: self.head.clone(),
+            id: None,
+            data,
+        };
+        let entry = self.store.save_message(entry).unwrap();
+        self.head = Some(entry.id.clone().unwrap());
+        entry
     }
 
-    fn process_message(
-        &mut self,
-        content: &str,
-        role: &str,
-        parent_id: Option<String>,
-    ) -> Result<String, Box<dyn std::error::Error>> {
-        let store = MessageStore::new(self.store_id.clone());
-        
-        // Create and save initial message
-        let msg = Message::new(role.to_string(), content.to_string(), parent_id);
-        let msg_id = store.save_message(&StoredMessage::Message(msg))?;
+    pub fn add_user_message(&mut self, content: &str) {
+        let msg = Message {
+            content: content.to_string(),
+            role: "user".to_string(),
+        };
 
-        // Notify children and collect their responses
-        let child_responses = self.notify_children(&msg_id)?;
+        self.add_to_chain(MessageData::Chat(msg));
 
-        // Create and save rollup message if there are any child responses
-        if !child_responses.is_empty() {
-            let rollup = RollupMessage {
-                original_message_id: msg_id.clone(),
-                child_responses,
-                parent: Some(msg_id.clone()),
-                id: None,
-            };
-            let rollup_id = store.save_message(&StoredMessage::Rollup(rollup))?;
-            // Update head to rollup
-            self.update_head(rollup_id.clone())?;
-            Ok(rollup_id)
-        } else {
-            // If no child responses, just return the message ID
-            self.update_head(msg_id.clone())?;
-            Ok(msg_id)
+        let messages = self.get_anthropic_messages();
+
+        match self.claude_client.generate_response(messages) {
+            Ok(response) => {
+                let anthropic_msg = Message {
+                    content: response,
+                    role: "assistant".to_string(),
+                };
+                self.add_to_chain(MessageData::Chat(anthropic_msg));
+            }
+            Err(e) => {
+                log(&format!("Failed to generate completion: {}", e));
+            }
         }
     }
 
-    pub fn notify_children(
-        &mut self,
-        head_id: &str,
-    ) -> Result<Vec<crate::messages::ChildResponse>, Box<dyn std::error::Error>> {
-        let mut responses = Vec::new();
+    pub fn get_anthropic_messages(&mut self) -> Vec<Message> {
+        let mut messages = vec![];
+        let chain = self.get_chain();
 
-        for (actor_id, _child) in &self.children {
-            // Notify each child of the new head
-            if let Ok(response_bytes) = request(
-                actor_id,
-                &serde_json::to_vec(&json!({
-                    "msg_type": "head-update",
-                    "data": {
-                        "head_id": head_id
-                    }
-                }))?,
-            ) {
-                if let Ok(response) = serde_json::from_slice::<serde_json::Value>(&response_bytes) {
-                    if response["status"] == "ok" {
-                        if let Some(message_id) = response["message_id"].as_str() {
-                            responses.push(crate::messages::ChildResponse {
-                                child_id: actor_id.clone(),
-                                message_id: message_id.to_string(),
-                            });
-                        }
-                    }
+        for entry in chain {
+            match entry.data {
+                MessageData::Chat(msg) => {
+                    messages.push(msg.clone());
+                }
+                MessageData::Child(child_msg) => {
+                    let text = child_msg.text.clone();
+                    let actor_msg = format!("<actor id={}>{}</actor>", child_msg.child_id, text);
+                    let chat_msg = messages.last_mut().unwrap();
+                    chat_msg.content.push_str(&actor_msg);
                 }
             }
         }
 
-        Ok(responses)
+        messages
     }
 
-    pub fn start_child(&mut self, manifest_name: &str) -> Result<String, Box<dyn std::error::Error>> {
+    pub fn get_chain(&mut self) -> Vec<ChainEntry> {
+        let mut chain = vec![];
+
+        let mut current_id = self.head.clone();
+        while let Some(id) = current_id {
+            let entry = self.store.load_message(&id).unwrap();
+            current_id = entry.parent.clone();
+            chain.push(entry);
+        }
+
+        chain
+    }
+
+    pub fn get_message(&mut self, message_id: &str) -> Result<ChainEntry, Box<dyn Error>> {
+        self.store.load_message(message_id)
+    }
+
+    pub fn start_child(
+        &mut self,
+        manifest_name: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let manifest_path = format!(
             "/Users/colinrozzi/work/actors/chat/assets/children/{}.toml",
             manifest_name
@@ -192,7 +147,7 @@ impl State {
             &serde_json::to_vec(&json!({
                 "msg_type": "introduction",
                 "data": {
-                    "store_id": self.store_id.clone()
+                    "store_id": self.store.store_id.clone(),
                 }
             }))?,
         ) {
@@ -200,10 +155,5 @@ impl State {
         }
 
         Ok(actor_id)
-    }
-
-    pub fn update_head(&mut self, message_id: String) -> Result<(), Box<dyn std::error::Error>> {
-        self.chat.head = Some(message_id);
-        Ok(())
     }
 }

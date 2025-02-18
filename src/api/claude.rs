@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 use crate::bindings::ntwk::theater::http_client::{send_http, HttpRequest};
 use crate::messages::Message;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AnthropicMessage {
@@ -9,6 +9,7 @@ pub struct AnthropicMessage {
     pub content: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ClaudeClient {
     api_key: String,
 }
@@ -38,13 +39,11 @@ impl ClaudeClient {
                 ("x-api-key".to_string(), self.api_key.clone()),
                 ("anthropic-version".to_string(), "2023-06-01".to_string()),
             ],
-            body: Some(
-                serde_json::to_vec(&json!({
-                    "model": "claude-3-5-sonnet-20241022",
-                    "max_tokens": 1024,
-                    "messages": anthropic_messages,
-                }))?,
-            ),
+            body: Some(serde_json::to_vec(&json!({
+                "model": "claude-3-5-sonnet-20241022",
+                "max_tokens": 1024,
+                "messages": anthropic_messages,
+            }))?),
         };
 
         let http_response = send_http(&request);

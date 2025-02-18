@@ -2,8 +2,6 @@ use crate::bindings::exports::ntwk::theater::http_server::{HttpRequest, HttpResp
 use crate::bindings::ntwk::theater::filesystem::read_file;
 use crate::bindings::ntwk::theater::types::Json;
 use crate::state::State;
-use crate::messages::history::MessageHistory;
-use crate::messages::store::MessageStore;
 use serde_json::json;
 
 pub fn handle_request(req: HttpRequest, state: Json) -> (HttpResponse, Json) {
@@ -51,36 +49,24 @@ pub fn handle_request(req: HttpRequest, state: Json) -> (HttpResponse, Json) {
         }
 
         ("GET", "/api/messages") => {
-            let current_state: State = serde_json::from_slice(&state).unwrap();
-            let store = MessageStore::new(current_state.store_id.clone());
-            let history = MessageHistory::new(store);
-            
-            match history.get_full_message_tree(current_state.chat.head.clone()) {
-                Ok(messages) => (
-                    HttpResponse {
-                        status: 200,
-                        headers: vec![
-                            ("Content-Type".to_string(), "application/json".to_string()),
-                        ],
-                        body: Some(
-                            serde_json::to_vec(&json!({
-                                "status": "success",
-                                "messages": messages
-                            }))
-                            .unwrap(),
-                        ),
-                    },
-                    state,
-                ),
-                Err(_) => (
-                    HttpResponse {
-                        status: 500,
-                        headers: vec![],
-                        body: Some(b"Failed to load messages".to_vec()),
-                    },
-                    state,
-                ),
-            }
+            let mut current_state: State = serde_json::from_slice(&state).unwrap();
+            let messages = current_state.get_chain();
+            (
+                HttpResponse {
+                    status: 200,
+                    headers: vec![
+                        ("Content-Type".to_string(), "application/json".to_string()),
+                    ],
+                    body: Some(
+                        serde_json::to_vec(&json!({
+                            "status": "success",
+                            "messages": messages
+                        }))
+                        .unwrap(),
+                    ),
+                },
+                state,
+            )   
         }
         // Default 404 response
         _ => (

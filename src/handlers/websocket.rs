@@ -1,14 +1,17 @@
 use crate::bindings::exports::ntwk::theater::websocket_server::{
     MessageType, WebsocketMessage, WebsocketResponse,
 };
+use crate::bindings::ntwk::theater::runtime::log;
 use crate::bindings::ntwk::theater::types::Json;
-use crate::state::State;
-use crate::messages::history::MessageHistory;
-use crate::messages::store::MessageStore;
 use crate::children::scan_available_children;
+use crate::state::State;
 use serde_json::{json, Value};
 
 pub fn handle_message(msg: WebsocketMessage, state: Json) -> (Json, WebsocketResponse) {
+    log("Handling WebSocket message");
+
+    log(&format!("Message: {:?}", msg));
+
     let mut current_state: State = serde_json::from_slice(&state).unwrap();
 
     match msg.ty {
@@ -19,9 +22,7 @@ pub fn handle_message(msg: WebsocketMessage, state: Json) -> (Json, WebsocketRes
                         Some("get_available_children") => {
                             handle_get_available_children(&current_state)
                         }
-                        Some("get_running_children") => {
-                            handle_get_running_children(&current_state)
-                        }
+                        Some("get_running_children") => handle_get_running_children(&current_state),
                         Some("start_child") => {
                             if let Some(manifest_name) = command["manifest_name"].as_str() {
                                 handle_start_child(&mut current_state, manifest_name)
@@ -43,14 +44,29 @@ pub fn handle_message(msg: WebsocketMessage, state: Json) -> (Json, WebsocketRes
                                 default_response(&current_state)
                             }
                         }
-                        Some("get_messages") => handle_get_messages(&current_state),
-                        Some("get_message_content") => {
+                        Some("get_message") => {
                             if let Some(message_id) = command["message_id"].as_str() {
-                                handle_get_message_content(&current_state, message_id)
+                                let message = current_state.get_message(message_id).unwrap();
+                                (
+                                    serde_json::to_vec(&current_state).unwrap(),
+                                    WebsocketResponse {
+                                        messages: vec![WebsocketMessage {
+                                            ty: MessageType::Text,
+                                            text: Some(
+                                                json!({
+                                                    "type": "message",
+                                                    "message": message
+                                                })
+                                                .to_string(),
+                                            ),
+                                            data: None,
+                                        }],
+                                    },
+                                )
                             } else {
                                 default_response(&current_state)
                             }
-                        },
+                        }
                         _ => default_response(&current_state),
                     }
                 } else {
@@ -191,79 +207,23 @@ fn handle_stop_child(state: &mut State, actor_id: &str) -> (Json, WebsocketRespo
 }
 
 fn handle_send_message(state: &mut State, content: &str) -> (Json, WebsocketResponse) {
-    if let Ok(new_messages) = state.handle_send_message(content) {
-        (
-            serde_json::to_vec(state).unwrap(),
-            WebsocketResponse {
-                messages: vec![WebsocketMessage {
-                    ty: MessageType::Text,
-                    text: Some(
-                        json!({
-                            "type": "message_update",
-                            "messages": new_messages
-                        })
-                        .to_string(),
-                    ),
-                    data: None,
-                }],
-            },
-        )
-    } else {
-        default_response(state)
-    }
-}
-
-fn handle_get_message_content(state: &State, message_id: &str) -> (Json, WebsocketResponse) {
-    let store = MessageStore::new(state.store_id.clone());
-    let history = MessageHistory::new(store);
-    
-    if let Ok(responses) = history.get_child_responses(message_id) {
-        (
-            serde_json::to_vec(state).unwrap(),
-            WebsocketResponse {
-                messages: vec![WebsocketMessage {
-                    ty: MessageType::Text,
-                    text: Some(
-                        json!({
-                            "type": "message_content",
-                            "message_id": message_id,
-                            "content": responses
-                        })
-                        .to_string(),
-                    ),
-                    data: None,
-                }],
-            },
-        )
-    } else {
-        default_response(state)
-    }
-}
-
-fn handle_get_messages(state: &State) -> (Json, WebsocketResponse) {
-    let store = MessageStore::new(state.store_id.clone());
-    let history = MessageHistory::new(store);
-    
-    if let Ok(messages) = history.get_full_message_tree(state.chat.head.clone()) {
-        (
-            serde_json::to_vec(state).unwrap(),
-            WebsocketResponse {
-                messages: vec![WebsocketMessage {
-                    ty: MessageType::Text,
-                    text: Some(
-                        json!({
-                            "type": "message_update",
-                            "messages": messages
-                        })
-                        .to_string(),
-                    ),
-                    data: None,
-                }],
-            },
-        )
-    } else {
-        default_response(state)
-    }
+    state.add_user_message(content);
+    (
+        serde_json::to_vec(state).unwrap(),
+        WebsocketResponse {
+            messages: vec![WebsocketMessage {
+                ty: MessageType::Text,
+                text: Some(
+                    json!({
+                        "type": "messages_updated",
+                        "head": state.head,
+                    })
+                    .to_string(),
+                ),
+                data: None,
+            }],
+        },
+    )
 }
 
 fn default_response(state: &State) -> (Json, WebsocketResponse) {
