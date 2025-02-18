@@ -360,7 +360,10 @@ impl State {
                     .iter()
                     .map(|v| v.as_u64().unwrap_or(0) as u8)
                     .collect::<Vec<u8>>();
-                let mut msg: StoredMessage = serde_json::from_slice(&bytes)?;
+                log(&format!("Loaded message: {:?}", bytes));
+                let msg: Result<StoredMessage, serde_json::Error> = serde_json::from_slice(&bytes);
+                log(&format!("Loaded message: {:?}", msg));
+                let mut msg = msg?;
 
                 // Add ID to the correct variant
                 match &mut msg {
@@ -412,6 +415,8 @@ impl State {
                                 "Loading child message: {:?}",
                                 &child_response.message_id
                             ));
+                            let child_msg = self.load_message(&child_response.message_id)?;
+                            log(&format!("Child message: {:?}", child_msg));
                             if let Ok(child_msg) = self.load_message(&child_response.message_id) {
                                 log(&format!("Child message: {:?}", child_msg));
                                 match child_msg {
