@@ -120,11 +120,11 @@ function renderActorResponsesSection(messageId, children) {
         }
         return rollup.child_responses.map(response => `
             <div class="actor-response">
-                <div class="actor-response-header">
-                    Actor: ${response.child_id}
-                </div>
                 <div class="actor-response-content">
-                    ${formatMessage(response.content || '')}
+                    <div class="actor-response-header">
+                        <span class="actor-name">Actor: ${response.child_id}</span>
+                    </div>
+                    ${formatMessage(response.content || 'No response content')}
                 </div>
             </div>
         `).join('');
