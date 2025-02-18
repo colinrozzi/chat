@@ -217,10 +217,12 @@ function updateConnectionStatus(status) {
 }
 
 function connectWebSocket() {
+    console.log("Connecting to WebSocket...");
     updateConnectionStatus('connecting');
     ws = new WebSocket(WEBSOCKET_URL);
     
     ws.onopen = () => {
+        console.log("WebSocket connected");
         updateConnectionStatus('connected');
         reconnectAttempts = 0;
         sendWebSocketMessage({ type: 'get_messages' });
@@ -228,6 +230,7 @@ function connectWebSocket() {
     };
     
     ws.onclose = () => {
+        console.log("WebSocket disconnected");
         updateConnectionStatus('disconnected');
         if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             reconnectAttempts++;
@@ -243,6 +246,7 @@ function connectWebSocket() {
     ws.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
+            console.log("WebSocket message received:", data);
             handleWebSocketMessage(data);
         } catch (error) {
             console.error('Error parsing WebSocket message:', error);
@@ -251,9 +255,11 @@ function connectWebSocket() {
 }
 
 function sendWebSocketMessage(message) {
+    console.log("Sending WebSocket message:", message);
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(message));
     } else {
+        console.log("WebSocket not connected, can't send message");
         updateConnectionStatus('disconnected');
     }
 }
@@ -262,6 +268,7 @@ function handleWebSocketMessage(data) {
     switch(data.type) {
         case 'message_update':
             if (data.messages) {
+                console.log("Updating messages:", data.messages);
                 data.messages.forEach(msg => messageCache.set(msg.id, msg));
                 const allMessages = Array.from(messageCache.values());
                 renderMessages(allMessages);
@@ -269,41 +276,130 @@ function handleWebSocketMessage(data) {
             }
             break;
         case 'children_update':
-            if (data.available_children) availableChildren = data.available_children;
-            if (data.running_children) runningChildren = data.running_children;
+            console.log("Children update received:", data);
+            if (data.available_children) {
+                console.log("Updating available children:", data.available_children);
+                availableChildren = data.available_children;
+            }
+            if (data.running_children) {
+                console.log("Updating running children:", data.running_children);
+                runningChildren = data.running_children;
+            }
             renderChildPanel();
             break;
+        default:
+            console.log("Unknown message type:", data.type);
     }
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    connectWebSocket();
+// Child panel management
+function initializeChildPanel() {
+    console.log("Initializing child panel...");
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        console.log("WebSocket not ready, retrying in 1s...");
+        setTimeout(initializeChildPanel, 1000);
+        return;
+    }
     
-    const messageInput = document.getElementById('messageInput');
+    console.log("Requesting available children");
+    sendWebSocketMessage({
+        type: 'get_available_children'
+    });
     
-    // Auto-resize textarea
-    messageInput.addEventListener('input', () => {
-        messageInput.style.height = 'auto';
-        messageInput.style.height = Math.min(messageInput.scrollHeight, 200) + 'px';
+    console.log("Requesting running children");
+    sendWebSocketMessage({
+        type: 'get_running_children'
     });
+}
 
-    // Handle message sending
-    messageInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-            sendMessage();
-        }
+function startChild(manifestName) {
+    console.log("Starting child actor:", manifestName);
+    sendWebSocketMessage({
+        type: 'start_child',
+        manifest_name: manifestName
     });
+}
 
-    // Global shortcut for focusing input
-    document.addEventListener('keydown', (event) => {
-        if (event.key === '/' && document.activeElement !== messageInput) {
-            event.preventDefault();
-            messageInput.focus();
-        }
+function stopChild(actorId) {
+    console.log("Stopping child actor:", actorId);
+    sendWebSocketMessage({
+        type: 'stop_child',
+        actor_id: actorId
     });
-});
+}
+
+function updateHeadId(messages) {
+    const headElement = document.querySelector('.head-id');
+    if (messages && messages.length > 0) {
+        const lastMessage = messages[messages.length - 1];
+        headElement.textContent = `Head: ${lastMessage.id.slice(0, 8)}...`;
+    } else {
+        headElement.textContent = 'Head: None';
+    }
+}
+
+function renderChildPanel() {
+    console.log("Rendering child panel");
+    console.log("Available children:", availableChildren);
+    console.log("Running children:", runningChildren);
+    
+    const panel = document.getElementById('childPanel');
+    if (!panel) {
+        console.error("Child panel element not found!");
+        return;
+    }
+    
+    panel.innerHTML = `
+        <div class="panel-header">
+            <h2>Actor Management</h2>
+            <button class="collapse-button">×</button>
+        </div>
+        <div class="panel-content">
+            <div class="section">
+                <h3>Available Actors</h3>
+                ${availableChildren.length ? 
+                    availableChildren.map(child => `
+                        <div class="actor-item">
+                            <div class="actor-info">
+                                <span class="actor-name">${child.name || child.manifest_name}</span>
+                                ${child.description ? `<span class="actor-description">${child.description}</span>` : ''}
+                            </div>
+                            <button class="start-button" onclick="startChild('${child.manifest_name}')">
+                                Start
+                            </button>
+                        </div>
+                    `).join('') 
+                    : '<div class="empty-state">No available actors</div>'
+                }
+            </div>
+            <div class="section">
+                <h3>Running Actors</h3>
+                ${runningChildren.length ?
+                    runningChildren.map(child => `
+                        <div class="actor-item">
+                            <div class="actor-info">
+                                <span class="actor-name">${child.manifest_name}</span>
+                                <span class="actor-id">ID: ${child.actor_id}</span>
+                            </div>
+                            <button class="stop-button" onclick="stopChild('${child.actor_id}')">
+                                Stop
+                            </button>
+                        </div>
+                    `).join('')
+                    : '<div class="empty-state">No running actors</div>'
+                }
+            </div>
+        </div>
+    `;
+
+    const collapseButton = panel.querySelector('.collapse-button');
+    if (collapseButton) {
+        collapseButton.addEventListener('click', () => {
+            console.log("Toggle child panel collapse");
+            panel.classList.toggle('collapsed');
+        });
+    }
+}
 
 // Message sending
 async function sendMessage() {
@@ -336,3 +432,52 @@ async function sendMessage() {
         alert('Failed to send message. Please try again.');
     }
 }
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("Initializing application...");
+    const messageArea = document.getElementById('messageArea');
+    const messageInput = document.getElementById('messageInput');
+    
+    // Connect WebSocket
+    connectWebSocket();
+    
+    // Auto-resize textarea
+    messageInput.addEventListener('input', () => {
+        messageInput.style.height = 'auto';
+        messageInput.style.height = Math.min(messageInput.scrollHeight, 200) + 'px';
+    });
+
+    // Handle message sending
+    messageInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+    });
+
+    // Global shortcut for focusing input
+    document.addEventListener('keydown', (event) => {
+        if (event.key === '/' && document.activeElement !== messageInput) {
+            event.preventDefault();
+            messageInput.focus();
+        }
+    });
+});
+
+// Handle visibility changes
+document.addEventListener('visibilitychange', () => {
+    console.log("Visibility changed, document hidden:", document.hidden);
+    if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {
+        console.log("Page visible and WebSocket not connected, attempting reconnection");
+        connectWebSocket();
+    }
+});
+
+// Cleanup on page unload
+window.addEventListener('unload', () => {
+    console.log("Page unloading, cleaning up...");
+    if (ws) {
+        ws.close();
+    }
+});
