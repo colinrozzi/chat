@@ -127,8 +127,16 @@ function renderMessageTree(messages) {
 
 // Update renderMessageTreeNode to handle both message and rollup types
 function renderMessageTreeNode(message, messageChildren) {
-    // Check if this is a rollup or a regular message
+    // For Rollup type messages, we don't render them directly
+    if (message.type === 'Rollup') {
+        return '';
+    }
+    
+    // For regular messages (no type or type === 'Message')
     if (!message.type || message.type === 'Message') {
+        const children = messageChildren.get(message.id) || [];
+        const hasActorResponses = children.some(child => child.type === 'Rollup');
+        
         return `
             <div class="message-tree">
                 <div class="message ${message.role} ${message.id === selectedMessageId ? 'selected' : ''}" 
@@ -140,49 +148,55 @@ function renderMessageTreeNode(message, messageChildren) {
                         </button>
                     </div>
                 </div>
-                ${messageChildren.get(message.id)?.map(child => 
+                ${hasActorResponses ? renderActorResponsesSection(message.id, children) : ''}
+                ${children.filter(child => child.type !== 'Rollup').map(child => 
                     renderMessageTreeNode(child, messageChildren)
-                ).join('') || ''}
+                ).join('')}
             </div>
         `;
-    } else if (message.type === 'Rollup') {
-        const rollup = message;
-        return `
-            <div class="message-tree">
-                ${rollup.child_responses.length > 0 ? `
-                    <div class="child-responses">
-                        ${rollup.child_responses.map(response => `
-                            <div class="child-response">
-                                <div class="child-response-header">
-                                    <span>Actor: ${response.child_id}</span>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-                ${messageChildren.get(message.id)?.map(child => 
-                    renderMessageTreeNode(child, messageChildren)
-                ).join('') || ''}
-            </div>
-        `;
-    } else if (message.type === 'Message') {
-        const regularMessage = message;
-        return `
-            <div class="message-tree">
-                <div class="message ${regularMessage.role} ${regularMessage.id === selectedMessageId ? 'selected' : ''}" 
-                     data-id="${regularMessage.id}">
-                    ${formatMessage(regularMessage.content)}
-                    <div class="message-actions">
-                        <button class="message-action-button copy-button">
-                            Copy ID
-                        </button>
-                    </div>
+    }
+    
+    return '';
+}
+
+function renderActorResponsesSection(messageId, children) {
+    const actorResponses = children.filter(child => child.type === 'Rollup');
+    const totalResponses = actorResponses.reduce((sum, rollup) => 
+        sum + (rollup.child_responses ? rollup.child_responses.length : 0), 0
+    );
+    
+    if (totalResponses === 0) {
+        return '';
+    }
+    
+    const responsesHtml = actorResponses.map(rollup => {
+        if (!rollup.child_responses) return '';
+        return rollup.child_responses.map(response => `
+            <div class="actor-response">
+                <div class="actor-response-header">
+                    Actor: ${response.child_id}
                 </div>
-                ${messageChildren.get(regularMessage.id)?.map(child => 
-                    renderMessageTreeNode(child, messageChildren)
-                ).join('') || ''}
+                <div class="actor-response-content">
+                    ${formatMessage(response.content || '')}
+                </div>
             </div>
-        `;
+        `).join('');
+    }).join('');
+
+    return `
+        <div class="actor-responses-wrapper" data-message-id="${messageId}">
+            <div class="actor-responses-indicator" onclick="toggleActorResponses('${messageId}')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                ${totalResponses} actor response${totalResponses !== 1 ? 's' : ''}
+            </div>
+            <div class="actor-responses" id="actor-responses-${messageId}">
+                ${responsesHtml}
+            </div>
+        </div>
+    `;
+
     }
     return '';
 }
@@ -263,6 +277,17 @@ function escapeHtml(unsafe) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+// Toggle actor responses
+function toggleActorResponses(messageId) {
+    const indicator = document.querySelector(`.actor-responses-wrapper[data-message-id="${messageId}"] .actor-responses-indicator`);
+    const responsesContainer = document.getElementById(`actor-responses-${messageId}`);
+    
+    if (indicator && responsesContainer) {
+        indicator.classList.toggle('expanded');
+        responsesContainer.classList.toggle('expanded');
+    }
 }
 
 // Message actions
