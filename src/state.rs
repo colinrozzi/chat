@@ -56,14 +56,24 @@ impl State {
         let history = MessageHistory::new(store);
 
         // Process user message and get rollup ID
+        log("Processing user message");
         let user_rollup_id = self.process_message(content, "user", self.chat.head.clone())?;
 
-        // Generate AI response using message history
-        let messages = history.get_message_history(self.chat.head.clone())?;
+        // Wait a moment for actor responses to be processed
+        log("Waiting for actor responses...");
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        // Get updated message history including actor responses
+        log("Getting updated message history");
+        let messages = history.get_message_history(Some(user_rollup_id.clone()))?;
+
+        // Generate AI response using updated message history
+        log("Generating AI response");
         let claude = ClaudeClient::new(self.api_key.clone());
         let ai_response = claude.generate_response(messages)?;
 
         // Process assistant message with user rollup as parent
+        log("Processing assistant message");
         let assistant_rollup_id =
             self.process_message(&ai_response, "assistant", Some(user_rollup_id.clone()))?;
 

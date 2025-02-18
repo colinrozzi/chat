@@ -240,6 +240,32 @@ fn handle_get_message_content(state: &State, message_id: &str) -> (Json, Websock
     }
 }
 
+fn handle_get_messages(state: &State) -> (Json, WebsocketResponse) {
+    let store = MessageStore::new(state.store_id.clone());
+    let history = MessageHistory::new(store);
+    
+    if let Ok(messages) = history.get_full_message_tree(state.chat.head.clone()) {
+        (
+            serde_json::to_vec(state).unwrap(),
+            WebsocketResponse {
+                messages: vec![WebsocketMessage {
+                    ty: MessageType::Text,
+                    text: Some(
+                        json!({
+                            "type": "message_update",
+                            "messages": messages
+                        })
+                        .to_string(),
+                    ),
+                    data: None,
+                }],
+            },
+        )
+    } else {
+        default_response(state)
+    }
+}
+
 fn default_response(state: &State) -> (Json, WebsocketResponse) {
     (
         serde_json::to_vec(state).unwrap(),
