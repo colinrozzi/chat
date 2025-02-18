@@ -378,18 +378,46 @@ impl State {
         let mut stored_messages = Vec::new();
         let mut current_id = self.chat.head.clone();
 
+        // First, collect all messages in the chain
         while let Some(id) = current_id {
             let stored_msg = self.load_message(&id)?;
             current_id = stored_msg.parent();
             stored_messages.push(stored_msg);
         }
 
-        // Process stored messages into regular messages
+        // Process stored messages in reverse (oldest first)
         for stored_msg in stored_messages.iter().rev() {
-            // Reverse to get oldest first
             match stored_msg {
-                StoredMessage::Message(msg) => messages.push(msg.clone()),
-                StoredMessage::Rollup(_) => continue, // Skip rollup messages in history
+                StoredMessage::Message(msg) => {
+                    messages.push(msg.clone());
+                }
+                StoredMessage::Rollup(rollup) => {
+                    // For each child response, load it and format it
+                    let mut child_content = String::new();
+                    for child_response in &rollup.child_responses {
+                        if let Ok(child_msg) = self.load_message(&child_response.message_id) {
+                            match child_msg {
+                                StoredMessage::Message(msg) => {
+                                    child_content.push_str(&format!(
+                                        "\nActor {} response:\n{}",
+                                        child_response.child_id, msg.content
+                                    ));
+                                }
+                                _ => continue,
+                            }
+                        }
+                    }
+
+                    // If we have child responses, create a system message with them
+                    if !child_content.is_empty() {
+                        messages.push(Message {
+                            role: "system".to_string(),
+                            content: format!("Actor Responses:{}", child_content),
+                            parent: None,
+                            id: None,
+                        });
+                    }
+                }
             }
         }
 
