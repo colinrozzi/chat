@@ -44,6 +44,13 @@ pub fn handle_message(msg: WebsocketMessage, state: Json) -> (Json, WebsocketRes
                             }
                         }
                         Some("get_messages") => handle_get_messages(&current_state),
+                        Some("get_message_content") => {
+                            if let Some(message_id) = command["message_id"].as_str() {
+                                handle_get_message_content(&current_state, message_id)
+                            } else {
+                                default_response(&current_state)
+                            }
+                        },
                         _ => default_response(&current_state),
                     }
                 } else {
@@ -206,11 +213,11 @@ fn handle_send_message(state: &mut State, content: &str) -> (Json, WebsocketResp
     }
 }
 
-fn handle_get_messages(state: &State) -> (Json, WebsocketResponse) {
+fn handle_get_message_content(state: &State, message_id: &str) -> (Json, WebsocketResponse) {
     let store = MessageStore::new(state.store_id.clone());
     let history = MessageHistory::new(store);
     
-    if let Ok(messages) = history.get_full_message_tree(state.chat.head.clone()) {
+    if let Ok(responses) = history.get_child_responses(message_id) {
         (
             serde_json::to_vec(state).unwrap(),
             WebsocketResponse {
@@ -218,8 +225,9 @@ fn handle_get_messages(state: &State) -> (Json, WebsocketResponse) {
                     ty: MessageType::Text,
                     text: Some(
                         json!({
-                            "type": "message_update",
-                            "messages": messages
+                            "type": "message_content",
+                            "message_id": message_id,
+                            "content": responses
                         })
                         .to_string(),
                     ),

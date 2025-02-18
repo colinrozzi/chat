@@ -309,6 +309,8 @@ function sendWebSocketMessage(message) {
 }
 
 function handleWebSocketMessage(data) {
+    console.log('Received WebSocket message:', data);
+    
     switch(data.type) {
         case 'message_update':
             if (data.messages) {
@@ -319,6 +321,21 @@ function handleWebSocketMessage(data) {
                 updateHeadId(allMessages);
             }
             break;
+            
+        case 'message_content':
+            if (data.message_id && data.content) {
+                console.log("Received message content:", data);
+                // Update the message in cache
+                const message = messageCache.get(data.message_id);
+                if (message) {
+                    message.child_responses = data.content;
+                    messageCache.set(data.message_id, message);
+                    // Re-render messages to show the new content
+                    renderMessages([...messageCache.values()]);
+                }
+            }
+            break;
+            
         case 'children_update':
             console.log("Children update received:", data);
             if (data.available_children) {
@@ -331,6 +348,7 @@ function handleWebSocketMessage(data) {
             }
             renderChildPanel();
             break;
+            
         default:
             console.log("Unknown message type:", data.type);
     }
