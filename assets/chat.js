@@ -128,7 +128,24 @@ function renderMessageTree(messages) {
 // Update renderMessageTreeNode to handle both message and rollup types
 function renderMessageTreeNode(message, messageChildren) {
     // Check if this is a rollup or a regular message
-    if (message.type === 'Rollup') {
+    if (!message.type || message.type === 'Message') {
+        return `
+            <div class="message-tree">
+                <div class="message ${message.role} ${message.id === selectedMessageId ? 'selected' : ''}" 
+                     data-id="${message.id}">
+                    ${formatMessage(message.content)}
+                    <div class="message-actions">
+                        <button class="message-action-button copy-button">
+                            Copy ID
+                        </button>
+                    </div>
+                </div>
+                ${messageChildren.get(message.id)?.map(child => 
+                    renderMessageTreeNode(child, messageChildren)
+                ).join('') || ''}
+            </div>
+        `;
+    } else if (message.type === 'Rollup') {
         const rollup = message;
         return `
             <div class="message-tree">
@@ -378,11 +395,17 @@ function handleWebSocketMessage(data) {
                     messageCache.set(msg.id, msg);
                 });
                 
-                // Remove any temporary messages
+                // Only remove temporary messages if they have been replaced
                 for (const [id, msg] of messageCache.entries()) {
                     if (id.startsWith('temp-')) {
-                        console.log("Removing temporary message:", id);
-                        messageCache.delete(id);
+                        const hasServerMessage = data.messages.some(m => 
+                            m.role === msg.role && 
+                            m.content === msg.content
+                        );
+                        if (hasServerMessage) {
+                            console.log("Removing temporary message that has been replaced:", id);
+                            messageCache.delete(id);
+                        }
                     }
                 }
                 
@@ -440,13 +463,19 @@ async function sendMessage() {
             role: 'user',
             content: text,
             id: 'temp-' + Date.now(),
+            type: 'Message',
             parent: null
         };
         console.log("Created temporary message:", userMsg);
         messageCache.set(userMsg.id, userMsg);
         
-        // Show messages with typing indicator
-        renderMessages([...messageCache.values()], true);
+        // Show messages without typing indicator for immediate feedback
+        renderMessages([...messageCache.values()], false);
+        
+        // Add typing indicator after a brief delay
+        setTimeout(() => {
+            renderMessages([...messageCache.values()], true);
+        }, 100);
 
         // Send message to server
         sendWebSocketMessage({

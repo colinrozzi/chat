@@ -1,5 +1,5 @@
-use super::{Message, StoredMessage};
 use super::store::MessageStore;
+use super::{Message, StoredMessage};
 use crate::bindings::ntwk::theater::runtime::log;
 
 pub struct MessageHistory {
@@ -11,7 +11,10 @@ impl MessageHistory {
         Self { store }
     }
 
-    pub fn get_full_message_tree(&self, head: Option<String>) -> Result<Vec<StoredMessage>, Box<dyn std::error::Error>> {
+    pub fn get_full_message_tree(
+        &self,
+        head: Option<String>,
+    ) -> Result<Vec<StoredMessage>, Box<dyn std::error::Error>> {
         let mut messages = Vec::new();
         let mut current_id = head;
 
@@ -26,7 +29,10 @@ impl MessageHistory {
         Ok(messages)
     }
 
-    pub fn get_child_responses(&self, message_id: &str) -> Result<Vec<StoredMessage>, Box<dyn std::error::Error>> {
+    pub fn get_child_responses(
+        &self,
+        message_id: &str,
+    ) -> Result<Vec<StoredMessage>, Box<dyn std::error::Error>> {
         if let StoredMessage::Rollup(rollup) = self.store.load_message(message_id)? {
             let mut responses = Vec::new();
             for child_response in rollup.child_responses {
@@ -40,7 +46,10 @@ impl MessageHistory {
         }
     }
 
-    pub fn get_message_history(&self, head: Option<String>) -> Result<Vec<Message>, Box<dyn std::error::Error>> {
+    pub fn get_message_history(
+        &self,
+        head: Option<String>,
+    ) -> Result<Vec<Message>, Box<dyn std::error::Error>> {
         log("Getting message history");
         let mut messages = Vec::new();
         let mut stored_messages = Vec::new();
@@ -64,11 +73,13 @@ impl MessageHistory {
                     if let Some(last_message) = messages.last_mut() {
                         let mut child_content = String::new();
                         for child_response in &rollup.child_responses {
-                            if let Ok(child_msg) = self.store.load_message(&child_response.message_id) {
+                            if let Ok(child_msg) =
+                                self.store.load_message(&child_response.message_id)
+                            {
                                 match child_msg {
                                     StoredMessage::Message(msg) => {
                                         child_content.push_str(&format!(
-                                            "\nActor {} response:\n{}",
+                                            "\n<actor id={}>\n{}\n</actor>",
                                             child_response.child_id, msg.content
                                         ));
                                     }
@@ -79,10 +90,8 @@ impl MessageHistory {
 
                         // If we have child responses, append them to the last message
                         if !child_content.is_empty() {
-                            last_message.content = format!(
-                                "{}\n\nActor Responses:{}",
-                                last_message.content, child_content
-                            );
+                            last_message.content =
+                                format!("{}\n\n{}", last_message.content, child_content);
                         }
                     }
                 }
@@ -92,3 +101,4 @@ impl MessageHistory {
         Ok(messages)
     }
 }
+

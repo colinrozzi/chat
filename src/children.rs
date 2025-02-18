@@ -1,8 +1,7 @@
+use crate::bindings::ntwk::theater::filesystem::{list_files, read_file};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::fs;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChildInfo {
     pub name: String,
     pub description: String,
@@ -11,30 +10,37 @@ pub struct ChildInfo {
 
 pub fn scan_available_children() -> Vec<ChildInfo> {
     let mut children = Vec::new();
-    let children_dir = "/Users/colinrozzi/work/actors/chat/assets/children";
 
-    if let Ok(entries) = fs::read_dir(children_dir) {
-        for entry in entries.flatten() {
-            if let Ok(metadata) = entry.metadata() {
-                if metadata.is_file() && entry.path().extension().map_or(false, |ext| ext == "toml") {
-                    if let Ok(content) = fs::read_to_string(entry.path()) {
-                        if let Ok(manifest) = toml::from_str::<Value>(&content) {
-                            if let (Some(name), Some(description)) = (
-                                manifest.get("name").and_then(Value::as_str),
-                                manifest.get("description").and_then(Value::as_str),
-                            ) {
-                                let manifest_name = entry
-                                    .path()
-                                    .file_stem()
-                                    .unwrap()
-                                    .to_string_lossy()
-                                    .into_owned();
-                                children.push(ChildInfo {
-                                    name: name.to_string(),
-                                    description: description.to_string(),
-                                    manifest_name,
-                                });
-                            }
+    // List all files in the children directory relative to our assets root
+    if let Ok(files) = list_files("children") {
+        for file in files {
+            // Only process .toml files
+            if file.ends_with(".toml") {
+                if let Ok(content) = read_file(&format!("children/{}", file)) {
+                    if let Ok(content_str) = String::from_utf8(content) {
+                        if let Ok(manifest) = toml::from_str::<toml::Value>(&content_str) {
+                            // Get base name without .toml extension for manifest_name
+                            let manifest_name =
+                                file.strip_suffix(".toml").unwrap_or(&file).to_string();
+
+                            // Extract name and description directly from top level
+                            let name = manifest
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Unknown Actor")
+                                .to_string();
+
+                            let description = manifest
+                                .get("description")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("No description available")
+                                .to_string();
+
+                            children.push(ChildInfo {
+                                name,
+                                description,
+                                manifest_name,
+                            });
                         }
                     }
                 }
@@ -44,3 +50,4 @@ pub fn scan_available_children() -> Vec<ChildInfo> {
 
     children
 }
+
