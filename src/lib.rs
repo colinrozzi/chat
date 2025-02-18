@@ -203,6 +203,7 @@ impl State {
 
         // Generate AI response using message history
         let messages = self.get_message_history()?;
+        log(&format!("Messages: {:?}", messages));
         let ai_response = self.generate_response(messages)?;
 
         // Process assistant message with user rollup as parent
@@ -374,6 +375,7 @@ impl State {
     }
 
     fn get_message_history(&self) -> Result<Vec<Message>, Box<dyn std::error::Error>> {
+        log("Getting message history");
         let mut messages = Vec::new();
         let mut stored_messages = Vec::new();
         let mut current_id = self.chat.head.clone();
@@ -385,37 +387,54 @@ impl State {
             stored_messages.push(stored_msg);
         }
 
+        log(&format!("Stored messages: {:?}", stored_messages));
+
         // Process stored messages in reverse (oldest first)
         for stored_msg in stored_messages.iter().rev() {
             match stored_msg {
                 StoredMessage::Message(msg) => {
+                    log(&format!("Message: {:?}", msg));
                     messages.push(msg.clone());
                 }
                 StoredMessage::Rollup(rollup) => {
-                    // For each child response, load it and format it
-                    let mut child_content = String::new();
-                    for child_response in &rollup.child_responses {
-                        if let Ok(child_msg) = self.load_message(&child_response.message_id) {
-                            match child_msg {
-                                StoredMessage::Message(msg) => {
-                                    child_content.push_str(&format!(
-                                        "\nActor {} response:\n{}",
-                                        child_response.child_id, msg.content
-                                    ));
+                    log(&format!("Rollup: {:?}", rollup));
+                    // For each child response, load it and append to the previous message
+                    if let Some(last_message) = messages.last_mut() {
+                        log(&format!("Last message: {:?}", last_message));
+                        let mut child_content = String::new();
+                        log(&format!(
+                            "Rollup child responses: {:?}",
+                            rollup.child_responses
+                        ));
+                        for child_response in &rollup.child_responses {
+                            log(&format!("Child response: {:?}", child_response));
+                            log(&format!(
+                                "Loading child message: {:?}",
+                                &child_response.message_id
+                            ));
+                            if let Ok(child_msg) = self.load_message(&child_response.message_id) {
+                                log(&format!("Child message: {:?}", child_msg));
+                                match child_msg {
+                                    StoredMessage::Message(msg) => {
+                                        child_content.push_str(&format!(
+                                            "\nActor {} response:\n{}",
+                                            child_response.child_id, msg.content
+                                        ));
+                                    }
+                                    _ => continue,
                                 }
-                                _ => continue,
                             }
                         }
-                    }
 
-                    // If we have child responses, create a system message with them
-                    if !child_content.is_empty() {
-                        messages.push(Message {
-                            role: "system".to_string(),
-                            content: format!("Actor Responses:{}", child_content),
-                            parent: None,
-                            id: None,
-                        });
+                        // If we have child responses, append them to the last message
+                        if !child_content.is_empty() {
+                            last_message.content = format!(
+                                "{}\n\nActor Responses:{}",
+                                last_message.content, child_content
+                            );
+                        }
+                    } else {
+                        log("No previous message to append child responses to");
                     }
                 }
             }
