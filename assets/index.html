@@ -3,46 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat</title>
+    <title>Enhanced Chat</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="app-container">
-        <div class="container">
-            <div class="main-chat">
-                <div class="title-bar">
-                    <div class="title-info">
-                        <div class="head-id">Head: None</div>
-                        <div id="connectionStatus" class="connection-status disconnected">
-                            Disconnected
-                        </div>
+    <div class="app">
+        <main class="chat-container">
+            <header class="header">
+                <div class="header-title">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span>Chat Interface</span>
+                </div>
+                <div id="connectionStatus" class="connection-status disconnected">
+                    <div class="status-indicator"></div>
+                    <span>Disconnected</span>
+                </div>
+            </header>
+
+            <div class="messages-container" id="messagesContainer">
+                <!-- Messages will be rendered here -->
+                <div class="empty-state">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mx-auto mb-4">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <p>No messages yet</p>
+                    <p class="text-sm">Start a conversation!</p>
+                </div>
+            </div>
+
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <textarea 
+                        id="messageInput"
+                        class="message-input"
+                        placeholder="Type your message... (Shift+Enter for new line)"
+                        rows="1"
+                    ></textarea>
+                    <button id="sendButton" class="send-button" disabled>
+                        Send
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M5 12h14m-6-6l6 6-6 6" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div id="loadingOverlay" class="loading-overlay">
+                <div class="loading-spinner"></div>
+            </div>
+        </main>
+
+        <aside id="actorPanel" class="actor-panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    Actor Management
+                </div>
+                <button id="collapseButton" class="collapse-button">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="panel-content">
+                <div class="section">
+                    <h3 class="section-title">Available Actors</h3>
+                    <div id="availableActors">
+                        <!-- Available actors will be rendered here -->
                     </div>
                 </div>
-                <div class="message-area-container">
-                    <div id="messageLoading" class="loading-overlay">
-                        <div class="loading-spinner"></div>
-                    </div>
-                    <div id="messageArea" class="message-area">
-                        <!-- Messages will be rendered here -->
-                    </div>
-                </div>
-                <div class="input-area">
-                    <div class="input-container">
-                        <textarea id="messageInput" class="message-input"
-                            placeholder="Type your message... (Shift+Enter for new line)" rows="1"></textarea>
-                        <button id="sendButton" class="send-button">
-                            Send
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path d="M5 12h14m-6-6l6 6-6 6" stroke-width="2" stroke-linecap="round" />
-                            </svg>
-                        </button>
+                <div class="section">
+                    <h3 class="section-title">Running Actors</h3>
+                    <div id="runningActors">
+                        <!-- Running actors will be rendered here -->
                     </div>
                 </div>
             </div>
-            <div id="childPanel" class="child-panel">
-                <!-- Child Panel will be rendered here -->
-            </div>
-        </div>
+        </aside>
+
+        <button id="togglePanelButton" class="toggle-panel-button">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+        </button>
     </div>
     <script src="chat.js"></script>
 </body>

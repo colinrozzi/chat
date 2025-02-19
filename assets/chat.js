@@ -6,153 +6,230 @@ let runningChildren = [];
 let ws = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_DELAY = 1000;
+
+// DOM Elements
+const elements = {
+    messageInput: document.getElementById('messageInput'),
+    sendButton: document.getElementById('sendButton'),
+    messagesContainer: document.getElementById('messagesContainer'),
+    connectionStatus: document.getElementById('connectionStatus'),
+    loadingOverlay: document.getElementById('loadingOverlay'),
+    actorPanel: document.getElementById('actorPanel'),
+    collapseButton: document.getElementById('collapseButton'),
+    togglePanelButton: document.getElementById('togglePanelButton'),
+    availableActors: document.getElementById('availableActors'),
+    runningActors: document.getElementById('runningActors')
+};
 
 // WebSocket setup
 function connectWebSocket() {
-    console.log("Connecting to WebSocket...");
+    console.log('Connecting to WebSocket...');
     updateConnectionStatus('connecting');
     
     ws = new WebSocket(`ws://localhost:{{WEBSOCKET_PORT}}/`);
     
     ws.onopen = () => {
-        console.log("WebSocket connected");
+        console.log('WebSocket connected');
         updateConnectionStatus('connected');
         reconnectAttempts = 0;
-        console.log("Requesting initial state");
+        
+        // Request initial state
         sendWebSocketMessage({ type: 'get_head' });
         sendWebSocketMessage({ type: 'get_available_children' });
         sendWebSocketMessage({ type: 'get_running_children' });
     };
     
     ws.onclose = () => {
-        console.log("WebSocket disconnected");
+        console.log('WebSocket disconnected');
         updateConnectionStatus('disconnected');
+        elements.sendButton.disabled = true;
+        
         if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             reconnectAttempts++;
-            setTimeout(connectWebSocket, 1000 * Math.min(reconnectAttempts, 30));
+            setTimeout(connectWebSocket, RECONNECT_DELAY * Math.min(reconnectAttempts, 30));
         }
     };
     
     ws.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
-            console.log("Received WebSocket message:", data);
             handleWebSocketMessage(data);
         } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
+            showError('Failed to process server message');
         }
     };
 
     ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        showError('Connection error occurred');
     };
 }
 
-function requestMessage(messageId) {
-    console.log("Requesting message:", messageId);
-    sendWebSocketMessage({
-        type: 'get_message',
-        message_id: messageId
-    });
-}
-
-function sendWebSocketMessage(message) {
-    console.log("Sending WebSocket message:", message);
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(message));
-    } else {
-        console.error("WebSocket not connected, can't send message");
-    }
-}
-
-function updateConnectionStatus(status) {
-    const statusElement = document.getElementById('connectionStatus');
-    if (statusElement) {
-        statusElement.className = 'connection-status ' + status;
-        statusElement.textContent = status.charAt(0).toUpperCase() + status.slice(1);
-    }
-}
-
+// Message handling
 function handleWebSocketMessage(data) {
-    console.log("Processing message:", data);
+    console.log('Received message:', data);
 
-    if (data.type === 'children_update') {
-        console.log("Children update received:", data);
-        if (data.available_children) {
-            availableChildren = data.available_children;
-        }
-        if (data.running_children) {
-            runningChildren = data.running_children;
-        }
-        renderChildPanel();
-        return;
-    }
+    switch (data.type) {
+        case 'children_update':
+            if (data.available_children) {
+                availableChildren = data.available_children;
+            }
+            if (data.running_children) {
+                runningChildren = data.running_children;
+            }
+            renderActorPanels();
+            break;
 
-    if (data.type === 'messages_updated') {
-        console.log("Messages updated, head:", data.head);
-        if (data.head) {
-            currentHead = data.head;
-            document.querySelector('.head-id').textContent = `Head: ${data.head}`;
-            requestMessage(data.head); // Request the head message
-        }
-        return;
-    }
+        case 'messages_updated':
+        case 'head':
+            if (data.head) {
+                currentHead = data.head;
+                requestMessage(data.head);
+            }
+            break;
 
-    if (data.type === 'head') {
-        console.log("Received head:", data.head);
-        if (data.head) {
-            currentHead = data.head;
-            document.querySelector('.head-id').textContent = `Head: ${data.head}`;
-            requestMessage(data.head); // Request the head message
-        }
-        return;
-    }
-
-    if (data.type === 'message' && data.message) {
-        console.log("Received message:", data.message);
-        const message = data.message;
-        
-        // Add to message chain if not already present
-        if (!messageChain.find(m => m.id === message.id)) {
-            messageChain.push(message);
-        }
-
-        // If this message has a parent and we don't have it yet, request it
-        if (message.parent && !messageChain.find(m => m.id === message.parent)) {
-            requestMessage(message.parent);
-        }
-
-        renderMessages();
+        case 'message':
+            if (data.message) {
+                handleNewMessage(data.message);
+            }
+            break;
     }
 }
 
-// Message rendering
-function renderMessages() {
-    console.log("Rendering messages, chain length:", messageChain.length);
-    const messageArea = document.getElementById('messageArea');
-    if (!messageArea) return;
-
-    if (messageChain.length === 0) {
-        messageArea.innerHTML = '<div class="empty-state">No messages yet.<br>Start the conversation!</div>';
-        return;
+function handleNewMessage(message) {
+    // Add to message chain if not already present
+    if (!messageChain.find(m => m.id === message.id)) {
+        messageChain.push(message);
     }
 
-    // Sort messages by parent relationship
-    const sortedChain = sortMessageChain();
-    console.log("Sorted message chain:", sortedChain);
-    
-    // Render messages
-    messageArea.innerHTML = sortedChain.map(entry => {
-        if (entry.data.Chat) {
-            return renderChatMessage(entry.data.Chat);
-        } else if (entry.data.Child) {
-            return renderChildMessage(entry.data.Child);
-        }
-        return '';
-    }).join('');
+    // Request parent message if needed
+    if (message.parent && !messageChain.find(m => m.id === message.parent)) {
+        requestMessage(message.parent);
+    }
 
-    // Scroll to bottom
-    messageArea.scrollTop = messageArea.scrollHeight;
+    renderMessages();
+    scrollToBottom();
+}
+
+// UI Updates
+function updateConnectionStatus(status) {
+    elements.connectionStatus.className = 'connection-status ' + status;
+    elements.connectionStatus.innerHTML = `
+        <div class="status-indicator"></div>
+        <span>${status.charAt(0).toUpperCase() + status.slice(1)}</span>
+    `;
+    elements.sendButton.disabled = status !== 'connected';
+}
+
+function showError(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        ${message}
+    `;
+    elements.messagesContainer.prepend(errorDiv);
+    setTimeout(() => errorDiv.remove(), 5000);
+}
+
+function renderMessages() {
+    const sortedMessages = sortMessageChain();
+    elements.messagesContainer.innerHTML = sortedMessages.length ? 
+        sortedMessages.map(renderMessage).join('') :
+        renderEmptyState();
+}
+
+function renderMessage(message) {
+    if (message.data.Chat) {
+        const { role, content } = message.data.Chat;
+        return `
+            <div class="message ${role}">
+                ${formatMessageContent(content)}
+            </div>
+        `;
+    } else if (message.data.Child) {
+        const { child_id, text } = message.data.Child;
+        return `
+            <div class="message child">
+                <div class="child-header">Actor: ${child_id}</div>
+                ${formatMessageContent(text)}
+            </div>
+        `;
+    }
+    return '';
+}
+
+function renderEmptyState() {
+    return `
+        <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <p>No messages yet</p>
+            <p class="text-sm">Start a conversation!</p>
+        </div>
+    `;
+}
+
+function renderActorPanels() {
+    // Available Actors
+    elements.availableActors.innerHTML = availableChildren.length ?
+        availableChildren.map(actor => `
+            <div class="actor-card">
+                <div class="actor-name">${actor.name || actor.manifest_name}</div>
+                ${actor.description ? `<div class="actor-description">${actor.description}</div>` : ''}
+                <button class="actor-button start-button" onclick="startActor('${actor.manifest_name}')">
+                    Start
+                </button>
+            </div>
+        `).join('') :
+        '<div class="empty-state">No available actors</div>';
+
+    // Running Actors
+    elements.runningActors.innerHTML = runningChildren.length ?
+        runningChildren.map(actor => `
+            <div class="actor-card">
+                <div class="actor-name">${actor.manifest_name}</div>
+                <div class="actor-id">${actor.actor_id}</div>
+                <button class="actor-button stop-button" onclick="stopActor('${actor.actor_id}')">
+                    Stop
+                </button>
+            </div>
+        `).join('') :
+        '<div class="empty-state">No running actors</div>';
+}
+
+// Utility functions
+function formatMessageContent(content) {
+    if (!content) return '';
+    
+    // Escape HTML
+    let text = content
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    
+    // Format code blocks
+    text = text.replace(/```([^`]+)```/g, (_, code) => 
+        `<pre><code>${code}</code></pre>`
+    );
+    
+    // Format inline code
+    text = text.replace(/`([^`]+)`/g, (_, code) => 
+        `<code>${code}</code>`
+    );
+    
+    // Convert newlines to <br>
+    text = text.replace(/\n/g, '<br>');
+    
+    return text;
 }
 
 function sortMessageChain() {
@@ -165,230 +242,112 @@ function sortMessageChain() {
         const message = messageChain.find(m => m.id === id);
         if (!message) return;
 
-        // First add parent if exists
         if (message.parent) {
             addMessage(message.parent);
         }
 
-        // Then add this message
         if (!visited.has(id)) {
             sorted.push(message);
             visited.add(id);
         }
     }
 
-    // Start from head
     if (currentHead) {
         addMessage(currentHead);
     } else {
-        // If no head, add all messages in order
-        [...messageChain].sort((a, b) => {
-            if (!a.parent && b.parent) return -1;
-            if (a.parent && !b.parent) return 1;
-            return 0;
-        }).forEach(message => {
-            addMessage(message.id);
-        });
+        messageChain
+            .sort((a, b) => (!a.parent && b.parent) ? -1 : (a.parent && !b.parent) ? 1 : 0)
+            .forEach(message => addMessage(message.id));
     }
 
     return sorted;
 }
 
-function renderChatMessage(message) {
-    console.log("Rendering chat message:", message);
-    const role = message.role;
-    const content = formatMessageContent(message.content);
-    
-    return `
-        <div class="message ${role}">
-            ${content}
-        </div>
-    `;
+function scrollToBottom() {
+    elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
 }
 
-function renderChildMessage(childMessage) {
-    console.log("Rendering child message:", childMessage);
-    return `
-        <div class="child-response">
-            <div class="actor-response-content">
-                <div class="actor-response-header">
-                    <span class="actor-name">Actor: ${childMessage.child_id}</span>
-                </div>
-                ${formatMessageContent(childMessage.text)}
-            </div>
-        </div>
-    `;
-}
-
-// Child panel functionality
-function renderChildPanel() {
-    console.log("Rendering child panel");
-    const panel = document.getElementById('childPanel');
-    if (!panel) return;
-
-    panel.innerHTML = `
-        <div class="panel-header">
-            <h2>Actor Management</h2>
-            <button class="collapse-button">×</button>
-        </div>
-        <div class="panel-content">
-            <div class="section">
-                <h3>Available Actors</h3>
-                ${availableChildren.length ? 
-                    availableChildren.map(child => `
-                        <div class="actor-item">
-                            <div class="actor-info">
-                                <span class="actor-name">${child.name || child.manifest_name}</span>
-                                ${child.description ? 
-                                    `<span class="actor-description">${child.description}</span>` 
-                                    : ''}
-                            </div>
-                            <button class="start-button" onclick="startChild('${child.manifest_name}')">
-                                Start
-                            </button>
-                        </div>
-                    `).join('') 
-                    : '<div class="empty-state">No available actors</div>'
-                }
-            </div>
-            <div class="section">
-                <h3>Running Actors</h3>
-                ${runningChildren.length ?
-                    runningChildren.map(child => `
-                        <div class="actor-item">
-                            <div class="actor-info">
-                                <span class="actor-name">${child.manifest_name}</span>
-                                <span class="actor-id">ID: ${child.actor_id}</span>
-                            </div>
-                            <button class="stop-button" onclick="stopChild('${child.actor_id}')">
-                                Stop
-                            </button>
-                        </div>
-                    `).join('')
-                    : '<div class="empty-state">No running actors</div>'
-                }
-            </div>
-        </div>
-    `;
-
-    // Set up collapse button handler
-    const collapseButton = panel.querySelector('.collapse-button');
-    if (collapseButton) {
-        collapseButton.addEventListener('click', () => {
-            panel.classList.toggle('collapsed');
-        });
+// WebSocket communication
+function sendWebSocketMessage(message) {
+    if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(message));
+    } else {
+        showError('Not connected to server');
     }
 }
 
-function startChild(manifestName) {
-    console.log("Starting child:", manifestName);
+function requestMessage(messageId) {
+    sendWebSocketMessage({
+        type: 'get_message',
+        message_id: messageId
+    });
+}
+
+// Actor management
+function startActor(manifestName) {
     sendWebSocketMessage({
         type: 'start_child',
         manifest_name: manifestName
     });
 }
 
-function stopChild(actorId) {
-    console.log("Stopping child:", actorId);
+function stopActor(actorId) {
     sendWebSocketMessage({
         type: 'stop_child',
         actor_id: actorId
     });
 }
 
-function formatMessageContent(content) {
-    if (!content) return '';
-    
-    // Escape HTML
-    let text = content
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;")
-        .replace(/\n/g, '<br>');
-    
-    // Format code blocks
-    text = text.replace(/```([^`]+)```/g, (match, code) => 
-        `<pre><code>${code}</code></pre>`
-    );
-    
-    // Format inline code
-    text = text.replace(/`([^`]+)`/g, (match, code) => 
-        `<code>${code}</code>`
-    );
-    
-    return text;
-}
-
-// Message sending
+// Message input handling
 function sendMessage() {
-    const messageInput = document.getElementById('messageInput');
-    const content = messageInput.value.trim();
+    const content = elements.messageInput.value.trim();
     
     if (!content || !ws || ws.readyState !== WebSocket.OPEN) {
-        console.log("Cannot send message:", {
-            content: !!content,
-            wsExists: !!ws,
-            wsState: ws ? ws.readyState : 'no websocket'
-        });
         return;
     }
     
-    console.log("Sending message:", content);
-    // Send message
     sendWebSocketMessage({
         type: 'send_message',
         content: content
     });
     
-    // Clear input
-    messageInput.value = '';
-    messageInput.style.height = '2.5rem';
-    messageInput.focus();
+    elements.messageInput.value = '';
+    elements.messageInput.style.height = 'auto';
+    elements.messageInput.focus();
 }
 
-// Initialize
+// Event listeners
 document.addEventListener('DOMContentLoaded', () => {
-    console.log("Initializing chat application");
     // Initialize WebSocket
     connectWebSocket();
     
-    // Setup message input
-    const messageInput = document.getElementById('messageInput');
-    const sendButton = document.getElementById('sendButton');
-    
     // Auto-resize textarea
-    messageInput.addEventListener('input', () => {
-        messageInput.style.height = '2.5rem';
-        messageInput.style.height = Math.min(messageInput.scrollHeight, 200) + 'px';
+    elements.messageInput.addEventListener('input', () => {
+        elements.messageInput.style.height = 'auto';
+        elements.messageInput.style.height = Math.min(elements.messageInput.scrollHeight, 120) + 'px';
+        elements.sendButton.disabled = !elements.messageInput.value.trim();
     });
     
-    // Send message on Enter (not Shift+Enter)
-    messageInput.addEventListener('keydown', (event) => {
+    // Send message handlers
+    elements.messageInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
             sendMessage();
         }
     });
     
-    // Send button click
-    sendButton.addEventListener('click', sendMessage);
+    elements.sendButton.addEventListener('click', sendMessage);
     
-    // Global shortcut to focus input
-    document.addEventListener('keydown', (event) => {
-        if (event.key === '/' && document.activeElement !== messageInput) {
-            event.preventDefault();
-            messageInput.focus();
-        }
+    // Panel toggle handlers
+    elements.collapseButton.addEventListener('click', () => {
+        elements.actorPanel.classList.add('collapsed');
+        elements.togglePanelButton.style.display = 'flex';
     });
-});
-
-// Handle visibility changes
-document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) {
-        connectWebSocket();
-    }
+    
+    elements.togglePanelButton.addEventListener('click', () => {
+        elements.actorPanel.classList.remove('collapsed');
+        elements.togglePanelButton.style.display = 'none';
+    });
 });
 
 // Cleanup
