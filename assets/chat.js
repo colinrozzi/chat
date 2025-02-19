@@ -1,6 +1,8 @@
 // State management
 let messageChain = [];
 let currentHead = null;
+let availableChildren = [];
+let runningChildren = [];
 let ws = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -16,8 +18,10 @@ function connectWebSocket() {
         console.log("WebSocket connected");
         updateConnectionStatus('connected');
         reconnectAttempts = 0;
-        console.log("Requesting initial head");
+        console.log("Requesting initial state");
         sendWebSocketMessage({ type: 'get_head' });
+        sendWebSocketMessage({ type: 'get_available_children' });
+        sendWebSocketMessage({ type: 'get_running_children' });
     };
     
     ws.onclose = () => {
@@ -71,6 +75,18 @@ function updateConnectionStatus(status) {
 
 function handleWebSocketMessage(data) {
     console.log("Processing message:", data);
+
+    if (data.type === 'children_update') {
+        console.log("Children update received:", data);
+        if (data.available_children) {
+            availableChildren = data.available_children;
+        }
+        if (data.running_children) {
+            runningChildren = data.running_children;
+        }
+        renderChildPanel();
+        return;
+    }
 
     if (data.type === 'messages_updated') {
         console.log("Messages updated, head:", data.head);
@@ -202,6 +218,82 @@ function renderChildMessage(childMessage) {
             </div>
         </div>
     `;
+}
+
+// Child panel functionality
+function renderChildPanel() {
+    console.log("Rendering child panel");
+    const panel = document.getElementById('childPanel');
+    if (!panel) return;
+
+    panel.innerHTML = `
+        <div class="panel-header">
+            <h2>Actor Management</h2>
+            <button class="collapse-button">×</button>
+        </div>
+        <div class="panel-content">
+            <div class="section">
+                <h3>Available Actors</h3>
+                ${availableChildren.length ? 
+                    availableChildren.map(child => `
+                        <div class="actor-item">
+                            <div class="actor-info">
+                                <span class="actor-name">${child.name || child.manifest_name}</span>
+                                ${child.description ? 
+                                    `<span class="actor-description">${child.description}</span>` 
+                                    : ''}
+                            </div>
+                            <button class="start-button" onclick="startChild('${child.manifest_name}')">
+                                Start
+                            </button>
+                        </div>
+                    `).join('') 
+                    : '<div class="empty-state">No available actors</div>'
+                }
+            </div>
+            <div class="section">
+                <h3>Running Actors</h3>
+                ${runningChildren.length ?
+                    runningChildren.map(child => `
+                        <div class="actor-item">
+                            <div class="actor-info">
+                                <span class="actor-name">${child.manifest_name}</span>
+                                <span class="actor-id">ID: ${child.actor_id}</span>
+                            </div>
+                            <button class="stop-button" onclick="stopChild('${child.actor_id}')">
+                                Stop
+                            </button>
+                        </div>
+                    `).join('')
+                    : '<div class="empty-state">No running actors</div>'
+                }
+            </div>
+        </div>
+    `;
+
+    // Set up collapse button handler
+    const collapseButton = panel.querySelector('.collapse-button');
+    if (collapseButton) {
+        collapseButton.addEventListener('click', () => {
+            panel.classList.toggle('collapsed');
+        });
+    }
+}
+
+function startChild(manifestName) {
+    console.log("Starting child:", manifestName);
+    sendWebSocketMessage({
+        type: 'start_child',
+        manifest_name: manifestName
+    });
+}
+
+function stopChild(actorId) {
+    console.log("Stopping child:", actorId);
+    sendWebSocketMessage({
+        type: 'stop_child',
+        actor_id: actorId
+    });
 }
 
 function formatMessageContent(content) {

@@ -11,7 +11,7 @@ pub struct ChainEntry {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MessageData {
     Chat(Message),
-    Child(ChildMessage),
+    ChildRollup(Vec<ChildMessage>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

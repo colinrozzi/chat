@@ -14,13 +14,6 @@ pub struct ChildActor {
     pub manifest_name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ChildResponse {
-    child_id: String,
-    status: String,
-    msg: ChildMessage,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct State {
     pub head: Option<String>,
@@ -68,6 +61,7 @@ impl State {
         };
 
         self.add_to_chain(MessageData::Chat(msg));
+        self.notify_children();
 
         let messages = self.get_anthropic_messages();
 
@@ -85,6 +79,39 @@ impl State {
         }
     }
 
+    pub fn notify_children(&mut self) {
+        let mut child_responses = vec![];
+        for (actor_id, _) in self.children.iter() {
+            log(&format!("Notifying child: {}", actor_id));
+            let response = request(
+                actor_id,
+                &serde_json::to_vec(&json!({
+                    "msg_type": "head-update",
+                    "data": {
+                        "head": self.head.clone(),
+                    }
+                }))
+                .unwrap(),
+            );
+
+            log(&format!("Child response: {:?}", response));
+
+            match response {
+                Ok(response) => {
+                    let child_response: ChildMessage = serde_json::from_slice(&response).unwrap();
+                    child_responses.push(child_response);
+                }
+                Err(e) => {
+                    log(&format!("Failed to notify child: {}", e));
+                }
+            }
+        }
+
+        log(&format!("Child responses: {:?}", child_responses));
+
+        self.add_to_chain(MessageData::ChildRollup(child_responses));
+    }
+
     pub fn get_anthropic_messages(&mut self) -> Vec<Message> {
         let mut messages = vec![];
         let chain = self.get_chain();
@@ -94,11 +121,14 @@ impl State {
                 MessageData::Chat(msg) => {
                     messages.push(msg.clone());
                 }
-                MessageData::Child(child_msg) => {
-                    let text = child_msg.text.clone();
-                    let actor_msg = format!("<actor id={}>{}</actor>", child_msg.child_id, text);
-                    let chat_msg = messages.last_mut().unwrap();
-                    chat_msg.content.push_str(&actor_msg);
+                MessageData::ChildRollup(child_messages) => {
+                    for child_msg in child_messages {
+                        let text = child_msg.text.clone();
+                        let actor_msg =
+                            format!("<actor id={}>{}</actor>", child_msg.child_id, text);
+                        let chat_msg = messages.last_mut().unwrap();
+                        chat_msg.content.push_str(&actor_msg);
+                    }
                 }
             }
         }
