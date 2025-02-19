@@ -164,6 +164,75 @@ function renderMessage(message) {
     return '';
 }
 
+function renderMessage(message) {
+    if (message.data.Chat) {
+        const { role, content } = message.data.Chat;
+        return `
+            <div class="message ${role}">
+                ${formatMessageContent(content)}
+            </div>
+        `;
+    } else if (message.data.Child) {
+        const { child_id, text, data } = message.data.Child;
+        const messageId = `child-${message.id}`;
+        return `
+            <div class="child-message">
+                <div class="child-message-header">
+                    <div class="child-header">Actor: ${child_id}</div>
+                    ${Object.keys(data).length > 0 ? `
+                        <button class="child-data-toggle" onclick="toggleChildData('${messageId}')">
+                            <span>View Data</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18l6-6-6-6"/>
+                            </svg>
+                        </button>
+                    ` : ''}
+                </div>
+                <div class="child-message-content">
+                    ${formatMessageContent(text)}
+                    ${Object.keys(data).length > 0 ? `
+                        <div id="${messageId}" class="child-data">
+                            <div class="child-data-content">
+                                ${formatJsonData(data)}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+    return '';
+}
+
+function formatJsonData(data) {
+    try {
+        // Convert the data to a formatted string with 2-space indentation
+        return JSON.stringify(data, null, 2)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    } catch (error) {
+        console.error('Error formatting JSON data:', error);
+        return 'Error displaying data';
+    }
+}
+
+function toggleChildData(messageId) {
+    const container = document.getElementById(messageId);
+    const content = container.querySelector('.child-data-content');
+    const toggle = container.parentElement.querySelector('.child-data-toggle');
+    
+    content.classList.toggle('expanded');
+    toggle.classList.toggle('expanded');
+    
+    // Update toggle text
+    const toggleText = toggle.querySelector('span');
+    toggleText.textContent = content.classList.contains('expanded') ? 'Hide Data' : 'View Data';
+}
+
+
 function renderEmptyState() {
     return `
         <div class="empty-state">
