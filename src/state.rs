@@ -147,39 +147,41 @@ impl State {
                 MessageData::ChildRollup(child_messages) => {
                     log(&format!("Adding child messages: {:?}", child_messages));
                     for child_msg in child_messages {
-                        log(&format!("Adding child message: {:?}", child_msg));
-                        let text = child_msg.text.clone();
-                        log(&format!("Child message text: {}", text));
-                        let actor_msg =
-                            format!("\n<actor id={}>{}</actor>", child_msg.child_id, text);
-                        log(&format!("Actor message: {}", actor_msg));
+                        if !child_msg.text.is_empty() {
+                            log(&format!("Adding child message: {:?}", child_msg));
+                            let text = child_msg.text.clone();
+                            log(&format!("Child message text: {}", text));
+                            let actor_msg =
+                                format!("\n<actor id={}>{}</actor>", child_msg.child_id, text);
+                            log(&format!("Actor message: {}", actor_msg));
 
-                        if !messages.is_empty() {
-                            let last_msg = messages.last().unwrap();
-                            if last_msg.role == "assistant" {
+                            if !messages.is_empty() {
+                                let last_msg = messages.last().unwrap();
+                                if last_msg.role == "assistant" {
+                                    let chat_msg = Message {
+                                        role: "user".to_string(),
+                                        content: actor_msg,
+                                    };
+                                    log(&format!("Chat message: {:?}", chat_msg));
+                                    messages.push(chat_msg);
+                                    continue;
+                                } else {
+                                    let unsure = messages.last_mut();
+                                    log(&format!("Last message: {:?}", unsure));
+                                    let chat_msg = messages.last_mut().unwrap();
+                                    log(&format!("Last chat message: {:?}", chat_msg));
+                                    chat_msg.content.push_str(&actor_msg);
+                                    log(&format!("Updated chat message: {:?}", chat_msg));
+                                }
+                            } else {
+                                log("Messages is empty");
                                 let chat_msg = Message {
                                     role: "user".to_string(),
                                     content: actor_msg,
                                 };
                                 log(&format!("Chat message: {:?}", chat_msg));
                                 messages.push(chat_msg);
-                                continue;
-                            } else {
-                                let unsure = messages.last_mut();
-                                log(&format!("Last message: {:?}", unsure));
-                                let chat_msg = messages.last_mut().unwrap();
-                                log(&format!("Last chat message: {:?}", chat_msg));
-                                chat_msg.content.push_str(&actor_msg);
-                                log(&format!("Updated chat message: {:?}", chat_msg));
                             }
-                        } else {
-                            log("Messages is empty");
-                            let chat_msg = Message {
-                                role: "user".to_string(),
-                                content: actor_msg,
-                            };
-                            log(&format!("Chat message: {:?}", chat_msg));
-                            messages.push(chat_msg);
                         }
                     }
                 }

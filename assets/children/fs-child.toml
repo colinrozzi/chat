@@ -1,0 +1,15 @@
+name = "Filesystem Operations"
+description = "Provides filesystem operations like reading, writing, and listing files"
+component_path = "/Users/colinrozzi/work/actors/fs-child/target/wasm32-unknown-unknown/release/fs_child.wasm"
+
+[interface]
+implements = "ntwk:theater/actor"
+requires = []
+
+[[handlers]]
+type = "runtime"
+config = {}
+
+[[handlers]]
+type = "filesystem"
+config = { path = "/Users/colinrozzi/work/tmp"}
