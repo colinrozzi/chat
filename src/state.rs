@@ -51,6 +51,7 @@ impl State {
         };
         let entry = self.store.save_message(entry).unwrap();
         self.head = Some(entry.id.clone().unwrap());
+        log(&format!("Added message to chain: {:?}", entry));
         entry
     }
 
@@ -63,10 +64,13 @@ impl State {
         self.add_to_chain(MessageData::Chat(msg));
         self.notify_children();
 
+        log("Getting anthropic messages");
         let messages = self.get_anthropic_messages();
+        log(&format!("Anthropic messages: {:?}", messages));
 
         match self.claude_client.generate_response(messages) {
             Ok(response) => {
+                log(&format!("Generated completion: {}", response));
                 let anthropic_msg = Message {
                     content: response,
                     role: "assistant".to_string(),
@@ -83,6 +87,7 @@ impl State {
         let mut child_responses = vec![];
         for (actor_id, _) in self.children.iter() {
             log(&format!("Notifying child: {}", actor_id));
+
             let response = request(
                 actor_id,
                 &serde_json::to_vec(&json!({
@@ -110,28 +115,78 @@ impl State {
         log(&format!("Child responses: {:?}", child_responses));
 
         self.add_to_chain(MessageData::ChildRollup(child_responses));
+        log("Notified children");
     }
 
     pub fn get_anthropic_messages(&mut self) -> Vec<Message> {
-        let mut messages = vec![];
+        let mut messages: Vec<Message> = vec![];
         let chain = self.get_chain();
+        log(&format!("Chain: {:?}", chain));
 
         for entry in chain {
+            log(&format!("Processing entry: {:?}", entry));
             match entry.data {
                 MessageData::Chat(msg) => {
+                    log(&format!("Adding message: {:?}", msg));
+
+                    // If the last message is from the user, and the current message is also from
+                    // the user, combine them into a single message
+                    let last_msg = messages.last();
+                    log(&format!("Last message: {:?}", last_msg));
+                    if let Some(last_msg) = last_msg {
+                        if last_msg.role == "user" && msg.role == "user" {
+                            let chat_msg = messages.last_mut().unwrap();
+                            chat_msg.content.push_str(&format!("\n{}", msg.content));
+                            log(&format!("Updated chat message: {:?}", chat_msg));
+                            continue;
+                        }
+                    }
+
                     messages.push(msg.clone());
                 }
                 MessageData::ChildRollup(child_messages) => {
+                    log(&format!("Adding child messages: {:?}", child_messages));
                     for child_msg in child_messages {
+                        log(&format!("Adding child message: {:?}", child_msg));
                         let text = child_msg.text.clone();
+                        log(&format!("Child message text: {}", text));
                         let actor_msg =
-                            format!("<actor id={}>{}</actor>", child_msg.child_id, text);
-                        let chat_msg = messages.last_mut().unwrap();
-                        chat_msg.content.push_str(&actor_msg);
+                            format!("\n<actor id={}>{}</actor>", child_msg.child_id, text);
+                        log(&format!("Actor message: {}", actor_msg));
+
+                        if !messages.is_empty() {
+                            let last_msg = messages.last().unwrap();
+                            if last_msg.role == "assistant" {
+                                let chat_msg = Message {
+                                    role: "user".to_string(),
+                                    content: actor_msg,
+                                };
+                                log(&format!("Chat message: {:?}", chat_msg));
+                                messages.push(chat_msg);
+                                continue;
+                            } else {
+                                let unsure = messages.last_mut();
+                                log(&format!("Last message: {:?}", unsure));
+                                let chat_msg = messages.last_mut().unwrap();
+                                log(&format!("Last chat message: {:?}", chat_msg));
+                                chat_msg.content.push_str(&actor_msg);
+                                log(&format!("Updated chat message: {:?}", chat_msg));
+                            }
+                        } else {
+                            log("Messages is empty");
+                            let chat_msg = Message {
+                                role: "user".to_string(),
+                                content: actor_msg,
+                            };
+                            log(&format!("Chat message: {:?}", chat_msg));
+                            messages.push(chat_msg);
+                        }
                     }
                 }
             }
         }
+
+        log(&format!("Done messages: {:?}", messages));
 
         messages
     }
@@ -146,6 +201,7 @@ impl State {
             chain.push(entry);
         }
 
+        chain.reverse();
         chain
     }
 
@@ -177,11 +233,15 @@ impl State {
             &serde_json::to_vec(&json!({
                 "msg_type": "introduction",
                 "data": {
+                    "child_id": actor_id.clone(),
                     "store_id": self.store.store_id.clone(),
                 }
             }))?,
         ) {
-            self.actor_messages.insert(actor_id.clone(), response);
+            log(&format!("Child response: {:?}", response));
+            // create a rollup message with the response and add it to the chain
+            let child_response: ChildMessage = serde_json::from_slice(&response)?;
+            self.add_to_chain(MessageData::ChildRollup(vec![child_response]));
         }
 
         Ok(actor_id)
