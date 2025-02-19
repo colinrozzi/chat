@@ -98,6 +98,7 @@ function handleWebSocketMessage(data) {
 }
 
 function handleNewMessage(message) {
+    console.log('Handling new message:', message);
     // Add to message chain if not already present
     if (!messageChain.find(m => m.id === message.id)) {
         messageChain.push(message);
@@ -145,6 +146,7 @@ function renderMessages() {
 }
 
 function renderMessage(message) {
+    console.log('Rendering message:', message, '\nMessage data:', JSON.stringify(message.data, null, 2));
     if (message.data.Chat) {
         const { role, content } = message.data.Chat;
         return `

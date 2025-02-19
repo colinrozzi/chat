@@ -54,7 +54,7 @@ body {
     display: grid;
     grid-template-columns: 1fr auto;
     height: 100vh;
-    overflow: hidden;
+    /* Removed overflow: hidden */
 }
 
 .chat-container {
@@ -164,12 +164,12 @@ body {
 
 /* Child Messages */
 .child-message {
-    background: var(--primary-light);
-    border: 1px solid var(--primary-border);
-    margin-right: auto;
+    background: #EEF2FF;
+    border: 1px solid #E0E7FF;
+    margin: 1rem 0;
     width: 100%;
-    border-radius: var(--radius);
-    overflow: hidden;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .child-message-header {
@@ -182,6 +182,8 @@ body {
 
 .child-message-content {
     padding: 1rem;
+    background: white;
+    border-top: 1px solid #E0E7FF;
 }
 
 .child-header {
