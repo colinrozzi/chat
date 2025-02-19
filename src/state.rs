@@ -76,6 +76,7 @@ impl State {
                     role: "assistant".to_string(),
                 };
                 self.add_to_chain(MessageData::Chat(anthropic_msg));
+                self.notify_children();
             }
             Err(e) => {
                 log(&format!("Failed to generate completion: {}", e));
@@ -98,8 +99,6 @@ impl State {
                 }))
                 .unwrap(),
             );
-
-            log(&format!("Child response: {:?}", response));
 
             match response {
                 Ok(response) => {
@@ -148,12 +147,9 @@ impl State {
                     log(&format!("Adding child messages: {:?}", child_messages));
                     for child_msg in child_messages {
                         if !child_msg.text.is_empty() {
-                            log(&format!("Adding child message: {:?}", child_msg));
                             let text = child_msg.text.clone();
-                            log(&format!("Child message text: {}", text));
                             let actor_msg =
                                 format!("\n<actor id={}>{}</actor>", child_msg.child_id, text);
-                            log(&format!("Actor message: {}", actor_msg));
 
                             if !messages.is_empty() {
                                 let last_msg = messages.last().unwrap();
@@ -162,24 +158,17 @@ impl State {
                                         role: "user".to_string(),
                                         content: actor_msg,
                                     };
-                                    log(&format!("Chat message: {:?}", chat_msg));
                                     messages.push(chat_msg);
                                     continue;
                                 } else {
-                                    let unsure = messages.last_mut();
-                                    log(&format!("Last message: {:?}", unsure));
                                     let chat_msg = messages.last_mut().unwrap();
-                                    log(&format!("Last chat message: {:?}", chat_msg));
                                     chat_msg.content.push_str(&actor_msg);
-                                    log(&format!("Updated chat message: {:?}", chat_msg));
                                 }
                             } else {
-                                log("Messages is empty");
                                 let chat_msg = Message {
                                     role: "user".to_string(),
                                     content: actor_msg,
                                 };
-                                log(&format!("Chat message: {:?}", chat_msg));
                                 messages.push(chat_msg);
                             }
                         }
@@ -187,8 +176,6 @@ impl State {
                 }
             }
         }
-
-        log(&format!("Done messages: {:?}", messages));
 
         messages
     }
