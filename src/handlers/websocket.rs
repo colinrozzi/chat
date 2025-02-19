@@ -67,6 +67,22 @@ pub fn handle_message(msg: WebsocketMessage, state: Json) -> (Json, WebsocketRes
                                 default_response(&current_state)
                             }
                         }
+                        Some("get_head") => (
+                            serde_json::to_vec(&current_state).unwrap(),
+                            WebsocketResponse {
+                                messages: vec![WebsocketMessage {
+                                    ty: MessageType::Text,
+                                    text: Some(
+                                        json!({
+                                            "type": "head",
+                                            "head": current_state.head
+                                        })
+                                        .to_string(),
+                                    ),
+                                    data: None,
+                                }],
+                            },
+                        ),
                         _ => default_response(&current_state),
                     }
                 } else {

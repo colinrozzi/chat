@@ -1,5 +1,6 @@
 // State management
 let messageCache = new Map();
+let headId = null;
 let ws = null;
 let reconnectAttempts = 0;
 let selectedMessageId = null;
@@ -12,6 +13,7 @@ let runningChildren = [];
 
 function renderMessages(messages, isTyping = false) {
     console.log("Rendering messages, typing indicator:", isTyping);
+    console.log("Messages:", messages);
     
     if (messages.length === 0 && !isTyping) {
         messageArea.innerHTML = `
@@ -40,52 +42,40 @@ function renderMessages(messages, isTyping = false) {
     messageArea.scrollTop = messageArea.scrollHeight;
 }
 
-function renderMessageTree(messages) {
-    // Build a map of message IDs to their children
-    const messageChildren = new Map();
-    messages.forEach(msg => {
-        if (msg.parent) {
-            if (!messageChildren.has(msg.parent)) {
-                messageChildren.set(msg.parent, []);
-            }
-            messageChildren.get(msg.parent).push(msg);
-        }
-    });
+function getMessageChain() {
+    let messageChain = [];
+    let currentMessage = headId ? messageCache.get(headId) : null;
 
-    // Find root messages
-    const rootMessages = messages.filter(msg => 
-        !msg.parent || !messages.find(m => m.id === msg.parent)
-    );
+    while (currentMessage) {
+        messageChain.unshift(currentMessage);
+        currentMessage = messageCache.get(currentMessage.parent);
+    }
+
+    return messageChain;
+}
+
+function renderMessageTree(messages) {
+    let messageChain = getMessageChain();
 
     // Render message tree
     return `
         <div class="message-container">
-            ${rootMessages.map(msg => renderMessageTreeNode(msg, messageChildren)).join('')}
+            ${renderMessageTreeNode(messageChain)}
         </div>
     `;
 }
 
-function renderMessageTreeNode(message, messageChildren) {
-    if (!message) {
+function renderMessageTreeNode(messages) {
+    if (!messages) {
         return '';
     }
 
-    // Skip rendering Rollup type messages directly
-    if (message.type === 'Rollup') {
-        return '';
-    }
-
-    // Get children of this message
     const children = messageChildren.get(message.id) || [];
     const hasActorResponses = children.some(child => child.type === 'Rollup');
 
-    const actorResponsesHtml = hasActorResponses ? 
-        renderActorResponsesSection(message.id, children) : '';
+    const actorResponsesHtml = hasActorResponses ?  renderActorResponsesSection(message.id, children) : '';
 
-    const childMessagesHtml = children
-        .filter(child => child.type !== 'Rollup')
-        .map(child => renderMessageTreeNode(child, messageChildren))
-        .join('');
+    const childMessagesHtml = children.filter(child => child.type !== 'Rollup').map(child => renderMessageTreeNode(child, messageChildren)).join('');
 
     return `
         <div class="message-tree">
@@ -269,7 +259,7 @@ function connectWebSocket() {
         console.log("WebSocket connected");
         updateConnectionStatus('connected');
         reconnectAttempts = 0;
-        sendWebSocketMessage({ type: 'get_messages' });
+        sendWebSocketMessage({ type: 'get_head' });
         initializeChildPanel();
     };
     
@@ -312,27 +302,18 @@ function handleWebSocketMessage(data) {
     console.log('Received WebSocket message:', data);
     
     switch(data.type) {
-        case 'message_update':
-            if (data.messages) {
-                console.log("Updating messages:", data.messages);
-                data.messages.forEach(msg => messageCache.set(msg.id, msg));
-                const allMessages = Array.from(messageCache.values());
-                renderMessages(allMessages);
-                updateHeadId(allMessages);
+        case 'message':
+            console.log("Received message:", data);
+            if (data.id) {
+                messageCache.set(data.id, data);
+                renderMessages([...messageCache.values()]);
             }
-            break;
-            
-        case 'message_content':
-            if (data.message_id && data.content) {
-                console.log("Received message content:", data);
-                // Update the message in cache
-                const message = messageCache.get(data.message_id);
-                if (message) {
-                    message.child_responses = data.content;
-                    messageCache.set(data.message_id, message);
-                    // Re-render messages to show the new content
-                    renderMessages([...messageCache.values()]);
-                }
+
+        case 'head_update':
+            console.log("Head update received:", data);
+            if (data.head_id) {
+                headId = data.head_id;
+                updateHeadId([...messageCache.values()]);
             }
             break;
             
@@ -394,7 +375,7 @@ function updateHeadId(messages) {
     const headElement = document.querySelector('.head-id');
     if (messages && messages.length > 0) {
         const lastMessage = messages[messages.length - 1];
-        headElement.textContent = `Head: ${lastMessage.id.slice(0, 8)}...`;
+        headElement.textContent = `Head: ${lastMessage.id}...`;
     } else {
         headElement.textContent = 'Head: None';
     }
