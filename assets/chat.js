@@ -152,35 +152,14 @@ function renderMessage(message) {
                 ${formatMessageContent(content)}
             </div>
         `;
-    } else if (message.data.Child) {
-        const { child_id, text } = message.data.Child;
-        return `
-            <div class="message child">
-                <div class="child-header">Actor: ${child_id}</div>
-                ${formatMessageContent(text)}
-            </div>
-        `;
-    }
-    return '';
-}
-
-function renderMessage(message) {
-    if (message.data.Chat) {
-        const { role, content } = message.data.Chat;
-        return `
-            <div class="message ${role}">
-                ${formatMessageContent(content)}
-            </div>
-        `;
-    } else if (message.data.Child) {
-        const { child_id, text, data } = message.data.Child;
-        const messageId = `child-${message.id}`;
-        return `
+    } else if (message.data.ChildRollup) {
+        // Handle array of child messages
+        return message.data.ChildRollup.map(childMsg => `
             <div class="child-message">
                 <div class="child-message-header">
-                    <div class="child-header">Actor: ${child_id}</div>
-                    ${Object.keys(data).length > 0 ? `
-                        <button class="child-data-toggle" onclick="toggleChildData('${messageId}')">
+                    <div class="child-header">Actor: ${childMsg.child_id}</div>
+                    ${Object.keys(childMsg.data || {}).length > 0 ? `
+                        <button class="child-data-toggle" onclick="toggleChildData('child-${message.id}-${childMsg.child_id}')">
                             <span>View Data</span>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M9 18l6-6-6-6"/>
@@ -189,17 +168,17 @@ function renderMessage(message) {
                     ` : ''}
                 </div>
                 <div class="child-message-content">
-                    ${formatMessageContent(text)}
-                    ${Object.keys(data).length > 0 ? `
-                        <div id="${messageId}" class="child-data">
+                    ${formatMessageContent(childMsg.text)}
+                    ${Object.keys(childMsg.data || {}).length > 0 ? `
+                        <div id="child-${message.id}-${childMsg.child_id}" class="child-data">
                             <div class="child-data-content">
-                                ${formatJsonData(data)}
+                                ${formatJsonData(childMsg.data)}
                             </div>
                         </div>
                     ` : ''}
                 </div>
             </div>
-        `;
+        `).join('');
     }
     return '';
 }
