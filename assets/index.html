@@ -1,105 +1,101 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Enhanced Chat Interface">
     <title>Enhanced Chat</title>
     <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
     <div class="app">
-        <main class="chat-container">
-            <header class="header">
+        <main class="chat-container" role="main">
+            <header class="header" role="banner">
                 <div class="header-title">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
-                    <span>Chat Interface</span>
+                    <h1>Chat Interface</h1>
                 </div>
-                <div id="connectionStatus" class="connection-status disconnected">
-                    <div class="status-indicator"></div>
+                <div id="connectionStatus" class="connection-status disconnected" role="status" aria-live="polite">
+                    <div class="status-indicator" aria-hidden="true"></div>
                     <span>Disconnected</span>
                 </div>
             </header>
 
-            <div class="messages-container" id="messagesContainer">
-                <!-- Messages will be rendered here -->
+            <section class="messages-container" id="messagesContainer" role="log" aria-label="Chat messages">
                 <div class="empty-state">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        class="mx-auto mb-4">
+                    <svg aria-hidden="true" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
                     <p>No messages yet</p>
                     <p class="text-sm">Start a conversation!</p>
                 </div>
-            </div>
+            </section>
 
-            <div class="input-container">
+            <footer class="input-container">
                 <div class="input-wrapper">
-                    <textarea id="messageInput" class="message-input"
-                        placeholder="Type your message... (Shift+Enter for new line)" rows="1"></textarea>
-                    <button id="sendButton" class="send-button" disabled>
+                    <label for="messageInput" class="sr-only">Type your message</label>
+                    <textarea 
+                        id="messageInput" 
+                        class="message-input"
+                        placeholder="Type your message... (Shift+Enter for new line)" 
+                        rows="1"
+                        aria-label="Message input"
+                    ></textarea>
+                    <button id="sendButton" class="send-button" disabled aria-label="Send message">
                         Send
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path d="M5 12h14m-6-6l6 6-6 6" stroke-width="2" stroke-linecap="round" />
                         </svg>
                     </button>
                 </div>
-            </div>
-
-            <div id="loadingOverlay" class="loading-overlay">
-                <div class="loading-spinner"></div>
-            </div>
+            </footer>
         </main>
 
-        <aside id="actorPanel" class="actor-panel">
+        <aside id="actorPanel" class="actor-panel" role="complementary" aria-label="Actor management">
             <div class="panel-header">
-                <div class="panel-title">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <h2 class="panel-title">
+                    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                         <circle cx="9" cy="7" r="4" />
                         <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                         <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
                     Actor Management
-                </div>
-                <button id="collapseButton" class="collapse-button">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                </h2>
+                <button id="collapseButton" class="collapse-button" aria-label="Collapse panel">
+                    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M18 6L6 18M6 6l12 12" />
                     </svg>
                 </button>
             </div>
             <div class="panel-content">
-                <div class="section">
-                    <button class="section-header" onclick="toggleSection('availableActors')">
-                        <h3 class="section-title">Available Actors</h3>
-                        <svg class="section-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2">
+                <section class="section" aria-labelledby="availableActorsTitle">
+                    <button class="section-header" onclick="toggleSection('availableActors')" aria-expanded="true">
+                        <h3 id="availableActorsTitle" class="section-title">Available Actors</h3>
+                        <svg class="section-arrow" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M6 9l6 6 6-6" />
                         </svg>
                     </button>
-                    <div id="availableActors" class="section-content">
-                        <!-- Available actors will be rendered here -->
+                    <div id="availableActors" class="section-content" role="list">
+                        <!-- Available actors rendered here -->
                     </div>
-                </div>
-                <div class="section">
-                    <button class="section-header" onclick="toggleSection('runningActors')">
-                        <h3 class="section-title">Running Actors</h3>
-                        <svg class="section-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2">
+                </section>
+                <section class="section" aria-labelledby="runningActorsTitle">
+                    <button class="section-header" onclick="toggleSection('runningActors')" aria-expanded="true">
+                        <h3 id="runningActorsTitle" class="section-title">Running Actors</h3>
+                        <svg class="section-arrow" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M6 9l6 6 6-6" />
                         </svg>
                     </button>
-                    <div id="runningActors" class="section-content">
-                        <!-- Running actors will be rendered here -->
+                    <div id="runningActors" class="section-content" role="list">
+                        <!-- Running actors rendered here -->
                     </div>
-                </div>
+                </section>
             </div>
         </aside>
     </div>
     <script src="chat.js"></script>
 </body>
-
 </html>
