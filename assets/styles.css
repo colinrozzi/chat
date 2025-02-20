@@ -96,7 +96,7 @@ body {
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.5rem;
     scroll-behavior: smooth;
 }
 
@@ -107,16 +107,28 @@ body {
     line-height: 1.6;
     animation: messageAppear 0.3s ease-out;
     margin-right: auto;
-    background: var(--bg-tertiary);
+    background: var(--bg-primary);
     border-left: 3px solid transparent;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
 }
 
-.message.user {
-    border-left-color: var(--accent-primary);
+.message::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    left: 0;
+    width: 3px;
 }
 
-.message.assistant {
-    border-left-color: var(--text-muted);
+.message.user::before {
+    background: var(--accent-primary);
+}
+
+.message.assistant::before {
+    background: var(--text-muted);
 }
 
 /* Input Area */
@@ -137,7 +149,6 @@ body {
 
 .input-wrapper:focus-within {
     border-color: var(--accent-primary);
-    box-shadow: 0 0 0 2px var(--accent-muted);
 }
 
 .message-input {
@@ -244,7 +255,7 @@ body {
 
 /* Actor Cards */
 .actor-card {
-    background: var(--bg-tertiary);
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     padding: 1.25rem;
     margin-bottom: 1rem;
@@ -257,7 +268,7 @@ body {
 
 /* Child Messages */
 .child-message {
-    background: var(--bg-tertiary);
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     margin: 1rem 0;
     width: 100%;
