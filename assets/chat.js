@@ -165,7 +165,7 @@ function renderMessage(message) {
             .filter(childMsg => childMsg.text && childMsg.text.trim() !== '')
             .map(childMsg => `
                 <div class="child-message">
-                    <div class="child-message-header">
+                    <div class="child-message-header" onclick="toggleChildMessage(this)">
                         <div class="child-header">Actor: ${childMsg.child_id}</div>
                         ${Object.keys(childMsg.data || {}).length > 0 ? `
                             <button class="child-data-toggle" onclick="toggleChildData('child-${message.id}-${childMsg.child_id}')">
@@ -176,7 +176,7 @@ function renderMessage(message) {
                             </button>
                         ` : ''}
                     </div>
-                    <div class="child-message-content">
+                    <div class="child-message-content expanded">
                         ${formatMessageContent(childMsg.text)}
                         ${Object.keys(childMsg.data || {}).length > 0 ? `
                             <div id="child-${message.id}-${childMsg.child_id}" class="child-data">
@@ -419,6 +419,13 @@ document.addEventListener('DOMContentLoaded', () => {
 function toggleSection(sectionId) {
     const section = document.getElementById(sectionId).closest('.section');
     section.classList.toggle('collapsed');
+}
+
+// Toggle child message content
+function toggleChildMessage(header) {
+    const content = header.nextElementSibling;
+    content.classList.toggle('expanded');
+    header.classList.toggle('collapsed');
 }
 
 // Cleanup

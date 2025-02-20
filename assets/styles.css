@@ -214,13 +214,32 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    cursor: pointer;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    transition: all 0.2s ease;
+}
+
+.child-message-header:hover {
+    background: var(--bg-primary);
+}
+
+.child-message-header.collapsed {
+    border-radius: var(--radius-lg);
 }
 
 .child-message-content {
-    padding: 1rem;
+    padding: 0;
     background: var(--bg-tertiary);
     color: var(--text-primary);
     font-size: 0.75rem;  /* 12px */
+    max-height: 0;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.child-message-content.expanded {
+    padding: 1rem;
+    max-height: 1000px;
 }
 
 .child-header {
