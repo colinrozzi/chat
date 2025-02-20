@@ -1,0 +1,5 @@
+{
+    "name": "fs-tmp",
+    "base_path": ".",
+    "permissions": ["read", "write"] 
+}

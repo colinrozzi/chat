@@ -1,0 +1,5 @@
+{
+    "name": "fs-child",
+    "base_path": ".",
+    "permissions": ["read", "write"] 
+}

@@ -41,7 +41,7 @@ impl ClaudeClient {
             ],
             body: Some(serde_json::to_vec(&json!({
                 "model": "claude-3-5-sonnet-20241022",
-                "max_tokens": 1024,
+                "max_tokens": 8192,
                 "messages": anthropic_messages,
             }))?),
         };
