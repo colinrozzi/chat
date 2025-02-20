@@ -176,7 +176,7 @@ function renderMessage(message) {
                             </button>
                         ` : ''}
                     </div>
-                    <div class="child-message-content expanded">
+                    <div class="child-message-content">
                         ${formatMessageContent(childMsg.text)}
                         ${Object.keys(childMsg.data || {}).length > 0 ? `
                             <div id="child-${message.id}-${childMsg.child_id}" class="child-data">
