@@ -378,6 +378,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize WebSocket
     connectWebSocket();
     
+    // Add keyboard shortcut for focusing message input
+    document.addEventListener('keydown', (event) => {
+        if (event.key === '\\') {
+            event.preventDefault(); // Prevent the \ from being typed
+            elements.messageInput.focus();
+        }
+    });
+    
     // Auto-resize textarea
     elements.messageInput.addEventListener('input', () => {
         elements.messageInput.style.height = 'auto';
