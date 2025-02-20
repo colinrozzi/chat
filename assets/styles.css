@@ -167,6 +167,27 @@ body {
     border-bottom-left-radius: var(--radius-sm);
 }
 
+/* Button Styles */
+.child-data-toggle,
+.collapse-button {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.child-data-toggle:hover,
+.collapse-button:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
 /* Child Messages */
 .child-message {
     background: var(--bg-tertiary);
@@ -174,7 +195,6 @@ body {
     margin: 1rem 0;
     width: 100%;
     border-radius: var(--radius-lg);
-    overflow: hidden;
 }
 
 .child-message-header {
@@ -518,6 +538,30 @@ code {
     
     .actor-panel.visible {
         transform: translateX(0);
+    }
+    
+    .toggle-panel-button {
+        position: fixed;
+        top: 0.75rem;
+        right: 1rem;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-md);
+        width: 2.5rem;
+        height: 2.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        z-index: 50;
+        color: var(--text-secondary);
+    }
+    
+    .toggle-panel-button:hover {
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        border-color: var(--border-hover);
     }
     
     .message {
