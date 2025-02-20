@@ -17,7 +17,7 @@ const elements = {
     loadingOverlay: document.getElementById('loadingOverlay'),
     actorPanel: document.getElementById('actorPanel'),
     collapseButton: document.getElementById('collapseButton'),
-    togglePanelButton: document.getElementById('togglePanelButton'),
+    expandButton: document.getElementById('expandButton'),
     availableActors: document.getElementById('availableActors'),
     runningActors: document.getElementById('runningActors')
 };
@@ -393,12 +393,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Panel toggle handlers
     elements.collapseButton.addEventListener('click', () => {
         elements.actorPanel.classList.add('collapsed');
-        elements.togglePanelButton.style.display = 'flex';
+        elements.expandButton.classList.add('visible');
     });
     
-    elements.togglePanelButton.addEventListener('click', () => {
+    elements.expandButton.addEventListener('click', () => {
         elements.actorPanel.classList.remove('collapsed');
-        elements.togglePanelButton.style.display = 'none';
+        elements.expandButton.classList.remove('visible');
     });
 });
 

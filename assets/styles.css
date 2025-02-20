@@ -54,9 +54,14 @@ body {
 /* Layout */
 .app {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr var(--sidebar-width);
     height: 100vh;
     background: var(--bg-primary);
+    transition: grid-template-columns 0.3s ease;
+}
+
+.app:has(.actor-panel.collapsed) {
+    grid-template-columns: 1fr 0;
 }
 
 /* Chat Container */
@@ -291,12 +296,44 @@ body {
 /* Actor Panel */
 .actor-panel {
     max-height: 100vh;
-
     width: var(--sidebar-width);
     background: var(--bg-tertiary);
     border-left: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
+    transition: transform 0.3s ease;
+}
+
+.actor-panel.collapsed {
+    transform: translateX(100%);
+}
+
+.expand-button {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.5rem;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    z-index: 100;
+    transition: all 0.2s ease;
+}
+
+.expand-button.visible {
+    display: flex;
+}
+
+.expand-button:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--border-hover);
 }
 
 .panel-header {
