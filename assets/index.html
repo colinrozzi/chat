@@ -74,14 +74,24 @@
             </div>
             <div class="panel-content">
                 <div class="section">
-                    <h3 class="section-title">Available Actors</h3>
-                    <div id="availableActors">
+                    <button class="section-header" onclick="toggleSection('availableActors')">
+                        <h3 class="section-title">Available Actors</h3>
+                        <svg class="section-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+                    <div id="availableActors" class="section-content">
                         <!-- Available actors will be rendered here -->
                     </div>
                 </div>
                 <div class="section">
-                    <h3 class="section-title">Running Actors</h3>
-                    <div id="runningActors">
+                    <button class="section-header" onclick="toggleSection('runningActors')">
+                        <h3 class="section-title">Running Actors</h3>
+                        <svg class="section-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+                    <div id="runningActors" class="section-content">
                         <!-- Running actors will be rendered here -->
                     </div>
                 </div>
