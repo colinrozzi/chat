@@ -167,7 +167,6 @@ body {
     margin-right: auto;
     word-wrap: break-word;
     overflow-wrap: break-word;
-    white-space: pre-wrap;
 }
 
 .message.user {
@@ -210,7 +209,6 @@ body {
     width: 100%;
     border-radius: var(--radius-lg);
     max-width: 100%;
-    overflow: hidden;
 }
 
 .child-message-header {
