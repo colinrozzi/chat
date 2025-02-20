@@ -400,6 +400,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// Section toggling
+function toggleSection(sectionId) {
+    const section = document.getElementById(sectionId).closest('.section');
+    section.classList.toggle('collapsed');
+}
+
 // Cleanup
 window.addEventListener('unload', () => {
     if (ws) {
