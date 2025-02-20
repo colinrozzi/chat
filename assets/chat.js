@@ -85,6 +85,7 @@ function handleWebSocketMessage(data) {
         case 'head':
             if (data.head) {
                 currentHead = data.head;
+                elements.headId.textContent = `Head: ${data.head}`;
                 requestMessage(data.head);
             }
             break;
