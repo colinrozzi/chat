@@ -45,7 +45,7 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: "MesloLGM", "MesloLGL", "Meslo LG", Monaco, Menlo, "Courier New", monospace;
     background: var(--bg-primary);
     color: var(--text-primary);
     line-height: 1.5;
@@ -99,7 +99,7 @@ body {
     gap: 0.5rem;
     padding: 0.5rem 1rem;
     border-radius: var(--radius-lg);
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     font-weight: 500;
     transition: all 0.2s ease;
 }
@@ -159,7 +159,7 @@ body {
     border-radius: var(--radius-lg);
     line-height: 1.6;
     animation: messageAppear 0.3s ease-out;
-    font-size: 0.875rem;  /* 14px */
+    font-size: 0.75rem;  /* 12px */
 }
 
 .message.user {
@@ -217,11 +217,11 @@ body {
     padding: 1rem;
     background: var(--bg-tertiary);
     color: var(--text-primary);
-    font-size: 0.875rem;  /* 14px */
+    font-size: 0.75rem;  /* 12px */
 }
 
 .child-header {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
     font-weight: 500;
 }
@@ -254,7 +254,7 @@ body {
     border: none;
     outline: none;
     color: var(--text-primary);
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     padding: 0.75rem;
     resize: none;
     max-height: 120px;
@@ -413,14 +413,14 @@ body {
 }
 
 .actor-description {
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
     margin-bottom: 1rem;
 }
 
 .actor-id {
     font-family: ui-monospace, monospace;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
     background: var(--bg-primary);
     padding: 0.25rem 0.5rem;
@@ -497,7 +497,7 @@ pre {
 
 code {
     font-family: ui-monospace, monospace;
-    font-size: 0.875rem;
+    font-size: 0.75rem;
     color: var(--text-primary);
 }
 
