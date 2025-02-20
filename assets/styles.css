@@ -164,18 +164,17 @@ body {
     line-height: 1.6;
     animation: messageAppear 0.3s ease-out;
     font-size: 0.75rem;  /* 12px */
+    margin-right: auto;
 }
 
 .message.user {
     background: var(--accent-primary);
     color: white;
-    margin-left: auto;
-    border-bottom-right-radius: var(--radius-sm);
+    border-bottom-right-radius: var(--radius-lg);
 }
 
 .message.assistant {
     background: var(--bg-tertiary);
-    margin-right: auto;
     border-bottom-left-radius: var(--radius-sm);
 }
 
