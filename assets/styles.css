@@ -164,12 +164,13 @@ body {
 
 /* Child Messages */
 .child-message {
-    background: #EEF2FF;
-    border: 1px solid #E0E7FF;
+    background: #1E293B;
+    border: 1px solid #334155;
     margin: 1rem 0;
     width: 100%;
     border-radius: 0.75rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    color: #E2E8F0;
 }
 
 .child-message-header {
@@ -182,13 +183,13 @@ body {
 
 .child-message-content {
     padding: 1rem;
-    background: white;
-    border-top: 1px solid #E0E7FF;
+    background: #0F172A;
+    border-top: 1px solid #334155;
 }
 
 .child-header {
     font-size: 0.875rem;
-    color: var(--primary);
+    color: #94A3B8;
     font-weight: 500;
 }
 
@@ -201,7 +202,7 @@ body {
 .child-data-toggle {
     background: none;
     border: none;
-    color: var(--primary);
+    color: #60A5FA;
     font-size: 0.875rem;
     cursor: pointer;
     display: flex;
@@ -213,7 +214,8 @@ body {
 }
 
 .child-data-toggle:hover {
-    background: rgba(79, 70, 229, 0.1);
+    background: rgba(96, 165, 250, 0.1);
+    color: #93C5FD;
 }
 
 .child-data-toggle svg {
