@@ -156,31 +156,33 @@ function renderMessage(message) {
         `;
     } else if (message.data.ChildRollup) {
         // Handle array of child messages
-        return message.data.ChildRollup.map(childMsg => `
-            <div class="child-message">
-                <div class="child-message-header">
-                    <div class="child-header">Actor: ${childMsg.child_id}</div>
-                    ${Object.keys(childMsg.data || {}).length > 0 ? `
-                        <button class="child-data-toggle" onclick="toggleChildData('child-${message.id}-${childMsg.child_id}')">
-                            <span>View Data</span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M9 18l6-6-6-6"/>
-                            </svg>
-                        </button>
-                    ` : ''}
-                </div>
-                <div class="child-message-content">
-                    ${formatMessageContent(childMsg.text)}
-                    ${Object.keys(childMsg.data || {}).length > 0 ? `
-                        <div id="child-${message.id}-${childMsg.child_id}" class="child-data">
-                            <div class="child-data-content">
-                                ${formatJsonData(childMsg.data)}
+        return message.data.ChildRollup
+            .filter(childMsg => childMsg.text && childMsg.text.trim() !== '')
+            .map(childMsg => `
+                <div class="child-message">
+                    <div class="child-message-header">
+                        <div class="child-header">Actor: ${childMsg.child_id}</div>
+                        ${Object.keys(childMsg.data || {}).length > 0 ? `
+                            <button class="child-data-toggle" onclick="toggleChildData('child-${message.id}-${childMsg.child_id}')">
+                                <span>View Data</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 18l6-6-6-6"/>
+                                </svg>
+                            </button>
+                        ` : ''}
+                    </div>
+                    <div class="child-message-content">
+                        ${formatMessageContent(childMsg.text)}
+                        ${Object.keys(childMsg.data || {}).length > 0 ? `
+                            <div id="child-${message.id}-${childMsg.child_id}" class="child-data">
+                                <div class="child-data-content">
+                                    ${formatJsonData(childMsg.data)}
+                                </div>
                             </div>
-                        </div>
-                    ` : ''}
+                        ` : ''}
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `).join('');
     }
     return '';
 }
