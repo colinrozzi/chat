@@ -19,7 +19,8 @@ const elements = {
     collapseButton: document.getElementById('collapseButton'),
     expandButton: document.getElementById('expandButton'),
     availableActors: document.getElementById('availableActors'),
-    runningActors: document.getElementById('runningActors')
+    runningActors: document.getElementById('runningActors'),
+    headId: document.getElementById('headId')
 };
 
 // WebSocket setup
@@ -54,8 +55,11 @@ function connectWebSocket() {
     ws.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
+            console.log('Received WebSocket message:', data);  // Debug log
             handleWebSocketMessage(data);
         } catch (error) {
+            console.error('WebSocket message processing error:', error);  // Debug log
+            console.error('Raw message:', event.data);  // Debug log
             showError('Failed to process server message');
         }
     };
