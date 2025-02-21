@@ -183,6 +183,9 @@ function renderMessage(message) {
                             <span class="metadata-label">Tokens:</span> ${assistant.usage.input_tokens} in / ${assistant.usage.output_tokens} out
                         </div>
                         <div class="metadata-item">
+                            <span class="metadata-label">Cost:</span> $${calculateMessageCost(assistant.usage)}
+                        </div>
+                        <div class="metadata-item">
                             <span class="metadata-label">Stop Reason:</span> ${assistant.stop_reason}
                         </div>
                     </div>
@@ -289,6 +292,19 @@ function renderActorPanels() {
             </div>
         `).join('') :
         '<div class="empty-state">No running actors</div>';
+}
+
+// Cost calculation
+function calculateMessageCost(usage) {
+    const INPUT_COST_PER_MILLION = 3;
+    const OUTPUT_COST_PER_MILLION = 15;
+    
+    const inputCost = (usage.input_tokens / 1000000) * INPUT_COST_PER_MILLION;
+    const outputCost = (usage.output_tokens / 1000000) * OUTPUT_COST_PER_MILLION;
+    const totalCost = inputCost + outputCost;
+    
+    // Format to 4 decimal places
+    return totalCost.toFixed(4);
 }
 
 // Utility functions
