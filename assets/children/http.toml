@@ -1,0 +1,16 @@
+name = "http"
+description = "Provides http operations"
+component_path = "/Users/colinrozzi/work/actors/http-child/target/wasm32-unknown-unknown/release/http_child.wasm"
+init_data = "/Users/colinrozzi/work/actors/chat/assets/children/http.json"
+
+[interface]
+implements = "ntwk:theater/actor"
+requires = []
+
+[[handlers]]
+type = "runtime"
+config = {}
+
+[[handlers]]
+type = "http-client"
+config = {}
