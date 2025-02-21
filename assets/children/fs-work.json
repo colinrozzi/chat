@@ -1,0 +1,5 @@
+{
+    "name": "fs-work",
+    "base_path": ".",
+    "permissions": ["read"] 
+}
