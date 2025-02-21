@@ -15,9 +15,25 @@ pub enum MessageData {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Message {
-    pub role: String,
-    pub content: String,
+pub enum Message {
+    User {
+        content: String,
+    },
+    Assistant {
+        content: String,
+        id: String,
+        model: String,
+        stop_reason: String,
+        stop_sequence: Option<String>,
+        message_type: String,
+        usage: Usage,
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Usage {
+    pub input_tokens: u32,
+    pub output_tokens: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

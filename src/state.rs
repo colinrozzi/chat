@@ -56,9 +56,8 @@ impl State {
     }
 
     pub fn add_user_message(&mut self, content: &str) {
-        let msg = Message {
+        let msg = Message::User {
             content: content.to_string(),
-            role: "user".to_string(),
         };
 
         self.add_to_chain(MessageData::Chat(msg));
@@ -69,13 +68,9 @@ impl State {
         log(&format!("Anthropic messages: {:?}", messages));
 
         match self.claude_client.generate_response(messages) {
-            Ok(response) => {
-                log(&format!("Generated completion: {}", response));
-                let anthropic_msg = Message {
-                    content: response,
-                    role: "assistant".to_string(),
-                };
-                self.add_to_chain(MessageData::Chat(anthropic_msg));
+            Ok(assistant_msg) => {
+                log(&format!("Generated completion: {:?}", assistant_msg));
+                self.add_to_chain(MessageData::Chat(assistant_msg));
                 self.notify_children();
             }
             Err(e) => {
@@ -130,14 +125,16 @@ impl State {
 
                     // If the last message is from the user, and the current message is also from
                     // the user, combine them into a single message
-                    let last_msg = messages.last();
-                    log(&format!("Last message: {:?}", last_msg));
-                    if let Some(last_msg) = last_msg {
-                        if last_msg.role == "user" && msg.role == "user" {
-                            let chat_msg = messages.last_mut().unwrap();
-                            chat_msg.content.push_str(&format!("\n{}", msg.content));
-                            log(&format!("Updated chat message: {:?}", chat_msg));
-                            continue;
+                    if let Some(last_msg) = messages.last() {
+                        match (last_msg, &msg) {
+                            (Message::User { content: last_content }, Message::User { content }) => {
+                                if let Some(Message::User { content: combined_content }) = messages.last_mut() {
+                                    combined_content.push_str(&format!("\n{}", content));
+                                    log(&format!("Updated chat message: {:?}", combined_content));
+                                    continue;
+                                }
+                            }
+                            _ => {}
                         }
                     }
 
@@ -152,24 +149,24 @@ impl State {
                                 format!("\n<actor id={}>{}</actor>", child_msg.child_id, text);
 
                             if !messages.is_empty() {
-                                let last_msg = messages.last().unwrap();
-                                if last_msg.role == "assistant" {
-                                    let chat_msg = Message {
-                                        role: "user".to_string(),
-                                        content: actor_msg,
-                                    };
-                                    messages.push(chat_msg);
-                                    continue;
-                                } else {
-                                    let chat_msg = messages.last_mut().unwrap();
-                                    chat_msg.content.push_str(&actor_msg);
+                                match messages.last() {
+                                    Some(Message::Assistant { .. }) => {
+                                        messages.push(Message::User {
+                                            content: actor_msg,
+                                        });
+                                        continue;
+                                    }
+                                    Some(Message::User { content }) => {
+                                        if let Some(Message::User { content }) = messages.last_mut() {
+                                            content.push_str(&actor_msg);
+                                        }
+                                    }
+                                    None => {}
                                 }
                             } else {
-                                let chat_msg = Message {
-                                    role: "user".to_string(),
+                                messages.push(Message::User {
                                     content: actor_msg,
-                                };
-                                messages.push(chat_msg);
+                                });
                             }
                         }
                     }
