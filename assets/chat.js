@@ -104,6 +104,10 @@ function handleWebSocketMessage(data) {
 
 function handleNewMessage(message) {
     console.log('Handling new message:', message);
+    
+    // Remove temporary message if it exists
+    messageChain = messageChain.filter(m => !m.id.startsWith('temp-'));
+    
     // Add to message chain if not already present
     if (!messageChain.find(m => m.id === message.id)) {
         messageChain.push(message);
@@ -113,6 +117,11 @@ function handleNewMessage(message) {
     if (message.parent && !messageChain.find(m => m.id === message.parent)) {
         requestMessage(message.parent);
     }
+
+    // Reset waiting state and remove typing indicator
+    isWaitingForResponse = false;
+    removeTypingIndicator();
+    elements.sendButton.disabled = !elements.messageInput.value.trim();
 
     renderMessages();
     scrollToBottom();
@@ -356,21 +365,68 @@ function stopActor(actorId) {
 }
 
 // Message input handling
+let isWaitingForResponse = false;
+
+function addTypingIndicator() {
+    const typingIndicator = document.createElement('div');
+    typingIndicator.className = 'typing-indicator';
+    typingIndicator.id = 'typingIndicator';
+    typingIndicator.innerHTML = `
+        <div class="typing-dots">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+        </div>
+    `;
+    elements.messagesContainer.appendChild(typingIndicator);
+    scrollToBottom();
+}
+
+function removeTypingIndicator() {
+    const indicator = document.getElementById('typingIndicator');
+    if (indicator) {
+        indicator.remove();
+    }
+}
+
 function sendMessage() {
     const content = elements.messageInput.value.trim();
     
-    if (!content || !ws || ws.readyState !== WebSocket.OPEN) {
+    if (!content || !ws || ws.readyState !== WebSocket.OPEN || isWaitingForResponse) {
         return;
     }
     
+    // Create temporary message object for optimistic rendering
+    const tempMessage = {
+        id: 'temp-' + Date.now(),
+        data: {
+            Chat: {
+                role: 'user',
+                content: content
+            }
+        }
+    };
+    
+    // Add to message chain and render immediately
+    messageChain.push(tempMessage);
+    renderMessages();
+    
+    // Add typing indicator
+    addTypingIndicator();
+    scrollToBottom();
+    
+    // Set waiting state
+    isWaitingForResponse = true;
+    elements.messageInput.value = '';
+    elements.messageInput.style.height = 'auto';
+    elements.messageInput.focus();
+    elements.sendButton.disabled = true;
+    
+    // Send the actual message
     sendWebSocketMessage({
         type: 'send_message',
         content: content
     });
-    
-    elements.messageInput.value = '';
-    elements.messageInput.style.height = 'auto';
-    elements.messageInput.focus();
 }
 
 // Event listeners
