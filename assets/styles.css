@@ -96,6 +96,29 @@ body {
     font-family: ui-monospace, monospace;
 }
 
+.total-cost {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    margin-left: auto;
+}
+
+.cost-label {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.cost-value {
+    color: var(--accent-primary);
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
 /* Connection Status */
 .connection-status {
     display: flex;

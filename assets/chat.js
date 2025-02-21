@@ -5,6 +5,7 @@ let availableChildren = [];
 let runningChildren = [];
 let ws = null;
 let reconnectAttempts = 0;
+let totalCost = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 1000;
 
@@ -301,10 +302,21 @@ function calculateMessageCost(usage) {
     
     const inputCost = (usage.input_tokens / 1000000) * INPUT_COST_PER_MILLION;
     const outputCost = (usage.output_tokens / 1000000) * OUTPUT_COST_PER_MILLION;
-    const totalCost = inputCost + outputCost;
+    const messageCost = inputCost + outputCost;
+    
+    // Update total cost
+    totalCost += messageCost;
+    updateTotalCostDisplay();
     
     // Format to 4 decimal places
-    return totalCost.toFixed(4);
+    return messageCost.toFixed(4);
+}
+
+function updateTotalCostDisplay() {
+    const costElement = document.querySelector('.cost-value');
+    if (costElement) {
+        costElement.textContent = `$${totalCost.toFixed(4)}`;
+    }
 }
 
 // Utility functions
