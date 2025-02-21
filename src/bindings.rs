@@ -740,11 +740,11 @@ pub mod ntwk {
             pub type HttpRequest = super::super::super::ntwk::theater::http_types::HttpRequest;
             pub type HttpResponse = super::super::super::ntwk::theater::http_types::HttpResponse;
             #[allow(unused_unsafe, clippy::all)]
-            pub fn send_http(req: &HttpRequest) -> HttpResponse {
+            pub fn send_http(req: &HttpRequest) -> Result<HttpResponse, _rt::String> {
                 unsafe {
                     #[repr(align(4))]
-                    struct RetArea([::core::mem::MaybeUninit<u8>; 24]);
-                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 24]);
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 28]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 28]);
                     let super::super::super::ntwk::theater::http_types::HttpRequest {
                         method: method0,
                         uri: uri0,
@@ -842,56 +842,79 @@ pub mod ntwk {
                         result8_2,
                         ptr9,
                     );
-                    let l10 = i32::from(*ptr9.add(0).cast::<u16>());
-                    let l11 = *ptr9.add(4).cast::<*mut u8>();
-                    let l12 = *ptr9.add(8).cast::<usize>();
-                    let base19 = l11;
-                    let len19 = l12;
-                    let mut result19 = _rt::Vec::with_capacity(len19);
-                    for i in 0..len19 {
-                        let base = base19.add(i * 16);
-                        let e19 = {
-                            let l13 = *base.add(0).cast::<*mut u8>();
-                            let l14 = *base.add(4).cast::<usize>();
-                            let len15 = l14;
-                            let bytes15 = _rt::Vec::from_raw_parts(
-                                l13.cast(),
-                                len15,
-                                len15,
-                            );
-                            let l16 = *base.add(8).cast::<*mut u8>();
-                            let l17 = *base.add(12).cast::<usize>();
-                            let len18 = l17;
-                            let bytes18 = _rt::Vec::from_raw_parts(
-                                l16.cast(),
-                                len18,
-                                len18,
-                            );
-                            (_rt::string_lift(bytes15), _rt::string_lift(bytes18))
-                        };
-                        result19.push(e19);
-                    }
-                    _rt::cabi_dealloc(base19, len19 * 16, 4);
-                    let l20 = i32::from(*ptr9.add(12).cast::<u8>());
+                    let l10 = i32::from(*ptr9.add(0).cast::<u8>());
                     if layout6.size() != 0 {
                         _rt::alloc::dealloc(result6.cast(), layout6);
                     }
-                    super::super::super::ntwk::theater::http_types::HttpResponse {
-                        status: l10 as u16,
-                        headers: result19,
-                        body: match l20 {
-                            0 => None,
-                            1 => {
-                                let e = {
-                                    let l21 = *ptr9.add(16).cast::<*mut u8>();
-                                    let l22 = *ptr9.add(20).cast::<usize>();
-                                    let len23 = l22;
-                                    _rt::Vec::from_raw_parts(l21.cast(), len23, len23)
-                                };
-                                Some(e)
-                            }
-                            _ => _rt::invalid_enum_discriminant(),
-                        },
+                    match l10 {
+                        0 => {
+                            let e = {
+                                let l11 = i32::from(*ptr9.add(4).cast::<u16>());
+                                let l12 = *ptr9.add(8).cast::<*mut u8>();
+                                let l13 = *ptr9.add(12).cast::<usize>();
+                                let base20 = l12;
+                                let len20 = l13;
+                                let mut result20 = _rt::Vec::with_capacity(len20);
+                                for i in 0..len20 {
+                                    let base = base20.add(i * 16);
+                                    let e20 = {
+                                        let l14 = *base.add(0).cast::<*mut u8>();
+                                        let l15 = *base.add(4).cast::<usize>();
+                                        let len16 = l15;
+                                        let bytes16 = _rt::Vec::from_raw_parts(
+                                            l14.cast(),
+                                            len16,
+                                            len16,
+                                        );
+                                        let l17 = *base.add(8).cast::<*mut u8>();
+                                        let l18 = *base.add(12).cast::<usize>();
+                                        let len19 = l18;
+                                        let bytes19 = _rt::Vec::from_raw_parts(
+                                            l17.cast(),
+                                            len19,
+                                            len19,
+                                        );
+                                        (_rt::string_lift(bytes16), _rt::string_lift(bytes19))
+                                    };
+                                    result20.push(e20);
+                                }
+                                _rt::cabi_dealloc(base20, len20 * 16, 4);
+                                let l21 = i32::from(*ptr9.add(16).cast::<u8>());
+                                super::super::super::ntwk::theater::http_types::HttpResponse {
+                                    status: l11 as u16,
+                                    headers: result20,
+                                    body: match l21 {
+                                        0 => None,
+                                        1 => {
+                                            let e = {
+                                                let l22 = *ptr9.add(20).cast::<*mut u8>();
+                                                let l23 = *ptr9.add(24).cast::<usize>();
+                                                let len24 = l23;
+                                                _rt::Vec::from_raw_parts(l22.cast(), len24, len24)
+                                            };
+                                            Some(e)
+                                        }
+                                        _ => _rt::invalid_enum_discriminant(),
+                                    },
+                                }
+                            };
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l25 = *ptr9.add(4).cast::<*mut u8>();
+                                let l26 = *ptr9.add(8).cast::<usize>();
+                                let len27 = l26;
+                                let bytes27 = _rt::Vec::from_raw_parts(
+                                    l25.cast(),
+                                    len27,
+                                    len27,
+                                );
+                                _rt::string_lift(bytes27)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
                     }
                 }
             }
@@ -1784,8 +1807,8 @@ pub(crate) use __export_single_chat_impl as export;
 #[cfg(target_arch = "wasm32")]
 #[link_section = "component-type:wit-bindgen:0.36.0:ntwk:theater:single-chat:encoded world"]
 #[doc(hidden)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 1824] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x9e\x0d\x01A\x02\x01\
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 1830] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xa4\x0d\x01A\x02\x01\
 A\x1b\x01B\x0e\x01p}\x04\0\x04json\x03\0\0\x01p}\x04\0\x05state\x03\0\x02\x01s\x04\
 \0\x08actor-id\x03\0\x04\x01kw\x01r\x03\x0aevent-types\x06parent\x06\x04data\x01\
 \x04\0\x05event\x03\0\x07\x01r\x02\x04hashw\x05event\x08\x04\0\x0ameta-event\x03\
@@ -1808,28 +1831,28 @@ eater/message-server-host\x05\x06\x01B\x09\x01p}\x04\0\x05bytes\x03\0\0\x01o\x02
 ss\x01p\x02\x01k\x01\x01r\x04\x06methods\x03uris\x07headers\x03\x04body\x04\x04\0\
 \x0chttp-request\x03\0\x05\x01r\x03\x06status{\x07headers\x03\x04body\x04\x04\0\x0d\
 http-response\x03\0\x07\x03\0\x17ntwk:theater/http-types\x05\x07\x02\x03\0\x04\x0c\
-http-request\x02\x03\0\x04\x0dhttp-response\x01B\x08\x02\x03\x02\x01\x01\x04\0\x04\
+http-request\x02\x03\0\x04\x0dhttp-response\x01B\x09\x02\x03\x02\x01\x01\x04\0\x04\
 json\x03\0\0\x02\x03\x02\x01\x08\x04\0\x0chttp-request\x03\0\x02\x02\x03\x02\x01\
-\x09\x04\0\x0dhttp-response\x03\0\x04\x01@\x01\x03req\x03\0\x05\x04\0\x09send-ht\
-tp\x01\x06\x03\0\x18ntwk:theater/http-client\x05\x0a\x02\x03\0\0\x05event\x01B\x09\
-\x02\x03\x02\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\x0b\x04\0\x05event\x03\
-\0\x02\x01@\x02\x03msg\x01\x05state\x01\0\x01\x04\0\x0bhandle-send\x01\x04\x01o\x02\
-\x01\x01\x01@\x02\x03msg\x01\x05state\x01\0\x05\x04\0\x0ehandle-request\x01\x06\x04\
-\0\"ntwk:theater/message-server-client\x05\x0c\x01B\x0d\x01q\x07\x04text\0\0\x06\
-binary\0\0\x07connect\0\0\x05close\0\0\x04ping\0\0\x04pong\0\0\x05other\x01s\0\x04\
-\0\x0cmessage-type\x03\0\0\x01p}\x01k\x02\x01ks\x01r\x03\x02ty\x01\x04data\x03\x04\
-text\x04\x04\0\x11websocket-message\x03\0\x05\x01p\x06\x01r\x01\x08messages\x07\x04\
-\0\x12websocket-response\x03\0\x08\x01o\x02\x02\x09\x01@\x02\x07message\x06\x05s\
-tate\x02\0\x0a\x04\0\x0ehandle-message\x01\x0b\x04\0\x1dntwk:theater/websocket-s\
-erver\x05\x0d\x01B\x07\x02\x03\x02\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\
-\x0b\x04\0\x05event\x03\0\x02\x01k\x01\x01@\x01\x04data\x04\0\x01\x04\0\x04init\x01\
-\x05\x04\0\x12ntwk:theater/actor\x05\x0e\x02\x03\0\0\x05state\x01B\x09\x02\x03\x02\
-\x01\x0f\x04\0\x05state\x03\0\0\x02\x03\x02\x01\x08\x04\0\x0chttp-request\x03\0\x02\
-\x02\x03\x02\x01\x09\x04\0\x0dhttp-response\x03\0\x04\x01o\x02\x05\x01\x01@\x02\x03\
-req\x03\x05state\x01\0\x06\x04\0\x0ehandle-request\x01\x07\x04\0\x18ntwk:theater\
-/http-server\x05\x10\x04\0\x18ntwk:theater/single-chat\x04\0\x0b\x11\x01\0\x0bsi\
-ngle-chat\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.\
-220.1\x10wit-bindgen-rust\x060.36.0";
+\x09\x04\0\x0dhttp-response\x03\0\x04\x01j\x01\x05\x01s\x01@\x01\x03req\x03\0\x06\
+\x04\0\x09send-http\x01\x07\x03\0\x18ntwk:theater/http-client\x05\x0a\x02\x03\0\0\
+\x05event\x01B\x09\x02\x03\x02\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\x0b\
+\x04\0\x05event\x03\0\x02\x01@\x02\x03msg\x01\x05state\x01\0\x01\x04\0\x0bhandle\
+-send\x01\x04\x01o\x02\x01\x01\x01@\x02\x03msg\x01\x05state\x01\0\x05\x04\0\x0eh\
+andle-request\x01\x06\x04\0\"ntwk:theater/message-server-client\x05\x0c\x01B\x0d\
+\x01q\x07\x04text\0\0\x06binary\0\0\x07connect\0\0\x05close\0\0\x04ping\0\0\x04p\
+ong\0\0\x05other\x01s\0\x04\0\x0cmessage-type\x03\0\0\x01p}\x01k\x02\x01ks\x01r\x03\
+\x02ty\x01\x04data\x03\x04text\x04\x04\0\x11websocket-message\x03\0\x05\x01p\x06\
+\x01r\x01\x08messages\x07\x04\0\x12websocket-response\x03\0\x08\x01o\x02\x02\x09\
+\x01@\x02\x07message\x06\x05state\x02\0\x0a\x04\0\x0ehandle-message\x01\x0b\x04\0\
+\x1dntwk:theater/websocket-server\x05\x0d\x01B\x07\x02\x03\x02\x01\x01\x04\0\x04\
+json\x03\0\0\x02\x03\x02\x01\x0b\x04\0\x05event\x03\0\x02\x01k\x01\x01@\x01\x04d\
+ata\x04\0\x01\x04\0\x04init\x01\x05\x04\0\x12ntwk:theater/actor\x05\x0e\x02\x03\0\
+\0\x05state\x01B\x09\x02\x03\x02\x01\x0f\x04\0\x05state\x03\0\0\x02\x03\x02\x01\x08\
+\x04\0\x0chttp-request\x03\0\x02\x02\x03\x02\x01\x09\x04\0\x0dhttp-response\x03\0\
+\x04\x01o\x02\x05\x01\x01@\x02\x03req\x03\x05state\x01\0\x06\x04\0\x0ehandle-req\
+uest\x01\x07\x04\0\x18ntwk:theater/http-server\x05\x10\x04\0\x18ntwk:theater/sin\
+gle-chat\x04\0\x0b\x11\x01\0\x0bsingle-chat\x03\0\0\0G\x09producers\x01\x0cproce\
+ssed-by\x02\x0dwit-component\x070.220.1\x10wit-bindgen-rust\x060.36.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

@@ -48,7 +48,7 @@ impl ClaudeClient {
 
         let http_response = send_http(&request);
 
-        if let Some(body) = http_response.body {
+        if let Some(body) = http_response.unwrap().body {
             if let Ok(response_data) = serde_json::from_slice::<Value>(&body) {
                 if let Some(text) = response_data["content"][0]["text"].as_str() {
                     return Ok(text.to_string());
