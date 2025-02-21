@@ -242,7 +242,29 @@ body {
 
 .child-message-content.expanded {
     padding: 1rem;
-    max-height: 1000px;
+    max-height: 400px; /* Set a reasonable max height */
+    overflow-y: auto; /* Enable vertical scrolling */
+    scrollbar-width: thin; /* For Firefox */
+    scrollbar-color: var(--text-muted) var(--bg-secondary); /* For Firefox */
+}
+
+/* Webkit scrollbar styling for the child message content */
+.child-message-content.expanded::-webkit-scrollbar {
+    width: 6px;
+}
+
+.child-message-content.expanded::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+}
+
+.child-message-content.expanded::-webkit-scrollbar-thumb {
+    background: var(--text-muted);
+    border-radius: var(--radius-sm);
+}
+
+.child-message-content.expanded::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
 }
 
 .child-header {
