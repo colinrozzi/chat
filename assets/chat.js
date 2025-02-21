@@ -162,12 +162,33 @@ function renderMessages() {
 function renderMessage(message) {
     console.log('Rendering message:', message, '\nMessage data:', JSON.stringify(message.data, null, 2));
     if (message.data.Chat) {
-        const { role, content } = message.data.Chat;
-        return `
-            <div class="message ${role}">
-                ${formatMessageContent(content)}
-            </div>
-        `;
+        const msg = message.data.Chat;
+        // Handle the new Message enum structure
+        if (msg.User) {
+            return `
+                <div class="message user">
+                    ${formatMessageContent(msg.User.content)}
+                </div>
+            `;
+        } else if (msg.Assistant) {
+            const assistant = msg.Assistant;
+            return `
+                <div class="message assistant">
+                    ${formatMessageContent(assistant.content)}
+                    <div class="message-metadata">
+                        <div class="metadata-item">
+                            <span class="metadata-label">Model:</span> ${assistant.model}
+                        </div>
+                        <div class="metadata-item">
+                            <span class="metadata-label">Tokens:</span> ${assistant.usage.input_tokens} in / ${assistant.usage.output_tokens} out
+                        </div>
+                        <div class="metadata-item">
+                            <span class="metadata-label">Stop Reason:</span> ${assistant.stop_reason}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
     } else if (message.data.ChildRollup) {
         // Handle array of child messages
         return message.data.ChildRollup
@@ -401,8 +422,9 @@ function sendMessage() {
         id: 'temp-' + Date.now(),
         data: {
             Chat: {
-                role: 'user',
-                content: content
+                User: {
+                    content: content
+                }
             }
         }
     };
