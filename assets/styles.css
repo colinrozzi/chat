@@ -178,6 +178,31 @@ body {
 .message.assistant {
     background: var(--bg-tertiary);
     border-bottom-left-radius: var(--radius-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.message-metadata {
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.metadata-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.metadata-label {
+    color: var(--text-secondary);
+    font-weight: 500;
 }
 
 /* Button Styles */
