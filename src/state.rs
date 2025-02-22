@@ -1,6 +1,7 @@
 use crate::api::claude::ClaudeClient;
 use crate::bindings::ntwk::theater::message_server_host::request;
-use crate::bindings::ntwk::theater::runtime::{log, spawn};
+use crate::bindings::ntwk::theater::runtime::log;
+use crate::bindings::ntwk::theater::supervisor::spawn;
 use crate::messages::store::MessageStore;
 use crate::messages::{ChainEntry, ChildMessage, Message, MessageData};
 use serde::{Deserialize, Serialize};
@@ -127,8 +128,16 @@ impl State {
                     // the user, combine them into a single message
                     if let Some(last_msg) = messages.last() {
                         match (last_msg, &msg) {
-                            (Message::User { content: last_content }, Message::User { content }) => {
-                                if let Some(Message::User { content: combined_content }) = messages.last_mut() {
+                            (
+                                Message::User {
+                                    content: last_content,
+                                },
+                                Message::User { content },
+                            ) => {
+                                if let Some(Message::User {
+                                    content: combined_content,
+                                }) = messages.last_mut()
+                                {
                                     combined_content.push_str(&format!("\n{}", content));
                                     log(&format!("Updated chat message: {:?}", combined_content));
                                     continue;
@@ -151,22 +160,19 @@ impl State {
                             if !messages.is_empty() {
                                 match messages.last() {
                                     Some(Message::Assistant { .. }) => {
-                                        messages.push(Message::User {
-                                            content: actor_msg,
-                                        });
+                                        messages.push(Message::User { content: actor_msg });
                                         continue;
                                     }
                                     Some(Message::User { content }) => {
-                                        if let Some(Message::User { content }) = messages.last_mut() {
+                                        if let Some(Message::User { content }) = messages.last_mut()
+                                        {
                                             content.push_str(&actor_msg);
                                         }
                                     }
                                     None => {}
                                 }
                             } else {
-                                messages.push(Message::User {
-                                    content: actor_msg,
-                                });
+                                messages.push(Message::User { content: actor_msg });
                             }
                         }
                     }
@@ -204,7 +210,7 @@ impl State {
             manifest_name
         );
 
-        let actor_id = spawn(&manifest_path);
+        let actor_id = spawn(&manifest_path)?;
 
         self.children.insert(
             actor_id.clone(),

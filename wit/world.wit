@@ -4,6 +4,7 @@ world single-chat {
     import runtime;
     import filesystem;
     import message-server-host;
+    import supervisor;
     import http-client;
     export message-server-client;
     export websocket-server;
