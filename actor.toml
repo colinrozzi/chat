@@ -27,3 +27,7 @@ config = { port = 8085}
 [[handlers]]
 type = "http-client"
 config = {}
+
+[[handlers]]
+type = "supervisor"
+config = {}
