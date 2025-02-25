@@ -9,7 +9,9 @@ use bindings::exports::ntwk::theater::actor::Guest as ActorGuest;
 use bindings::exports::ntwk::theater::http_server::Guest as HttpGuest;
 use bindings::exports::ntwk::theater::message_server_client::Guest as MessageServerClientGuest;
 use bindings::exports::ntwk::theater::websocket_server::Guest as WebSocketGuest;
+use bindings::exports::ntwk::theater::websocket_server::{WebsocketMessage, WebsocketResponse};
 use bindings::ntwk::theater::filesystem::read_file;
+use bindings::ntwk::theater::http_client::{HttpRequest, HttpResponse};
 use bindings::ntwk::theater::runtime::log;
 use bindings::ntwk::theater::types::Json;
 use serde::{Deserialize, Serialize};
@@ -25,10 +27,13 @@ struct InitData {
 struct Component;
 
 impl ActorGuest for Component {
-    fn init(data: Option<Vec<u8>>) -> Vec<u8> {
+    fn init(data: Option<Vec<u8>>, params: (String,)) -> Result<(Option<Vec<u8>>,), String> {
         log("Initializing chat actor");
+        log(format!("{:?}", data).as_str());
         let data = data.unwrap();
+        log("Data unwrapped");
         let init_data: InitData = serde_json::from_slice(&data).unwrap();
+        log("Init data deserialized");
 
         // Read API key
         log("Reading API key");
@@ -36,7 +41,7 @@ impl ActorGuest for Component {
             Ok(content) => String::from_utf8(content).unwrap().trim().to_string(),
             Err(_) => {
                 log("Failed to read API key");
-                return vec![];
+                return Err("Failed to read API key".to_string());
             }
         };
 
@@ -49,43 +54,43 @@ impl ActorGuest for Component {
         );
 
         log("State initialized");
-        serde_json::to_vec(&initial_state).unwrap()
+        Ok((Some(serde_json::to_vec(&initial_state).unwrap()),))
     }
 }
 
 impl HttpGuest for Component {
     fn handle_request(
-        req: bindings::exports::ntwk::theater::http_server::HttpRequest,
-        state: Json,
-    ) -> (
-        bindings::exports::ntwk::theater::http_server::HttpResponse,
-        Json,
-    ) {
-        handlers::http::handle_request(req, state)
+        state: Option<Vec<u8>>,
+        params: (HttpRequest,),
+    ) -> Result<(Option<Vec<u8>>, (HttpResponse,)), String> {
+        handlers::http::handle_request(params.0, state.unwrap())
     }
 }
 
 impl WebSocketGuest for Component {
     fn handle_message(
-        msg: bindings::exports::ntwk::theater::websocket_server::WebsocketMessage,
-        state: Json,
-    ) -> (
-        Json,
-        bindings::exports::ntwk::theater::websocket_server::WebsocketResponse,
-    ) {
-        handlers::websocket::handle_message(msg, state)
+        state: Option<Vec<u8>>,
+        params: (WebsocketMessage,),
+    ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+        handlers::websocket::handle_message(params.0, state.unwrap())
     }
 }
 
 impl MessageServerClientGuest for Component {
-    fn handle_send(_msg: Vec<u8>, state: Json) -> Json {
+    fn handle_send(
+        state: Option<Vec<u8>>,
+        _params: (Vec<u8>,),
+    ) -> Result<(Option<Vec<u8>>,), String> {
         log("Handling message server client send");
-        state
+        Ok((state,))
     }
 
-    fn handle_request(_msg: Vec<u8>, state: Json) -> (Vec<u8>, Json) {
+    fn handle_request(
+        state: Option<Vec<u8>>,
+        _params: (Vec<u8>,),
+    ) -> Result<(Option<Vec<u8>>, (Vec<u8>,)), String> {
         log("Handling message server client request");
-        (vec![], state)
+        Ok((state, (vec![],)))
     }
 }
 

@@ -45,6 +45,7 @@ impl State {
     }
 
     pub fn add_to_chain(&mut self, data: MessageData) -> ChainEntry {
+        log("Adding message to chain");
         let entry = ChainEntry {
             parent: self.head.clone(),
             id: None,

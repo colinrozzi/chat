@@ -4,29 +4,32 @@ use crate::bindings::ntwk::theater::types::Json;
 use crate::state::State;
 use serde_json::json;
 
-pub fn handle_request(req: HttpRequest, state: Json) -> (HttpResponse, Json) {
+pub fn handle_request(
+    req: HttpRequest,
+    state: Json,
+) -> Result<(Option<Json>, (HttpResponse,)), String> {
     match (req.method.as_str(), req.uri.as_str()) {
         ("GET", "/") | ("GET", "/index.html") => {
             let content = read_file("index.html").unwrap();
-            (
-                HttpResponse {
+            Ok((
+                Some(state),
+                (HttpResponse {
                     status: 200,
                     headers: vec![("Content-Type".to_string(), "text/html".to_string())],
                     body: Some(content),
-                },
-                state,
-            )
+                },),
+            ))
         }
         ("GET", "/styles.css") => {
             let content = read_file("styles.css").unwrap();
-            (
-                HttpResponse {
+            Ok((
+                Some(state),
+                (HttpResponse {
                     status: 200,
                     headers: vec![("Content-Type".to_string(), "text/css".to_string())],
                     body: Some(content),
-                },
-                state,
-            )
+                },),
+            ))
         }
         ("GET", "/chat.js") => {
             let raw_content = read_file("chat.js").unwrap();
@@ -36,27 +39,27 @@ pub fn handle_request(req: HttpRequest, state: Json) -> (HttpResponse, Json) {
                 "{{WEBSOCKET_PORT}}",
                 &current_state.websocket_port.to_string(),
             );
-            (
-                HttpResponse {
+            Ok((
+                Some(state),
+                (HttpResponse {
                     status: 200,
-                    headers: vec![
-                        ("Content-Type".to_string(), "application/javascript".to_string()),
-                    ],
+                    headers: vec![(
+                        "Content-Type".to_string(),
+                        "application/javascript".to_string(),
+                    )],
                     body: Some(content.into()),
-                },
-                state,
-            )
+                },),
+            ))
         }
 
         ("GET", "/api/messages") => {
             let mut current_state: State = serde_json::from_slice(&state).unwrap();
             let messages = current_state.get_chain();
-            (
-                HttpResponse {
+            Ok((
+                Some(state),
+                (HttpResponse {
                     status: 200,
-                    headers: vec![
-                        ("Content-Type".to_string(), "application/json".to_string()),
-                    ],
+                    headers: vec![("Content-Type".to_string(), "application/json".to_string())],
                     body: Some(
                         serde_json::to_vec(&json!({
                             "status": "success",
@@ -64,18 +67,17 @@ pub fn handle_request(req: HttpRequest, state: Json) -> (HttpResponse, Json) {
                         }))
                         .unwrap(),
                     ),
-                },
-                state,
-            )   
+                },),
+            ))
         }
         // Default 404 response
-        _ => (
-            HttpResponse {
+        _ => Ok((
+            Some(state),
+            (HttpResponse {
                 status: 404,
                 headers: vec![],
                 body: Some(b"Not Found".to_vec()),
-            },
-            state,
-        ),
+            },),
+        )),
     }
 }

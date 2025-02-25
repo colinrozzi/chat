@@ -7,7 +7,10 @@ use crate::children::scan_available_children;
 use crate::state::State;
 use serde_json::{json, Value};
 
-pub fn handle_message(msg: WebsocketMessage, state: Json) -> (Json, WebsocketResponse) {
+pub fn handle_message(
+    msg: WebsocketMessage,
+    state: Json,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     log("Handling WebSocket message");
 
     log(&format!("Message: {:?}", msg));
@@ -47,9 +50,9 @@ pub fn handle_message(msg: WebsocketMessage, state: Json) -> (Json, WebsocketRes
                         Some("get_message") => {
                             if let Some(message_id) = command["message_id"].as_str() {
                                 let message = current_state.get_message(message_id).unwrap();
-                                (
-                                    serde_json::to_vec(&current_state).unwrap(),
-                                    WebsocketResponse {
+                                Ok((
+                                    Some(serde_json::to_vec(&current_state).unwrap()),
+                                    (WebsocketResponse {
                                         messages: vec![WebsocketMessage {
                                             ty: MessageType::Text,
                                             text: Some(
@@ -61,15 +64,15 @@ pub fn handle_message(msg: WebsocketMessage, state: Json) -> (Json, WebsocketRes
                                             ),
                                             data: None,
                                         }],
-                                    },
-                                )
+                                    },),
+                                ))
                             } else {
                                 default_response(&current_state)
                             }
                         }
-                        Some("get_head") => (
-                            serde_json::to_vec(&current_state).unwrap(),
-                            WebsocketResponse {
+                        Some("get_head") => Ok((
+                            Some(serde_json::to_vec(&current_state).unwrap()),
+                            (WebsocketResponse {
                                 messages: vec![WebsocketMessage {
                                     ty: MessageType::Text,
                                     text: Some(
@@ -81,8 +84,9 @@ pub fn handle_message(msg: WebsocketMessage, state: Json) -> (Json, WebsocketRes
                                     ),
                                     data: None,
                                 }],
-                            },
-                        ),
+                            },),
+                        )),
+
                         _ => default_response(&current_state),
                     }
                 } else {
@@ -96,7 +100,9 @@ pub fn handle_message(msg: WebsocketMessage, state: Json) -> (Json, WebsocketRes
     }
 }
 
-fn handle_get_available_children(state: &State) -> (Json, WebsocketResponse) {
+fn handle_get_available_children(
+    state: &State,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     let available_children = scan_available_children()
         .into_iter()
         .map(|child| {
@@ -108,9 +114,9 @@ fn handle_get_available_children(state: &State) -> (Json, WebsocketResponse) {
         })
         .collect::<Vec<Value>>();
 
-    (
-        serde_json::to_vec(state).unwrap(),
-        WebsocketResponse {
+    Ok((
+        Some(serde_json::to_vec(state).unwrap()),
+        (WebsocketResponse {
             messages: vec![WebsocketMessage {
                 ty: MessageType::Text,
                 text: Some(
@@ -122,11 +128,13 @@ fn handle_get_available_children(state: &State) -> (Json, WebsocketResponse) {
                 ),
                 data: None,
             }],
-        },
-    )
+        },),
+    ))
 }
 
-fn handle_get_running_children(state: &State) -> (Json, WebsocketResponse) {
+fn handle_get_running_children(
+    state: &State,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     let running_children: Vec<Value> = state
         .children
         .iter()
@@ -138,9 +146,9 @@ fn handle_get_running_children(state: &State) -> (Json, WebsocketResponse) {
         })
         .collect();
 
-    (
-        serde_json::to_vec(state).unwrap(),
-        WebsocketResponse {
+    Ok((
+        Some(serde_json::to_vec(state).unwrap()),
+        (WebsocketResponse {
             messages: vec![WebsocketMessage {
                 ty: MessageType::Text,
                 text: Some(
@@ -152,11 +160,14 @@ fn handle_get_running_children(state: &State) -> (Json, WebsocketResponse) {
                 ),
                 data: None,
             }],
-        },
-    )
+        },),
+    ))
 }
 
-fn handle_start_child(state: &mut State, manifest_name: &str) -> (Json, WebsocketResponse) {
+fn handle_start_child(
+    state: &mut State,
+    manifest_name: &str,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     if let Ok(_actor_id) = state.start_child(manifest_name) {
         let running_children: Vec<Value> = state
             .children
@@ -168,10 +179,9 @@ fn handle_start_child(state: &mut State, manifest_name: &str) -> (Json, Websocke
                 })
             })
             .collect();
-
-        (
-            serde_json::to_vec(state).unwrap(),
-            WebsocketResponse {
+        Ok((
+            Some(serde_json::to_vec(state).unwrap()),
+            (WebsocketResponse {
                 messages: vec![WebsocketMessage {
                     ty: MessageType::Text,
                     text: Some(
@@ -183,14 +193,17 @@ fn handle_start_child(state: &mut State, manifest_name: &str) -> (Json, Websocke
                     ),
                     data: None,
                 }],
-            },
-        )
+            },),
+        ))
     } else {
         default_response(state)
     }
 }
 
-fn handle_stop_child(state: &mut State, actor_id: &str) -> (Json, WebsocketResponse) {
+fn handle_stop_child(
+    state: &mut State,
+    actor_id: &str,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     state.children.remove(actor_id);
 
     let running_children: Vec<Value> = state
@@ -204,9 +217,9 @@ fn handle_stop_child(state: &mut State, actor_id: &str) -> (Json, WebsocketRespo
         })
         .collect();
 
-    (
-        serde_json::to_vec(state).unwrap(),
-        WebsocketResponse {
+    Ok((
+        Some(serde_json::to_vec(state).unwrap()),
+        (WebsocketResponse {
             messages: vec![WebsocketMessage {
                 ty: MessageType::Text,
                 text: Some(
@@ -218,15 +231,18 @@ fn handle_stop_child(state: &mut State, actor_id: &str) -> (Json, WebsocketRespo
                 ),
                 data: None,
             }],
-        },
-    )
+        },),
+    ))
 }
 
-fn handle_send_message(state: &mut State, content: &str) -> (Json, WebsocketResponse) {
+fn handle_send_message(
+    state: &mut State,
+    content: &str,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     state.add_user_message(content);
-    (
-        serde_json::to_vec(state).unwrap(),
-        WebsocketResponse {
+    Ok((
+        Some(serde_json::to_vec(state).unwrap()),
+        (WebsocketResponse {
             messages: vec![WebsocketMessage {
                 ty: MessageType::Text,
                 text: Some(
@@ -238,13 +254,25 @@ fn handle_send_message(state: &mut State, content: &str) -> (Json, WebsocketResp
                 ),
                 data: None,
             }],
-        },
-    )
+        },),
+    ))
 }
 
-fn default_response(state: &State) -> (Json, WebsocketResponse) {
-    (
-        serde_json::to_vec(state).unwrap(),
-        WebsocketResponse { messages: vec![] },
-    )
+fn default_response(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    Ok((
+        Some(serde_json::to_vec(state).unwrap()),
+        (WebsocketResponse {
+            messages: vec![WebsocketMessage {
+                ty: MessageType::Text,
+                text: Some(
+                    json!({
+                        "type": "error",
+                        "message": "Invalid command"
+                    })
+                    .to_string(),
+                ),
+                data: None,
+            }],
+        },),
+    ))
 }
