@@ -13,13 +13,13 @@ use bindings::exports::ntwk::theater::websocket_server::{WebsocketMessage, Webso
 use bindings::ntwk::theater::filesystem::read_file;
 use bindings::ntwk::theater::http_client::{HttpRequest, HttpResponse};
 use bindings::ntwk::theater::runtime::log;
+use bindings::ntwk::theater::supervisor::spawn;
 use bindings::ntwk::theater::types::Json;
 use serde::{Deserialize, Serialize};
 use state::State;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct InitData {
-    store_id: String,
     head: Option<String>,
     websocket_port: u16,
 }
@@ -45,13 +45,12 @@ impl ActorGuest for Component {
             }
         };
 
+        // spawn the store actor
+        log("Spawning store actor");
+        let store_id = spawn("/Users/colinrozzi/work/actors/store/actor.toml")?;
+
         // Initialize state
-        let initial_state = State::new(
-            init_data.store_id,
-            api_key,
-            init_data.websocket_port,
-            init_data.head,
-        );
+        let initial_state = State::new(store_id, api_key, init_data.websocket_port, init_data.head);
 
         log("State initialized");
         Ok((Some(serde_json::to_vec(&initial_state).unwrap()),))
