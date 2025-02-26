@@ -1,4 +1,5 @@
 use crate::bindings::ntwk::theater::message_server_host::request;
+use crate::bindings::ntwk::theater::runtime::log;
 use crate::messages::ChainEntry;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -70,10 +71,15 @@ impl MessageStore {
         };
 
         let request_bytes = serde_json::to_vec(&req)?;
+        log("Sending request");
         let response_bytes = request(&self.store_id, &request_bytes)?;
+        log("Received response");
+        log(&format!("Response bytes: {:?}", response_bytes));
 
         let response: Response = serde_json::from_slice(&response_bytes)?;
+        log(&format!("Response: {:?}", response));
         if response.status == "ok".to_string() {
+            log("Response is ok");
             match response.data {
                 ResponseData::Put(PutResponse { key }) => {
                     entry.id = Some(key.clone());
