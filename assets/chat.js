@@ -111,6 +111,11 @@ function handleNewMessage(message) {
     
     // Add to message chain if not already present
     if (!messageChain.find(m => m.id === message.id)) {
+        // Add the cost to the total only when a new message is received
+        if (message.data && message.data.Chat && message.data.Chat.Assistant) {
+            const assistant = message.data.Chat.Assistant;
+            calculateMessageCost(assistant.usage, true); // Add to total
+        }
         messageChain.push(message);
     }
 
@@ -184,7 +189,7 @@ function renderMessage(message) {
                             <span class="metadata-label">Tokens:</span> ${assistant.usage.input_tokens} in / ${assistant.usage.output_tokens} out
                         </div>
                         <div class="metadata-item">
-                            <span class="metadata-label">Cost:</span> $${calculateMessageCost(assistant.usage)}
+                            <span class="metadata-label">Cost:</span> $${calculateMessageCost(assistant.usage, false)}
                         </div>
                         <div class="metadata-item">
                             <span class="metadata-label">Stop Reason:</span> ${assistant.stop_reason}
@@ -296,7 +301,7 @@ function renderActorPanels() {
 }
 
 // Cost calculation
-function calculateMessageCost(usage) {
+function calculateMessageCost(usage, addToTotal = false) {
     const INPUT_COST_PER_MILLION = 3;
     const OUTPUT_COST_PER_MILLION = 15;
     
@@ -304,9 +309,11 @@ function calculateMessageCost(usage) {
     const outputCost = (usage.output_tokens / 1000000) * OUTPUT_COST_PER_MILLION;
     const messageCost = inputCost + outputCost;
     
-    // Update total cost
-    totalCost += messageCost;
-    updateTotalCostDisplay();
+    // Update total cost only when explicitly requested
+    if (addToTotal) {
+        totalCost += messageCost;
+        updateTotalCostDisplay();
+    }
     
     // Format to 4 decimal places
     return messageCost.toFixed(4);
