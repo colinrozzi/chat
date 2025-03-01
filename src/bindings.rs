@@ -873,11 +873,13 @@ pub mod ntwk {
             }
             #[allow(unused_unsafe, clippy::all)]
             /// Get latest state of a child
-            pub fn get_child_state(child_id: &str) -> Result<_rt::Vec<u8>, _rt::String> {
+            pub fn get_child_state(
+                child_id: &str,
+            ) -> Result<Option<_rt::Vec<u8>>, _rt::String> {
                 unsafe {
                     #[repr(align(4))]
-                    struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
-                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 12]);
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 16]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 16]);
                     let vec0 = child_id;
                     let ptr0 = vec0.as_ptr().cast::<u8>();
                     let len0 = vec0.len();
@@ -897,24 +899,34 @@ pub mod ntwk {
                     match l2 {
                         0 => {
                             let e = {
-                                let l3 = *ptr1.add(4).cast::<*mut u8>();
-                                let l4 = *ptr1.add(8).cast::<usize>();
-                                let len5 = l4;
-                                _rt::Vec::from_raw_parts(l3.cast(), len5, len5)
+                                let l3 = i32::from(*ptr1.add(4).cast::<u8>());
+                                match l3 {
+                                    0 => None,
+                                    1 => {
+                                        let e = {
+                                            let l4 = *ptr1.add(8).cast::<*mut u8>();
+                                            let l5 = *ptr1.add(12).cast::<usize>();
+                                            let len6 = l5;
+                                            _rt::Vec::from_raw_parts(l4.cast(), len6, len6)
+                                        };
+                                        Some(e)
+                                    }
+                                    _ => _rt::invalid_enum_discriminant(),
+                                }
                             };
                             Ok(e)
                         }
                         1 => {
                             let e = {
-                                let l6 = *ptr1.add(4).cast::<*mut u8>();
-                                let l7 = *ptr1.add(8).cast::<usize>();
-                                let len8 = l7;
-                                let bytes8 = _rt::Vec::from_raw_parts(
-                                    l6.cast(),
-                                    len8,
-                                    len8,
+                                let l7 = *ptr1.add(4).cast::<*mut u8>();
+                                let l8 = *ptr1.add(8).cast::<usize>();
+                                let len9 = l8;
+                                let bytes9 = _rt::Vec::from_raw_parts(
+                                    l7.cast(),
+                                    len9,
+                                    len9,
                                 );
-                                _rt::string_lift(bytes8)
+                                _rt::string_lift(bytes9)
                             };
                             Err(e)
                         }
@@ -2422,7 +2434,7 @@ request\x01\x07\x03\0\x20ntwk:theater/message-server-host\x05\x06\x01B\x15\x01p}
 ampw\x04\0\x0bchain-event\x03\0\x02\x01j\x01s\x01s\x01@\x01\x08manifests\0\x04\x04\
 \0\x05spawn\x01\x05\x01ps\x01@\0\0\x06\x04\0\x0dlist-children\x01\x07\x01j\0\x01\
 s\x01@\x01\x08child-ids\0\x08\x04\0\x0astop-child\x01\x09\x04\0\x0drestart-child\
-\x01\x09\x01j\x01\0\x01s\x01@\x01\x08child-ids\0\x0a\x04\0\x0fget-child-state\x01\
+\x01\x09\x01j\x01\x01\x01s\x01@\x01\x08child-ids\0\x0a\x04\0\x0fget-child-state\x01\
 \x0b\x01p\x03\x01j\x01\x0c\x01s\x01@\x01\x08child-ids\0\x0d\x04\0\x10get-child-e\
 vents\x01\x0e\x03\0\x17ntwk:theater/supervisor\x05\x07\x01B\x09\x01p}\x04\0\x05b\
 ytes\x03\0\0\x01o\x02ss\x01p\x02\x01k\x01\x01r\x04\x06methods\x03uris\x07headers\
