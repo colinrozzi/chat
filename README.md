@@ -103,7 +103,7 @@ The system implements multiple communication channels:
 
 ### Prerequisites
 
-- Rust toolchain with `wasm32-unknown-unknown` target
+- Nix with flakes enabled (or alternatively: Rust toolchain with `wasm32-unknown-unknown` target)
 - Theater runtime system
 - Claude API key
 
@@ -114,18 +114,68 @@ The system implements multiple communication channels:
    ```bash
    echo "your-api-key" > assets/api-key.txt
    ```
+
+#### Using Nix Flake (Recommended)
+
+1. Make sure you have Nix with flakes enabled
+2. Enter the development environment:
+   ```bash
+   nix develop
+   ```
+   Or if you use direnv:
+   ```bash
+   direnv allow
+   ```
 3. Build the project:
    ```bash
-   cargo build --release
+   nix build
+   ```
+   This will create a `result` symlink with the built actor.
+
+#### Manual Build
+
+1. Install Rust with wasm32 target:
+   ```bash
+   rustup target add wasm32-unknown-unknown
+   ```
+2. Build the project:
+   ```bash
+   cargo build --target wasm32-unknown-unknown --release
    ```
 
 ### Running
+
+#### Using Nix Build
+
+1. Start the Theater runtime with the portable configuration:
+   ```bash
+   theater run ./result/actor.portable.toml
+   ```
+   Or use the local configuration:
+   ```bash
+   theater run actor.toml
+   ```
+
+#### Manual Run
 
 1. Start the Theater runtime:
    ```bash
    theater run actor.toml
    ```
+
 2. Access the web interface at `http://localhost:8084`
+
+### Distribution
+
+To distribute your actor:
+
+1. Build with Nix:
+   ```bash
+   nix build
+   ```
+
+2. The resulting package can be shared and contains all dependencies
+3. For NixOS users, they can simply add your flake to their inputs and use it directly
 
 ### Creating Child Actors
 
