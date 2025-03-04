@@ -1,4 +1,5 @@
 use crate::bindings::ntwk::theater::http_client::{send_http, HttpRequest};
+use crate::bindings::ntwk::theater::runtime::log;
 use crate::messages::{Message, Usage};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -52,7 +53,9 @@ impl ClaudeClient {
             }))?),
         };
 
-        let http_response = send_http(&request).map_err(|e| format!("HTTP request failed: {}", e))?;
+        let http_response =
+            send_http(&request).map_err(|e| format!("HTTP request failed: {}", e))?;
+        log(&format!("HTTP response: {:?}", http_response));
         let body = http_response.body.ok_or("No response body")?;
         let response_data: Value = serde_json::from_slice(&body)?;
 
@@ -61,7 +64,7 @@ impl ClaudeClient {
             .as_str()
             .ok_or("No content text")?
             .to_string();
-        
+
         let id = response_data["id"]
             .as_str()
             .ok_or("No message ID")?

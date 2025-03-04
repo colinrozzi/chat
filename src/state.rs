@@ -211,7 +211,7 @@ impl State {
             manifest_name
         );
 
-        let actor_id = spawn(&manifest_path)?;
+        let actor_id = spawn(&manifest_path, None)?;
 
         self.children.insert(
             actor_id.clone(),

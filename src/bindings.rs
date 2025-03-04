@@ -159,6 +159,7 @@ pub mod ntwk {
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             use super::super::super::_rt;
             #[allow(unused_unsafe, clippy::all)]
+            /// Basic file operations
             pub fn read_file(path: &str) -> Result<_rt::Vec<u8>, _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -519,6 +520,194 @@ pub mod ntwk {
                     }
                 }
             }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Command execution functions
+            pub fn execute_command(
+                dir: &str,
+                command: &str,
+                args: &[_rt::String],
+            ) -> Result<_rt::String, _rt::String> {
+                unsafe {
+                    #[repr(align(4))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 12]);
+                    let vec0 = dir;
+                    let ptr0 = vec0.as_ptr().cast::<u8>();
+                    let len0 = vec0.len();
+                    let vec1 = command;
+                    let ptr1 = vec1.as_ptr().cast::<u8>();
+                    let len1 = vec1.len();
+                    let vec3 = args;
+                    let len3 = vec3.len();
+                    let layout3 = _rt::alloc::Layout::from_size_align_unchecked(
+                        vec3.len() * 8,
+                        4,
+                    );
+                    let result3 = if layout3.size() != 0 {
+                        let ptr = _rt::alloc::alloc(layout3).cast::<u8>();
+                        if ptr.is_null() {
+                            _rt::alloc::handle_alloc_error(layout3);
+                        }
+                        ptr
+                    } else {
+                        ::core::ptr::null_mut()
+                    };
+                    for (i, e) in vec3.into_iter().enumerate() {
+                        let base = result3.add(i * 8);
+                        {
+                            let vec2 = e;
+                            let ptr2 = vec2.as_ptr().cast::<u8>();
+                            let len2 = vec2.len();
+                            *base.add(4).cast::<usize>() = len2;
+                            *base.add(0).cast::<*mut u8>() = ptr2.cast_mut();
+                        }
+                    }
+                    let ptr4 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/filesystem")]
+                    extern "C" {
+                        #[link_name = "execute-command"]
+                        fn wit_import(
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        );
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                    ) {
+                        unreachable!()
+                    }
+                    wit_import(
+                        ptr0.cast_mut(),
+                        len0,
+                        ptr1.cast_mut(),
+                        len1,
+                        result3,
+                        len3,
+                        ptr4,
+                    );
+                    let l5 = i32::from(*ptr4.add(0).cast::<u8>());
+                    if layout3.size() != 0 {
+                        _rt::alloc::dealloc(result3.cast(), layout3);
+                    }
+                    match l5 {
+                        0 => {
+                            let e = {
+                                let l6 = *ptr4.add(4).cast::<*mut u8>();
+                                let l7 = *ptr4.add(8).cast::<usize>();
+                                let len8 = l7;
+                                let bytes8 = _rt::Vec::from_raw_parts(
+                                    l6.cast(),
+                                    len8,
+                                    len8,
+                                );
+                                _rt::string_lift(bytes8)
+                            };
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l9 = *ptr4.add(4).cast::<*mut u8>();
+                                let l10 = *ptr4.add(8).cast::<usize>();
+                                let len11 = l10;
+                                let bytes11 = _rt::Vec::from_raw_parts(
+                                    l9.cast(),
+                                    len11,
+                                    len11,
+                                );
+                                _rt::string_lift(bytes11)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            pub fn execute_nix_command(
+                dir: &str,
+                command: &str,
+            ) -> Result<_rt::String, _rt::String> {
+                unsafe {
+                    #[repr(align(4))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 12]);
+                    let vec0 = dir;
+                    let ptr0 = vec0.as_ptr().cast::<u8>();
+                    let len0 = vec0.len();
+                    let vec1 = command;
+                    let ptr1 = vec1.as_ptr().cast::<u8>();
+                    let len1 = vec1.len();
+                    let ptr2 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/filesystem")]
+                    extern "C" {
+                        #[link_name = "execute-nix-command"]
+                        fn wit_import(
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        );
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                    ) {
+                        unreachable!()
+                    }
+                    wit_import(ptr0.cast_mut(), len0, ptr1.cast_mut(), len1, ptr2);
+                    let l3 = i32::from(*ptr2.add(0).cast::<u8>());
+                    match l3 {
+                        0 => {
+                            let e = {
+                                let l4 = *ptr2.add(4).cast::<*mut u8>();
+                                let l5 = *ptr2.add(8).cast::<usize>();
+                                let len6 = l5;
+                                let bytes6 = _rt::Vec::from_raw_parts(
+                                    l4.cast(),
+                                    len6,
+                                    len6,
+                                );
+                                _rt::string_lift(bytes6)
+                            };
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l7 = *ptr2.add(4).cast::<*mut u8>();
+                                let l8 = *ptr2.add(8).cast::<usize>();
+                                let len9 = l8;
+                                let bytes9 = _rt::Vec::from_raw_parts(
+                                    l7.cast(),
+                                    len9,
+                                    len9,
+                                );
+                                _rt::string_lift(bytes9)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
         }
         #[allow(dead_code, clippy::all)]
         pub mod message_server_host {
@@ -686,7 +875,10 @@ pub mod ntwk {
             }
             #[allow(unused_unsafe, clippy::all)]
             /// Spawn a new child actor
-            pub fn spawn(manifest: &str) -> Result<_rt::String, _rt::String> {
+            pub fn spawn(
+                manifest: &str,
+                init_bytes: Option<&[u8]>,
+            ) -> Result<_rt::String, _rt::String> {
                 unsafe {
                     #[repr(align(4))]
                     struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
@@ -694,45 +886,75 @@ pub mod ntwk {
                     let vec0 = manifest;
                     let ptr0 = vec0.as_ptr().cast::<u8>();
                     let len0 = vec0.len();
-                    let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    let (result2_0, result2_1, result2_2) = match init_bytes {
+                        Some(e) => {
+                            let vec1 = e;
+                            let ptr1 = vec1.as_ptr().cast::<u8>();
+                            let len1 = vec1.len();
+                            (1i32, ptr1.cast_mut(), len1)
+                        }
+                        None => (0i32, ::core::ptr::null_mut(), 0usize),
+                    };
+                    let ptr3 = ret_area.0.as_mut_ptr().cast::<u8>();
                     #[cfg(target_arch = "wasm32")]
                     #[link(wasm_import_module = "ntwk:theater/supervisor")]
                     extern "C" {
                         #[link_name = "spawn"]
-                        fn wit_import(_: *mut u8, _: usize, _: *mut u8);
+                        fn wit_import(
+                            _: *mut u8,
+                            _: usize,
+                            _: i32,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        );
                     }
                     #[cfg(not(target_arch = "wasm32"))]
-                    fn wit_import(_: *mut u8, _: usize, _: *mut u8) {
+                    fn wit_import(
+                        _: *mut u8,
+                        _: usize,
+                        _: i32,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                    ) {
                         unreachable!()
                     }
-                    wit_import(ptr0.cast_mut(), len0, ptr1);
-                    let l2 = i32::from(*ptr1.add(0).cast::<u8>());
-                    match l2 {
+                    wit_import(
+                        ptr0.cast_mut(),
+                        len0,
+                        result2_0,
+                        result2_1,
+                        result2_2,
+                        ptr3,
+                    );
+                    let l4 = i32::from(*ptr3.add(0).cast::<u8>());
+                    match l4 {
                         0 => {
                             let e = {
-                                let l3 = *ptr1.add(4).cast::<*mut u8>();
-                                let l4 = *ptr1.add(8).cast::<usize>();
-                                let len5 = l4;
-                                let bytes5 = _rt::Vec::from_raw_parts(
-                                    l3.cast(),
-                                    len5,
-                                    len5,
+                                let l5 = *ptr3.add(4).cast::<*mut u8>();
+                                let l6 = *ptr3.add(8).cast::<usize>();
+                                let len7 = l6;
+                                let bytes7 = _rt::Vec::from_raw_parts(
+                                    l5.cast(),
+                                    len7,
+                                    len7,
                                 );
-                                _rt::string_lift(bytes5)
+                                _rt::string_lift(bytes7)
                             };
                             Ok(e)
                         }
                         1 => {
                             let e = {
-                                let l6 = *ptr1.add(4).cast::<*mut u8>();
-                                let l7 = *ptr1.add(8).cast::<usize>();
-                                let len8 = l7;
-                                let bytes8 = _rt::Vec::from_raw_parts(
-                                    l6.cast(),
-                                    len8,
-                                    len8,
+                                let l8 = *ptr3.add(4).cast::<*mut u8>();
+                                let l9 = *ptr3.add(8).cast::<usize>();
+                                let len10 = l9;
+                                let bytes10 = _rt::Vec::from_raw_parts(
+                                    l8.cast(),
+                                    len10,
+                                    len10,
                                 );
-                                _rt::string_lift(bytes8)
+                                _rt::string_lift(bytes10)
                             };
                             Err(e)
                         }
@@ -2410,8 +2632,8 @@ pub(crate) use __export_single_chat_impl as export;
 #[cfg(target_arch = "wasm32")]
 #[link_section = "component-type:wit-bindgen:0.36.0:ntwk:theater:single-chat:encoded world"]
 #[doc(hidden)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 2184] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x86\x10\x01A\x02\x01\
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 2290] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xf0\x10\x01A\x02\x01\
 A\x1d\x01B\x0f\x01p}\x04\0\x04json\x03\0\0\x01p}\x01k\x02\x04\0\x05state\x03\0\x03\
 \x01s\x04\0\x08actor-id\x03\0\x05\x01kw\x01r\x03\x0aevent-types\x06parent\x07\x04\
 data\x01\x04\0\x05event\x03\0\x08\x01r\x02\x04hashw\x05event\x09\x04\0\x0ameta-e\
@@ -2420,51 +2642,53 @@ ntwk:theater/types\x05\0\x02\x03\0\0\x04json\x02\x03\0\0\x05chain\x02\x03\0\0\x0
 actor-id\x01B\x0a\x02\x03\x02\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\x02\x04\
 \0\x05chain\x03\0\x02\x02\x03\x02\x01\x03\x04\0\x08actor-id\x03\0\x04\x01@\x01\x03\
 msgs\x01\0\x04\0\x03log\x01\x06\x01@\0\0\x03\x04\0\x09get-chain\x01\x07\x03\0\x14\
-ntwk:theater/runtime\x05\x04\x01B\x12\x01p}\x01j\x01\0\x01s\x01@\x01\x04paths\0\x01\
+ntwk:theater/runtime\x05\x04\x01B\x17\x01p}\x01j\x01\0\x01s\x01@\x01\x04paths\0\x01\
 \x04\0\x09read-file\x01\x02\x01j\0\x01s\x01@\x02\x04paths\x07contents\0\x03\x04\0\
 \x0awrite-file\x01\x04\x01ps\x01j\x01\x05\x01s\x01@\x01\x04paths\0\x06\x04\0\x0a\
 list-files\x01\x07\x01@\x01\x04paths\0\x03\x04\0\x0bdelete-file\x01\x08\x04\0\x0a\
 create-dir\x01\x08\x04\0\x0adelete-dir\x01\x08\x01j\x01\x7f\x01s\x01@\x01\x04pat\
-hs\0\x09\x04\0\x0bpath-exists\x01\x0a\x03\0\x17ntwk:theater/filesystem\x05\x05\x01\
-B\x0a\x02\x03\x02\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\x03\x04\0\x08act\
-or-id\x03\0\x02\x01j\0\x01s\x01@\x02\x08actor-id\x03\x03msg\x01\0\x04\x04\0\x04s\
-end\x01\x05\x01j\x01\x01\x01s\x01@\x02\x08actor-id\x03\x03msg\x01\0\x06\x04\0\x07\
-request\x01\x07\x03\0\x20ntwk:theater/message-server-host\x05\x06\x01B\x15\x01p}\
-\x01k\0\x01r\x05\x04hash\0\x0bparent-hash\x01\x0aevent-types\x04data\0\x09timest\
-ampw\x04\0\x0bchain-event\x03\0\x02\x01j\x01s\x01s\x01@\x01\x08manifests\0\x04\x04\
-\0\x05spawn\x01\x05\x01ps\x01@\0\0\x06\x04\0\x0dlist-children\x01\x07\x01j\0\x01\
-s\x01@\x01\x08child-ids\0\x08\x04\0\x0astop-child\x01\x09\x04\0\x0drestart-child\
-\x01\x09\x01j\x01\x01\x01s\x01@\x01\x08child-ids\0\x0a\x04\0\x0fget-child-state\x01\
-\x0b\x01p\x03\x01j\x01\x0c\x01s\x01@\x01\x08child-ids\0\x0d\x04\0\x10get-child-e\
-vents\x01\x0e\x03\0\x17ntwk:theater/supervisor\x05\x07\x01B\x09\x01p}\x04\0\x05b\
-ytes\x03\0\0\x01o\x02ss\x01p\x02\x01k\x01\x01r\x04\x06methods\x03uris\x07headers\
-\x03\x04body\x04\x04\0\x0chttp-request\x03\0\x05\x01r\x03\x06status{\x07headers\x03\
-\x04body\x04\x04\0\x0dhttp-response\x03\0\x07\x03\0\x17ntwk:theater/http-types\x05\
-\x08\x02\x03\0\x05\x0chttp-request\x02\x03\0\x05\x0dhttp-response\x01B\x09\x02\x03\
-\x02\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\x09\x04\0\x0chttp-request\x03\
-\0\x02\x02\x03\x02\x01\x0a\x04\0\x0dhttp-response\x03\0\x04\x01j\x01\x05\x01s\x01\
-@\x01\x03req\x03\0\x06\x04\0\x09send-http\x01\x07\x03\0\x18ntwk:theater/http-cli\
-ent\x05\x0b\x02\x03\0\0\x05event\x01B\x0e\x02\x03\x02\x01\x01\x04\0\x04json\x03\0\
-\0\x02\x03\x02\x01\x0c\x04\0\x05event\x03\0\x02\x01k\x01\x01o\x01\x01\x01o\x01\x04\
-\x01j\x01\x06\x01s\x01@\x02\x05state\x04\x06params\x05\0\x07\x04\0\x0bhandle-sen\
-d\x01\x08\x01o\x02\x04\x05\x01j\x01\x09\x01s\x01@\x02\x05state\x04\x06params\x05\
-\0\x0a\x04\0\x0ehandle-request\x01\x0b\x04\0\"ntwk:theater/message-server-client\
-\x05\x0d\x02\x03\0\0\x05state\x01B\x12\x02\x03\x02\x01\x0e\x04\0\x05state\x03\0\0\
-\x01q\x07\x04text\0\0\x06binary\0\0\x07connect\0\0\x05close\0\0\x04ping\0\0\x04p\
-ong\0\0\x05other\x01s\0\x04\0\x0cmessage-type\x03\0\x02\x01p}\x01k\x04\x01ks\x01\
-r\x03\x02ty\x03\x04data\x05\x04text\x06\x04\0\x11websocket-message\x03\0\x07\x01\
-p\x08\x01r\x01\x08messages\x09\x04\0\x12websocket-response\x03\0\x0a\x01o\x01\x08\
-\x01o\x01\x0b\x01o\x02\x01\x0d\x01j\x01\x0e\x01s\x01@\x02\x05state\x01\x06params\
-\x0c\0\x0f\x04\0\x0ehandle-message\x01\x10\x04\0\x1dntwk:theater/websocket-serve\
-r\x05\x0f\x01B\x07\x02\x03\x02\x01\x0e\x04\0\x05state\x03\0\0\x01o\x01s\x01o\x01\
-\x01\x01j\x01\x03\x01s\x01@\x02\x05state\x01\x06params\x02\0\x04\x04\0\x04init\x01\
-\x05\x04\0\x12ntwk:theater/actor\x05\x10\x01B\x0c\x02\x03\x02\x01\x0e\x04\0\x05s\
-tate\x03\0\0\x02\x03\x02\x01\x09\x04\0\x0chttp-request\x03\0\x02\x02\x03\x02\x01\
-\x0a\x04\0\x0dhttp-response\x03\0\x04\x01o\x01\x03\x01o\x01\x05\x01o\x02\x01\x07\
-\x01j\x01\x08\x01s\x01@\x02\x05state\x01\x06params\x06\0\x09\x04\0\x0ehandle-req\
-uest\x01\x0a\x04\0\x18ntwk:theater/http-server\x05\x11\x04\0\x18ntwk:theater/sin\
-gle-chat\x04\0\x0b\x11\x01\0\x0bsingle-chat\x03\0\0\0G\x09producers\x01\x0cproce\
-ssed-by\x02\x0dwit-component\x070.220.1\x10wit-bindgen-rust\x060.36.0";
+hs\0\x09\x04\0\x0bpath-exists\x01\x0a\x01j\x01s\x01s\x01@\x03\x03dirs\x07command\
+s\x04args\x05\0\x0b\x04\0\x0fexecute-command\x01\x0c\x01@\x02\x03dirs\x07command\
+s\0\x0b\x04\0\x13execute-nix-command\x01\x0d\x03\0\x17ntwk:theater/filesystem\x05\
+\x05\x01B\x0a\x02\x03\x02\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\x03\x04\0\
+\x08actor-id\x03\0\x02\x01j\0\x01s\x01@\x02\x08actor-id\x03\x03msg\x01\0\x04\x04\
+\0\x04send\x01\x05\x01j\x01\x01\x01s\x01@\x02\x08actor-id\x03\x03msg\x01\0\x06\x04\
+\0\x07request\x01\x07\x03\0\x20ntwk:theater/message-server-host\x05\x06\x01B\x15\
+\x01p}\x01k\0\x01r\x05\x04hash\0\x0bparent-hash\x01\x0aevent-types\x04data\0\x09\
+timestampw\x04\0\x0bchain-event\x03\0\x02\x01j\x01s\x01s\x01@\x02\x08manifests\x0a\
+init-bytes\x01\0\x04\x04\0\x05spawn\x01\x05\x01ps\x01@\0\0\x06\x04\0\x0dlist-chi\
+ldren\x01\x07\x01j\0\x01s\x01@\x01\x08child-ids\0\x08\x04\0\x0astop-child\x01\x09\
+\x04\0\x0drestart-child\x01\x09\x01j\x01\x01\x01s\x01@\x01\x08child-ids\0\x0a\x04\
+\0\x0fget-child-state\x01\x0b\x01p\x03\x01j\x01\x0c\x01s\x01@\x01\x08child-ids\0\
+\x0d\x04\0\x10get-child-events\x01\x0e\x03\0\x17ntwk:theater/supervisor\x05\x07\x01\
+B\x09\x01p}\x04\0\x05bytes\x03\0\0\x01o\x02ss\x01p\x02\x01k\x01\x01r\x04\x06meth\
+ods\x03uris\x07headers\x03\x04body\x04\x04\0\x0chttp-request\x03\0\x05\x01r\x03\x06\
+status{\x07headers\x03\x04body\x04\x04\0\x0dhttp-response\x03\0\x07\x03\0\x17ntw\
+k:theater/http-types\x05\x08\x02\x03\0\x05\x0chttp-request\x02\x03\0\x05\x0dhttp\
+-response\x01B\x09\x02\x03\x02\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\x09\
+\x04\0\x0chttp-request\x03\0\x02\x02\x03\x02\x01\x0a\x04\0\x0dhttp-response\x03\0\
+\x04\x01j\x01\x05\x01s\x01@\x01\x03req\x03\0\x06\x04\0\x09send-http\x01\x07\x03\0\
+\x18ntwk:theater/http-client\x05\x0b\x02\x03\0\0\x05event\x01B\x0e\x02\x03\x02\x01\
+\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\x0c\x04\0\x05event\x03\0\x02\x01k\x01\
+\x01o\x01\x01\x01o\x01\x04\x01j\x01\x06\x01s\x01@\x02\x05state\x04\x06params\x05\
+\0\x07\x04\0\x0bhandle-send\x01\x08\x01o\x02\x04\x05\x01j\x01\x09\x01s\x01@\x02\x05\
+state\x04\x06params\x05\0\x0a\x04\0\x0ehandle-request\x01\x0b\x04\0\"ntwk:theate\
+r/message-server-client\x05\x0d\x02\x03\0\0\x05state\x01B\x12\x02\x03\x02\x01\x0e\
+\x04\0\x05state\x03\0\0\x01q\x07\x04text\0\0\x06binary\0\0\x07connect\0\0\x05clo\
+se\0\0\x04ping\0\0\x04pong\0\0\x05other\x01s\0\x04\0\x0cmessage-type\x03\0\x02\x01\
+p}\x01k\x04\x01ks\x01r\x03\x02ty\x03\x04data\x05\x04text\x06\x04\0\x11websocket-\
+message\x03\0\x07\x01p\x08\x01r\x01\x08messages\x09\x04\0\x12websocket-response\x03\
+\0\x0a\x01o\x01\x08\x01o\x01\x0b\x01o\x02\x01\x0d\x01j\x01\x0e\x01s\x01@\x02\x05\
+state\x01\x06params\x0c\0\x0f\x04\0\x0ehandle-message\x01\x10\x04\0\x1dntwk:thea\
+ter/websocket-server\x05\x0f\x01B\x07\x02\x03\x02\x01\x0e\x04\0\x05state\x03\0\0\
+\x01o\x01s\x01o\x01\x01\x01j\x01\x03\x01s\x01@\x02\x05state\x01\x06params\x02\0\x04\
+\x04\0\x04init\x01\x05\x04\0\x12ntwk:theater/actor\x05\x10\x01B\x0c\x02\x03\x02\x01\
+\x0e\x04\0\x05state\x03\0\0\x02\x03\x02\x01\x09\x04\0\x0chttp-request\x03\0\x02\x02\
+\x03\x02\x01\x0a\x04\0\x0dhttp-response\x03\0\x04\x01o\x01\x03\x01o\x01\x05\x01o\
+\x02\x01\x07\x01j\x01\x08\x01s\x01@\x02\x05state\x01\x06params\x06\0\x09\x04\0\x0e\
+handle-request\x01\x0a\x04\0\x18ntwk:theater/http-server\x05\x11\x04\0\x18ntwk:t\
+heater/single-chat\x04\0\x0b\x11\x01\0\x0bsingle-chat\x03\0\0\0G\x09producers\x01\
+\x0cprocessed-by\x02\x0dwit-component\x070.220.1\x10wit-bindgen-rust\x060.36.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

@@ -47,7 +47,7 @@ impl ActorGuest for Component {
 
         // spawn the store actor
         log("Spawning store actor");
-        let store_id = spawn("/Users/colinrozzi/work/actors/store/actor.toml")?;
+        let store_id = spawn("/Users/colinrozzi/work/actors/store/actor.toml", None)?;
 
         // Initialize state
         let initial_state = State::new(store_id, api_key, init_data.websocket_port, init_data.head);

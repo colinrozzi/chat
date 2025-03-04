@@ -1,0 +1,7 @@
+{
+    "name": "virt-fs",
+    "project_name": "hello-world",
+    "project_description": "Hello World",
+    "branch": "main",
+    "permissions": ["read", "write"]
+}

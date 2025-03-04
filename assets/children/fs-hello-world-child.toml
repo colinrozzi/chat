@@ -1,7 +1,7 @@
-name = "fs hello world child"
+name = "fs http child"
 description = "Provides filesystem operations like reading, writing, and listing files"
 component_path = "/Users/colinrozzi/work/actors/fs-child/target/wasm32-unknown-unknown/release/fs_child.wasm"
-init_data = "/Users/colinrozzi/work/actors/chat/assets/children/fs-hello-world-child.json"
+init_data = "/Users/colinrozzi/work/actors/chat/assets/children/fs-http-child.json"
 
 [interface]
 implements = "ntwk:theater/actor"
@@ -13,4 +13,4 @@ config = {}
 
 [[handlers]]
 type = "filesystem"
-config = { path = "/Users/colinrozzi/work/actors/hello-world"}
+config = { path = "/Users/colinrozzi/work/actors/http-child"}
