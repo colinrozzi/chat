@@ -82,8 +82,7 @@ impl State {
     }
 
     pub fn notify_children(&mut self) {
-        let mut child_responses = vec![];
-        for (actor_id, _) in self.children.iter() {
+        for (actor_id, _) in self.children.clone().iter() {
             log(&format!("Notifying child: {}", actor_id));
 
             let response = request(
@@ -100,17 +99,15 @@ impl State {
             match response {
                 Ok(response) => {
                     let child_response: ChildMessage = serde_json::from_slice(&response).unwrap();
-                    child_responses.push(child_response);
+                    if !child_response.text.is_empty() {
+                        self.add_to_chain(MessageData::ChildMessage(child_response));
+                    }
                 }
                 Err(e) => {
                     log(&format!("Failed to notify child: {}", e));
                 }
             }
         }
-
-        log(&format!("Child responses: {:?}", child_responses));
-
-        self.add_to_chain(MessageData::ChildRollup(child_responses));
         log("Notified children");
     }
 
@@ -150,31 +147,27 @@ impl State {
 
                     messages.push(msg.clone());
                 }
-                MessageData::ChildRollup(child_messages) => {
-                    log(&format!("Adding child messages: {:?}", child_messages));
-                    for child_msg in child_messages {
-                        if !child_msg.text.is_empty() {
-                            let text = child_msg.text.clone();
-                            let actor_msg =
-                                format!("\n<actor id={}>{}</actor>", child_msg.child_id, text);
+                MessageData::ChildMessage(child_msg) => {
+                    log(&format!("Adding child message: {:?}", child_msg));
+                    if !child_msg.text.is_empty() {
+                        let text = child_msg.text.clone();
+                        let actor_msg =
+                            format!("\n<actor id={}>{}</actor>", child_msg.child_id, text);
 
-                            if !messages.is_empty() {
-                                match messages.last() {
-                                    Some(Message::Assistant { .. }) => {
-                                        messages.push(Message::User { content: actor_msg });
-                                        continue;
-                                    }
-                                    Some(Message::User { content }) => {
-                                        if let Some(Message::User { content }) = messages.last_mut()
-                                        {
-                                            content.push_str(&actor_msg);
-                                        }
-                                    }
-                                    None => {}
+                        if !messages.is_empty() {
+                            match messages.last() {
+                                Some(Message::Assistant { .. }) => {
+                                    messages.push(Message::User { content: actor_msg });
                                 }
-                            } else {
-                                messages.push(Message::User { content: actor_msg });
+                                Some(Message::User { content }) => {
+                                    if let Some(Message::User { content }) = messages.last_mut() {
+                                        content.push_str(&actor_msg);
+                                    }
+                                }
+                                None => {}
                             }
+                        } else {
+                            messages.push(Message::User { content: actor_msg });
                         }
                     }
                 }
@@ -200,6 +193,13 @@ impl State {
 
     pub fn get_message(&mut self, message_id: &str) -> Result<ChainEntry, Box<dyn Error>> {
         self.store.load_message(message_id)
+    }
+
+    pub fn add_child_message(&mut self, child_message: ChildMessage) {
+        // Only add if the message has content
+        if !child_message.text.is_empty() {
+            self.add_to_chain(MessageData::ChildMessage(child_message));
+        }
     }
 
     pub fn start_child(
@@ -232,9 +232,11 @@ impl State {
             }))?,
         ) {
             log(&format!("Child response: {:?}", response));
-            // create a rollup message with the response and add it to the chain
+            // Add the child message directly to the chain
             let child_response: ChildMessage = serde_json::from_slice(&response)?;
-            self.add_to_chain(MessageData::ChildRollup(vec![child_response]));
+            if !child_response.text.is_empty() {
+                self.add_to_chain(MessageData::ChildMessage(child_response));
+            }
         }
 
         Ok(actor_id)

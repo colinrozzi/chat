@@ -69,6 +69,43 @@ pub fn handle_message(
                             } else {
                                 default_response(&current_state)
                             }
+                        },
+                        Some("child_message") => {
+                            if let (Some(child_id), Some(text)) = (
+                                command["child_id"].as_str(),
+                                command["text"].as_str(),
+                            ) {
+                                let data = command["data"].clone();
+                                
+                                // Create a child message
+                                let child_message = crate::messages::ChildMessage {
+                                    child_id: child_id.to_string(),
+                                    text: text.to_string(),
+                                    data,
+                                };
+                                
+                                // Add it to the chain
+                                current_state.add_child_message(child_message);
+                                
+                                Ok((
+                                    Some(serde_json::to_vec(&current_state).unwrap()),
+                                    (WebsocketResponse {
+                                        messages: vec![WebsocketMessage {
+                                            ty: MessageType::Text,
+                                            text: Some(
+                                                json!({
+                                                    "type": "messages_updated",
+                                                    "head": current_state.head,
+                                                })
+                                                .to_string(),
+                                            ),
+                                            data: None,
+                                        }],
+                                    },),
+                                ))
+                            } else {
+                                default_response(&current_state)
+                            }
                         }
                         Some("get_head") => Ok((
                             Some(serde_json::to_vec(&current_state).unwrap()),
