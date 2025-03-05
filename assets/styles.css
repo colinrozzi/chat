@@ -574,6 +574,20 @@ body {
     background: var(--accent-hover);
 }
 
+.actor-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.test-button {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.test-button:hover {
+    background: var(--accent-hover);
+}
+
 .stop-button {
     background: var(--error);
     color: white;

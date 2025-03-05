@@ -198,11 +198,11 @@ function renderMessage(message) {
                 </div>
             `;
         }
-    } else if (message.data.ChildRollup) {
-        // Handle array of child messages
-        return message.data.ChildRollup
-            .filter(childMsg => childMsg.text && childMsg.text.trim() !== '')
-            .map(childMsg => `
+    } else if (message.data.ChildMessage) {
+        // Handle individual child message
+        const childMsg = message.data.ChildMessage;
+        if (childMsg.text && childMsg.text.trim() !== '') {
+            return `
                 <div class="child-message">
                     <div class="child-message-header" onclick="toggleChildMessage(this)">
                         <div class="child-header">Actor: ${childMsg.child_id}</div>
@@ -226,7 +226,8 @@ function renderMessage(message) {
                         ` : ''}
                     </div>
                 </div>
-            `).join('');
+            `;
+        }
     }
     return '';
 }
@@ -292,9 +293,14 @@ function renderActorPanels() {
             <div class="actor-card">
                 <div class="actor-name">${actor.manifest_name}</div>
                 <div class="actor-id">${actor.actor_id}</div>
-                <button class="actor-button stop-button" onclick="stopActor('${actor.actor_id}')">
-                    Stop
-                </button>
+                <div class="actor-controls">
+                    <button class="actor-button test-button" onclick="sendTestMessage('${actor.actor_id}')">
+                        Send Test
+                    </button>
+                    <button class="actor-button stop-button" onclick="stopActor('${actor.actor_id}')">
+                        Stop
+                    </button>
+                </div>
             </div>
         `).join('') :
         '<div class="empty-state">No running actors</div>';
@@ -417,6 +423,28 @@ function stopActor(actorId) {
     sendWebSocketMessage({
         type: 'stop_child',
         actor_id: actorId
+    });
+}
+
+function sendTestMessage(actorId) {
+    const timestamp = new Date().toLocaleTimeString();
+    sendWebSocketMessage({
+        type: 'child_message',
+        child_id: actorId,
+        text: `This is a test message from actor ${actorId} at ${timestamp}`,
+        data: {
+            timestamp: timestamp,
+            type: 'test'
+        }
+    });
+}
+
+function sendChildMessage(childId, text, data = {}) {
+    sendWebSocketMessage({
+        type: 'child_message',
+        child_id: childId,
+        text: text,
+        data: data
     });
 }
 

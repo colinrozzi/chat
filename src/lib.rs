@@ -78,10 +78,40 @@ impl WebSocketGuest for Component {
 impl MessageServerClientGuest for Component {
     fn handle_send(
         state: Option<Vec<u8>>,
-        _params: (Vec<u8>,),
+        params: (Vec<u8>,),
     ) -> Result<(Option<Vec<u8>>,), String> {
         log("Handling message server client send");
-        Ok((state,))
+        let mut current_state: State = serde_json::from_slice(&state.unwrap()).unwrap();
+        
+        // Attempt to parse the incoming message
+        match serde_json::from_slice::<serde_json::Value>(&params.0) {
+            Ok(message) => {
+                log(&format!("Received message: {}", serde_json::to_string(&message).unwrap()));
+                
+                // Check if this is a child message
+                if let Some(msg_type) = message.get("msg_type").and_then(|v| v.as_str()) {
+                    if msg_type == "child_message" {
+                        if let Some(data) = message.get("data") {
+                            // Try to parse as ChildMessage
+                            match serde_json::from_value::<messages::ChildMessage>(data.clone()) {
+                                Ok(child_message) => {
+                                    log(&format!("Processing child message: {:?}", child_message));
+                                    current_state.add_child_message(child_message);
+                                }
+                                Err(e) => {
+                                    log(&format!("Failed to parse child message: {}", e));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                log(&format!("Failed to parse message: {}", e));
+            }
+        }
+        
+        Ok((Some(serde_json::to_vec(&current_state).unwrap()),))
     }
 
     fn handle_request(

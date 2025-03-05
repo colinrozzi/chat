@@ -198,7 +198,12 @@ impl State {
     pub fn add_child_message(&mut self, child_message: ChildMessage) {
         // Only add if the message has content
         if !child_message.text.is_empty() {
+            log(&format!("Adding child message from {}: {}", child_message.child_id, child_message.text));
             self.add_to_chain(MessageData::ChildMessage(child_message));
+            
+            // This is where we could add a call to notify WebSocket clients that the head has changed
+            // For now we'll just log it
+            log(&format!("Head has been updated to: {:?}", self.head));
         }
     }
 
