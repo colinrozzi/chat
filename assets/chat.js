@@ -11,29 +11,7 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 1000;
 const HEAD_POLLING_INTERVAL = 1000; // Poll every second
 
-// Polling functions
-function startHeadPolling() {
-    stopHeadPolling(); // Clear any existing interval
-    
-    // Set up polling interval
-    headPollingInterval = setInterval(() => {
-        if (ws?.readyState === WebSocket.OPEN) {
-            sendWebSocketMessage({ type: 'get_head' });
-        } else {
-            stopHeadPolling();
-        }
-    }, HEAD_POLLING_INTERVAL);
-    
-    console.log('Started head polling');
-}
-
-function stopHeadPolling() {
-    if (headPollingInterval) {
-        clearInterval(headPollingInterval);
-        headPollingInterval = null;
-        console.log('Stopped head polling');
-    }
-}
+// Removed polling functions since we now use server-side push
 
 // DOM Elements
 const elements = {
@@ -63,12 +41,11 @@ function connectWebSocket() {
         reconnectAttempts = 0;
         
         // Request initial state
-        sendWebSocketMessage({ type: 'get_head' });
+        sendWebSocketMessage({ type: 'get_head' });  // Initial head query
         sendWebSocketMessage({ type: 'get_available_children' });
         sendWebSocketMessage({ type: 'get_running_children' });
         
-        // Start polling for head updates
-        startHeadPolling();
+        // No longer need to start polling - server pushes updates
     };
     
     ws.onclose = () => {
@@ -76,8 +53,7 @@ function connectWebSocket() {
         updateConnectionStatus('disconnected');
         elements.sendButton.disabled = true;
         
-        // Clear polling interval when disconnected
-        stopHeadPolling();
+        // Disconnection handling
         
         if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             reconnectAttempts++;
@@ -602,7 +578,6 @@ function toggleChildMessage(header) {
 
 // Cleanup
 window.addEventListener('unload', () => {
-    stopHeadPolling();
     if (ws) {
         ws.close();
     }

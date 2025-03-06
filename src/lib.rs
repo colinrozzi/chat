@@ -197,6 +197,25 @@ impl HttpHandlersGuest for Component {
             connection_id,
             current_state.connected_clients.len()
         ));
+        
+        // Send the current head to the new client
+        if current_state.head.is_some() {
+            use bindings::ntwk::theater::http_framework::send_websocket_message;
+            use bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
+            
+            let head_message = WebsocketMessage {
+                ty: MessageType::Text,
+                text: Some(serde_json::to_string(&serde_json::json!({
+                    "type": "head",
+                    "head": current_state.head.clone()
+                })).unwrap()),
+                data: None,
+            };
+            
+            if let Err(e) = send_websocket_message(current_state.server_id, connection_id, &head_message) {
+                log(&format!("Failed to send initial head update to new client: {}", e));
+            }
+        }
 
         Ok((Some(serde_json::to_vec(&current_state).unwrap()),))
     }

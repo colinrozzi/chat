@@ -60,6 +60,12 @@ impl State {
         let entry = self.store.save_message(entry).unwrap();
         self.head = Some(entry.id.clone().unwrap());
         log(&format!("Added message to chain: {:?}", entry));
+        
+        // Notify all clients about head update
+        if let Err(e) = self.notify_head_update() {
+            log(&format!("Failed to notify clients about head update: {}", e));
+        }
+        
         entry
     }
 
@@ -83,6 +89,12 @@ impl State {
             }
             Err(e) => {
                 log(&format!("Failed to generate completion: {}", e));
+                // Notify clients about the error
+                let error_message = format!("Failed to generate AI response: {}", e);
+                let _ = self.broadcast_websocket_message(&serde_json::to_string(&serde_json::json!({
+                    "type": "error",
+                    "message": error_message
+                })).unwrap());
             }
         }
     }
@@ -210,8 +222,7 @@ impl State {
             ));
             self.add_to_chain(MessageData::ChildMessage(child_message));
 
-            // This is where we could add a call to notify WebSocket clients that the head has changed
-            // For now we'll just log it
+            // Log that head has been updated (add_to_chain already handles notification)
             log(&format!("Head has been updated to: {:?}", self.head));
         }
     }
