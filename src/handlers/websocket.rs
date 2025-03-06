@@ -7,6 +7,23 @@ use crate::children::scan_available_children;
 use crate::state::State;
 use serde_json::{json, Value};
 
+// Helper function to create a messages_updated response
+fn create_messages_updated_response(head: &Option<String>) -> WebsocketResponse {
+    WebsocketResponse {
+        messages: vec![WebsocketMessage {
+            ty: MessageType::Text,
+            text: Some(
+                json!({
+                    "type": "messages_updated",
+                    "head": head,
+                })
+                .to_string(),
+            ),
+            data: None,
+        }],
+    }
+}
+
 pub fn handle_message(
     msg: WebsocketMessage,
     state: Json,
@@ -69,60 +86,50 @@ pub fn handle_message(
                             } else {
                                 default_response(&current_state)
                             }
-                        },
+                        }
                         Some("child_message") => {
-                            if let (Some(child_id), Some(text)) = (
-                                command["child_id"].as_str(),
-                                command["text"].as_str(),
-                            ) {
+                            if let (Some(child_id), Some(text)) =
+                                (command["child_id"].as_str(), command["text"].as_str())
+                            {
                                 let data = command["data"].clone();
-                                
+
                                 // Create a child message
                                 let child_message = crate::messages::ChildMessage {
                                     child_id: child_id.to_string(),
                                     text: text.to_string(),
                                     data,
                                 };
-                                
+
                                 // Add it to the chain
                                 current_state.add_child_message(child_message);
-                                
+
                                 Ok((
                                     Some(serde_json::to_vec(&current_state).unwrap()),
-                                    (WebsocketResponse {
-                                        messages: vec![WebsocketMessage {
-                                            ty: MessageType::Text,
-                                            text: Some(
-                                                json!({
-                                                    "type": "messages_updated",
-                                                    "head": current_state.head,
-                                                })
-                                                .to_string(),
-                                            ),
-                                            data: None,
-                                        }],
-                                    },),
+                                    (create_messages_updated_response(&current_state.head),),
                                 ))
                             } else {
                                 default_response(&current_state)
                             }
                         }
-                        Some("get_head") => Ok((
-                            Some(serde_json::to_vec(&current_state).unwrap()),
-                            (WebsocketResponse {
-                                messages: vec![WebsocketMessage {
-                                    ty: MessageType::Text,
-                                    text: Some(
-                                        json!({
-                                            "type": "head",
-                                            "head": current_state.head
-                                        })
-                                        .to_string(),
-                                    ),
-                                    data: None,
-                                }],
-                            },),
-                        )),
+                        Some("get_head") => {
+                            // Efficiently handle head polling by skipping message recreation if not needed
+                            Ok((
+                                Some(serde_json::to_vec(&current_state).unwrap()),
+                                (WebsocketResponse {
+                                    messages: vec![WebsocketMessage {
+                                        ty: MessageType::Text,
+                                        text: Some(
+                                            json!({
+                                                "type": "head",
+                                                "head": current_state.head
+                                            })
+                                            .to_string(),
+                                        ),
+                                        data: None,
+                                    }],
+                                },),
+                            ))
+                        }
 
                         _ => default_response(&current_state),
                     }
@@ -206,6 +213,8 @@ fn handle_start_child(
     manifest_name: &str,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     if let Ok(_actor_id) = state.start_child(manifest_name) {
+        // After starting a child, also send a messages_updated response
+        // because the child's introduction message is added to the chain
         let running_children: Vec<Value> = state
             .children
             .iter()
@@ -216,10 +225,11 @@ fn handle_start_child(
                 })
             })
             .collect();
-        Ok((
-            Some(serde_json::to_vec(state).unwrap()),
-            (WebsocketResponse {
-                messages: vec![WebsocketMessage {
+
+        // Use the updated helper function
+        let children_update = WebsocketResponse {
+            messages: vec![
+                WebsocketMessage {
                     ty: MessageType::Text,
                     text: Some(
                         json!({
@@ -229,9 +239,22 @@ fn handle_start_child(
                         .to_string(),
                     ),
                     data: None,
-                }],
-            },),
-        ))
+                },
+                WebsocketMessage {
+                    ty: MessageType::Text,
+                    text: Some(
+                        json!({
+                            "type": "messages_updated",
+                            "head": state.head
+                        })
+                        .to_string(),
+                    ),
+                    data: None,
+                },
+            ],
+        };
+
+        Ok((Some(serde_json::to_vec(state).unwrap()), (children_update,)))
     } else {
         default_response(state)
     }
@@ -277,21 +300,11 @@ fn handle_send_message(
     content: &str,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     state.add_user_message(content);
+
+    // Use the helper function to create standardized response
     Ok((
         Some(serde_json::to_vec(state).unwrap()),
-        (WebsocketResponse {
-            messages: vec![WebsocketMessage {
-                ty: MessageType::Text,
-                text: Some(
-                    json!({
-                        "type": "messages_updated",
-                        "head": state.head,
-                    })
-                    .to_string(),
-                ),
-                data: None,
-            }],
-        },),
+        (create_messages_updated_response(&state.head),),
     ))
 }
 

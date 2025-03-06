@@ -30,6 +30,7 @@ impl ActorGuest for Component {
     fn init(data: Option<Vec<u8>>, params: (String,)) -> Result<(Option<Vec<u8>>,), String> {
         log("Initializing chat actor");
         log(format!("{:?}", data).as_str());
+        let id = params.0;
         let data = data.unwrap();
         log("Data unwrapped");
         let init_data: InitData = serde_json::from_slice(&data).unwrap();
@@ -50,7 +51,13 @@ impl ActorGuest for Component {
         let store_id = spawn("/Users/colinrozzi/work/actors/store/actor.toml", None)?;
 
         // Initialize state
-        let initial_state = State::new(store_id, api_key, init_data.websocket_port, init_data.head);
+        let initial_state = State::new(
+            id,
+            store_id,
+            api_key,
+            init_data.websocket_port,
+            init_data.head,
+        );
 
         log("State initialized");
         Ok((Some(serde_json::to_vec(&initial_state).unwrap()),))
@@ -82,12 +89,15 @@ impl MessageServerClientGuest for Component {
     ) -> Result<(Option<Vec<u8>>,), String> {
         log("Handling message server client send");
         let mut current_state: State = serde_json::from_slice(&state.unwrap()).unwrap();
-        
+
         // Attempt to parse the incoming message
         match serde_json::from_slice::<serde_json::Value>(&params.0) {
             Ok(message) => {
-                log(&format!("Received message: {}", serde_json::to_string(&message).unwrap()));
-                
+                log(&format!(
+                    "Received message: {}",
+                    serde_json::to_string(&message).unwrap()
+                ));
+
                 // Check if this is a child message
                 if let Some(msg_type) = message.get("msg_type").and_then(|v| v.as_str()) {
                     if msg_type == "child_message" {
@@ -110,7 +120,7 @@ impl MessageServerClientGuest for Component {
                 log(&format!("Failed to parse message: {}", e));
             }
         }
-        
+
         Ok((Some(serde_json::to_vec(&current_state).unwrap()),))
     }
 

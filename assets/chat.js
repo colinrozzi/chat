@@ -6,8 +6,34 @@ let runningChildren = [];
 let ws = null;
 let reconnectAttempts = 0;
 let totalCost = 0;
+let headPollingInterval = null;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 1000;
+const HEAD_POLLING_INTERVAL = 1000; // Poll every second
+
+// Polling functions
+function startHeadPolling() {
+    stopHeadPolling(); // Clear any existing interval
+    
+    // Set up polling interval
+    headPollingInterval = setInterval(() => {
+        if (ws?.readyState === WebSocket.OPEN) {
+            sendWebSocketMessage({ type: 'get_head' });
+        } else {
+            stopHeadPolling();
+        }
+    }, HEAD_POLLING_INTERVAL);
+    
+    console.log('Started head polling');
+}
+
+function stopHeadPolling() {
+    if (headPollingInterval) {
+        clearInterval(headPollingInterval);
+        headPollingInterval = null;
+        console.log('Stopped head polling');
+    }
+}
 
 // DOM Elements
 const elements = {
@@ -40,12 +66,18 @@ function connectWebSocket() {
         sendWebSocketMessage({ type: 'get_head' });
         sendWebSocketMessage({ type: 'get_available_children' });
         sendWebSocketMessage({ type: 'get_running_children' });
+        
+        // Start polling for head updates
+        startHeadPolling();
     };
     
     ws.onclose = () => {
         console.log('WebSocket disconnected');
         updateConnectionStatus('disconnected');
         elements.sendButton.disabled = true;
+        
+        // Clear polling interval when disconnected
+        stopHeadPolling();
         
         if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             reconnectAttempts++;
@@ -89,9 +121,13 @@ function handleWebSocketMessage(data) {
         case 'messages_updated':
         case 'head':
             if (data.head) {
-                currentHead = data.head;
-                elements.headId.textContent = `Head: ${data.head}`;
-                requestMessage(data.head);
+                // Check if head has changed
+                if (data.head !== currentHead) {
+                    console.log(`Head updated: ${currentHead} -> ${data.head}`);
+                    currentHead = data.head;
+                    elements.headId.textContent = `Head: ${data.head}`;
+                    requestMessage(data.head);
+                }
             }
             break;
 
@@ -293,14 +329,9 @@ function renderActorPanels() {
             <div class="actor-card">
                 <div class="actor-name">${actor.manifest_name}</div>
                 <div class="actor-id">${actor.actor_id}</div>
-                <div class="actor-controls">
-                    <button class="actor-button test-button" onclick="sendTestMessage('${actor.actor_id}')">
-                        Send Test
-                    </button>
-                    <button class="actor-button stop-button" onclick="stopActor('${actor.actor_id}')">
-                        Stop
-                    </button>
-                </div>
+                <button class="actor-button stop-button" onclick="stopActor('${actor.actor_id}')">
+                    Stop
+                </button>
             </div>
         `).join('') :
         '<div class="empty-state">No running actors</div>';
@@ -571,6 +602,7 @@ function toggleChildMessage(header) {
 
 // Cleanup
 window.addEventListener('unload', () => {
+    stopHeadPolling();
     if (ws) {
         ws.close();
     }

@@ -17,6 +17,7 @@ pub struct ChildActor {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct State {
+    pub id: String,
     pub head: Option<String>,
     pub claude_client: ClaudeClient,
     pub connected_clients: HashMap<String, bool>,
@@ -28,12 +29,14 @@ pub struct State {
 
 impl State {
     pub fn new(
+        id: String,
         store_id: String,
         api_key: String,
         websocket_port: u16,
         head: Option<String>,
     ) -> Self {
         Self {
+            id,
             head,
             claude_client: ClaudeClient::new(api_key.clone()),
             connected_clients: HashMap::new(),
@@ -198,9 +201,12 @@ impl State {
     pub fn add_child_message(&mut self, child_message: ChildMessage) {
         // Only add if the message has content
         if !child_message.text.is_empty() {
-            log(&format!("Adding child message from {}: {}", child_message.child_id, child_message.text));
+            log(&format!(
+                "Adding child message from {}: {}",
+                child_message.child_id, child_message.text
+            ));
             self.add_to_chain(MessageData::ChildMessage(child_message));
-            
+
             // This is where we could add a call to notify WebSocket clients that the head has changed
             // For now we'll just log it
             log(&format!("Head has been updated to: {:?}", self.head));
@@ -233,6 +239,7 @@ impl State {
                 "data": {
                     "child_id": actor_id.clone(),
                     "store_id": self.store.store_id.clone(),
+                    "chat_id": self.id.clone(),
                 }
             }))?,
         ) {
