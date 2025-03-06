@@ -17,6 +17,10 @@ type = "filesystem"
 config = { path = "/Users/colinrozzi/work/actors/chat/assets"}
 
 [[handlers]]
+type = "store"
+config = {}
+
+[[handlers]]
 type = "http-framework"
 config = {}
 
