@@ -17,12 +17,8 @@ type = "filesystem"
 config = { path = "./assets"}
 
 [[handlers]]
-type = "http-server"
-config = { port = 8084}
-
-[[handlers]]
-type = "websocket-server"
-config = { port = 8085}
+type = "http-framework"
+config = {}
 
 [[handlers]]
 type = "http-client"

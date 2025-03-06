@@ -35,9 +35,10 @@ pub fn handle_request(
             let raw_content = read_file("chat.js").unwrap();
             let str_content = String::from_utf8(raw_content).unwrap();
             let current_state: State = serde_json::from_slice(&state).unwrap();
-            let content = str_content.replace(
+            // Use the same port for WebSocket since we now use the http-framework
+        let content = str_content.replace(
                 "{{WEBSOCKET_PORT}}",
-                &current_state.websocket_port.to_string(),
+                "8084", // Use HTTP port for WebSocket with path /ws
             );
             Ok((
                 Some(state),

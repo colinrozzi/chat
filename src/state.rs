@@ -22,7 +22,8 @@ pub struct State {
     pub claude_client: ClaudeClient,
     pub connected_clients: HashMap<String, bool>,
     pub store: MessageStore,
-    pub websocket_port: u16,
+    pub server_id: u64,
+    pub websocket_port: u16, // Keep for backward compatibility
     pub children: HashMap<String, ChildActor>,
     pub actor_messages: HashMap<String, Vec<u8>>,
 }
@@ -32,6 +33,7 @@ impl State {
         id: String,
         store_id: String,
         api_key: String,
+        server_id: u64,
         websocket_port: u16,
         head: Option<String>,
     ) -> Self {
@@ -41,6 +43,7 @@ impl State {
             claude_client: ClaudeClient::new(api_key.clone()),
             connected_clients: HashMap::new(),
             store: MessageStore::new(store_id.clone()),
+            server_id,
             websocket_port,
             children: HashMap::new(),
             actor_messages: HashMap::new(),
@@ -211,6 +214,38 @@ impl State {
             // For now we'll just log it
             log(&format!("Head has been updated to: {:?}", self.head));
         }
+    }
+
+    pub fn broadcast_websocket_message(&self, message: &str) -> Result<(), String> {
+        use crate::bindings::ntwk::theater::http_framework::send_websocket_message;
+        use crate::bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
+        
+        for client_id in self.connected_clients.keys() {
+            if let Ok(connection_id) = client_id.parse::<u64>() {
+                let websocket_message = WebsocketMessage {
+                    ty: MessageType::Text,
+                    text: Some(message.to_string()),
+                    data: None,
+                };
+                
+                // Use the HTTP framework to send the message
+                if let Err(e) = send_websocket_message(self.server_id, connection_id, websocket_message) {
+                    log(&format!("Failed to send WebSocket message: {}", e));
+                }
+            }
+        }
+        
+        Ok(())
+    }
+    
+    pub fn notify_head_update(&self) -> Result<(), String> {
+        // Format head update notification
+        let message = serde_json::to_string(&serde_json::json!({
+            "type": "messages_updated",
+            "head": self.head
+        })).unwrap();
+        
+        self.broadcast_websocket_message(&message)
     }
 
     pub fn start_child(

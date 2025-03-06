@@ -7,7 +7,8 @@ world single-chat {
     import supervisor;
     import http-client;
     export message-server-client;
-    export websocket-server;
     export actor;
-    export http-server;
+
+    import http-framework;
+    export http-handlers;
 }

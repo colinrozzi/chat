@@ -55,7 +55,7 @@ function connectWebSocket() {
     console.log('Connecting to WebSocket...');
     updateConnectionStatus('connecting');
     
-    ws = new WebSocket(`ws://localhost:{{WEBSOCKET_PORT}}/`);
+    ws = new WebSocket(`ws://localhost:{{WEBSOCKET_PORT}}/ws`);
     
     ws.onopen = () => {
         console.log('WebSocket connected');

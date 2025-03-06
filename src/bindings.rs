@@ -1254,6 +1254,7 @@ pub mod ntwk {
                 }
             }
         }
+        /// Types used by the HTTP framework
         #[allow(dead_code, clippy::all)]
         pub mod http_types {
             #[used]
@@ -1296,6 +1297,100 @@ pub mod ntwk {
                         .field("status", &self.status)
                         .field("headers", &self.headers)
                         .field("body", &self.body)
+                        .finish()
+                }
+            }
+            /// TLS configuration
+            #[derive(Clone)]
+            pub struct TlsConfig {
+                /// Path to the certificate file
+                pub cert_path: _rt::String,
+                /// Path to the key file
+                pub key_path: _rt::String,
+            }
+            impl ::core::fmt::Debug for TlsConfig {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.debug_struct("TlsConfig")
+                        .field("cert-path", &self.cert_path)
+                        .field("key-path", &self.key_path)
+                        .finish()
+                }
+            }
+            /// Configuration for an HTTP server
+            #[derive(Clone)]
+            pub struct ServerConfig {
+                /// Port to listen on, 0 means system-assigned
+                pub port: Option<u16>,
+                /// Host address to bind to
+                pub host: Option<_rt::String>,
+                /// TLS configuration
+                pub tls_config: Option<TlsConfig>,
+            }
+            impl ::core::fmt::Debug for ServerConfig {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.debug_struct("ServerConfig")
+                        .field("port", &self.port)
+                        .field("host", &self.host)
+                        .field("tls-config", &self.tls_config)
+                        .finish()
+                }
+            }
+            /// Information about a server
+            #[derive(Clone)]
+            pub struct ServerInfo {
+                /// Server ID
+                pub id: u64,
+                /// Current listening port
+                pub port: u16,
+                /// Host address
+                pub host: _rt::String,
+                /// Whether the server is running
+                pub running: bool,
+                /// Number of active routes
+                pub routes_count: u32,
+                /// Number of active middleware
+                pub middleware_count: u32,
+                /// Whether WebSocket is enabled
+                pub websocket_enabled: bool,
+            }
+            impl ::core::fmt::Debug for ServerInfo {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.debug_struct("ServerInfo")
+                        .field("id", &self.id)
+                        .field("port", &self.port)
+                        .field("host", &self.host)
+                        .field("running", &self.running)
+                        .field("routes-count", &self.routes_count)
+                        .field("middleware-count", &self.middleware_count)
+                        .field("websocket-enabled", &self.websocket_enabled)
+                        .finish()
+                }
+            }
+            /// Result from middleware processing
+            #[derive(Clone)]
+            pub struct MiddlewareResult {
+                /// Whether to continue processing the request
+                pub proceed: bool,
+                /// The modified request
+                pub request: HttpRequest,
+            }
+            impl ::core::fmt::Debug for MiddlewareResult {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.debug_struct("MiddlewareResult")
+                        .field("proceed", &self.proceed)
+                        .field("request", &self.request)
                         .finish()
                 }
             }
@@ -1480,6 +1575,1019 @@ pub mod ntwk {
                                     len27,
                                 );
                                 _rt::string_lift(bytes27)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+        }
+        /// Types used for WebSocket communication
+        #[allow(dead_code, clippy::all)]
+        pub mod websocket_types {
+            #[used]
+            #[doc(hidden)]
+            static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
+            use super::super::super::_rt;
+            /// The type of WebSocket message/event
+            #[derive(Clone)]
+            pub enum MessageType {
+                /// A text message
+                Text,
+                /// A binary message
+                Binary,
+                /// A new connection was established
+                Connect,
+                /// The connection was closed
+                Close,
+                /// A ping message (for keep-alive)
+                Ping,
+                /// A pong message (response to ping)
+                Pong,
+                /// Any other message type
+                Other(_rt::String),
+            }
+            impl ::core::fmt::Debug for MessageType {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    match self {
+                        MessageType::Text => f.debug_tuple("MessageType::Text").finish(),
+                        MessageType::Binary => {
+                            f.debug_tuple("MessageType::Binary").finish()
+                        }
+                        MessageType::Connect => {
+                            f.debug_tuple("MessageType::Connect").finish()
+                        }
+                        MessageType::Close => {
+                            f.debug_tuple("MessageType::Close").finish()
+                        }
+                        MessageType::Ping => f.debug_tuple("MessageType::Ping").finish(),
+                        MessageType::Pong => f.debug_tuple("MessageType::Pong").finish(),
+                        MessageType::Other(e) => {
+                            f.debug_tuple("MessageType::Other").field(e).finish()
+                        }
+                    }
+                }
+            }
+            /// Represents a message sent or received over a WebSocket connection
+            #[derive(Clone)]
+            pub struct WebsocketMessage {
+                /// The type of the message
+                pub ty: MessageType,
+                /// Binary data payload (used for binary messages)
+                pub data: Option<_rt::Vec<u8>>,
+                /// Text payload (used for text messages)
+                pub text: Option<_rt::String>,
+            }
+            impl ::core::fmt::Debug for WebsocketMessage {
+                fn fmt(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.debug_struct("WebsocketMessage")
+                        .field("ty", &self.ty)
+                        .field("data", &self.data)
+                        .field("text", &self.text)
+                        .finish()
+                }
+            }
+        }
+        /// The HTTP framework interface provides a comprehensive API for creating,
+        /// configuring, and managing HTTP and WebSocket servers from within WebAssembly actors.
+        #[allow(dead_code, clippy::all)]
+        pub mod http_framework {
+            #[used]
+            #[doc(hidden)]
+            static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
+            use super::super::super::_rt;
+            pub type ServerConfig = super::super::super::ntwk::theater::http_types::ServerConfig;
+            pub type ServerInfo = super::super::super::ntwk::theater::http_types::ServerInfo;
+            pub type WebsocketMessage = super::super::super::ntwk::theater::websocket_types::WebsocketMessage;
+            /// Core types
+            pub type ServerId = u64;
+            pub type HandlerId = u64;
+            pub type RouteId = u64;
+            pub type MiddlewareId = u64;
+            #[allow(unused_unsafe, clippy::all)]
+            /// Server lifecycle
+            /// Create a new HTTP server with the given configuration
+            pub fn create_server(
+                config: &ServerConfig,
+            ) -> Result<ServerId, _rt::String> {
+                unsafe {
+                    #[repr(align(8))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 16]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 16]);
+                    let super::super::super::ntwk::theater::http_types::ServerConfig {
+                        port: port0,
+                        host: host0,
+                        tls_config: tls_config0,
+                    } = config;
+                    let (result1_0, result1_1) = match port0 {
+                        Some(e) => (1i32, _rt::as_i32(e)),
+                        None => (0i32, 0i32),
+                    };
+                    let (result3_0, result3_1, result3_2) = match host0 {
+                        Some(e) => {
+                            let vec2 = e;
+                            let ptr2 = vec2.as_ptr().cast::<u8>();
+                            let len2 = vec2.len();
+                            (1i32, ptr2.cast_mut(), len2)
+                        }
+                        None => (0i32, ::core::ptr::null_mut(), 0usize),
+                    };
+                    let (result7_0, result7_1, result7_2, result7_3, result7_4) = match tls_config0 {
+                        Some(e) => {
+                            let super::super::super::ntwk::theater::http_types::TlsConfig {
+                                cert_path: cert_path4,
+                                key_path: key_path4,
+                            } = e;
+                            let vec5 = cert_path4;
+                            let ptr5 = vec5.as_ptr().cast::<u8>();
+                            let len5 = vec5.len();
+                            let vec6 = key_path4;
+                            let ptr6 = vec6.as_ptr().cast::<u8>();
+                            let len6 = vec6.len();
+                            (1i32, ptr5.cast_mut(), len5, ptr6.cast_mut(), len6)
+                        }
+                        None => {
+                            (
+                                0i32,
+                                ::core::ptr::null_mut(),
+                                0usize,
+                                ::core::ptr::null_mut(),
+                                0usize,
+                            )
+                        }
+                    };
+                    let ptr8 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "create-server"]
+                        fn wit_import(
+                            _: i32,
+                            _: i32,
+                            _: i32,
+                            _: *mut u8,
+                            _: usize,
+                            _: i32,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        );
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(
+                        _: i32,
+                        _: i32,
+                        _: i32,
+                        _: *mut u8,
+                        _: usize,
+                        _: i32,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                    ) {
+                        unreachable!()
+                    }
+                    wit_import(
+                        result1_0,
+                        result1_1,
+                        result3_0,
+                        result3_1,
+                        result3_2,
+                        result7_0,
+                        result7_1,
+                        result7_2,
+                        result7_3,
+                        result7_4,
+                        ptr8,
+                    );
+                    let l9 = i32::from(*ptr8.add(0).cast::<u8>());
+                    match l9 {
+                        0 => {
+                            let e = {
+                                let l10 = *ptr8.add(8).cast::<i64>();
+                                l10 as u64
+                            };
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l11 = *ptr8.add(8).cast::<*mut u8>();
+                                let l12 = *ptr8.add(12).cast::<usize>();
+                                let len13 = l12;
+                                let bytes13 = _rt::Vec::from_raw_parts(
+                                    l11.cast(),
+                                    len13,
+                                    len13,
+                                );
+                                _rt::string_lift(bytes13)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Get information about a server
+            pub fn get_server_info(
+                server_id: ServerId,
+            ) -> Result<ServerInfo, _rt::String> {
+                unsafe {
+                    #[repr(align(8))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 48]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 48]);
+                    let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "get-server-info"]
+                        fn wit_import(_: i64, _: *mut u8);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(_: i64, _: *mut u8) {
+                        unreachable!()
+                    }
+                    wit_import(_rt::as_i64(server_id), ptr0);
+                    let l1 = i32::from(*ptr0.add(0).cast::<u8>());
+                    match l1 {
+                        0 => {
+                            let e = {
+                                let l2 = *ptr0.add(8).cast::<i64>();
+                                let l3 = i32::from(*ptr0.add(16).cast::<u16>());
+                                let l4 = *ptr0.add(20).cast::<*mut u8>();
+                                let l5 = *ptr0.add(24).cast::<usize>();
+                                let len6 = l5;
+                                let bytes6 = _rt::Vec::from_raw_parts(
+                                    l4.cast(),
+                                    len6,
+                                    len6,
+                                );
+                                let l7 = i32::from(*ptr0.add(28).cast::<u8>());
+                                let l8 = *ptr0.add(32).cast::<i32>();
+                                let l9 = *ptr0.add(36).cast::<i32>();
+                                let l10 = i32::from(*ptr0.add(40).cast::<u8>());
+                                super::super::super::ntwk::theater::http_types::ServerInfo {
+                                    id: l2 as u64,
+                                    port: l3 as u16,
+                                    host: _rt::string_lift(bytes6),
+                                    running: _rt::bool_lift(l7 as u8),
+                                    routes_count: l8 as u32,
+                                    middleware_count: l9 as u32,
+                                    websocket_enabled: _rt::bool_lift(l10 as u8),
+                                }
+                            };
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l11 = *ptr0.add(8).cast::<*mut u8>();
+                                let l12 = *ptr0.add(12).cast::<usize>();
+                                let len13 = l12;
+                                let bytes13 = _rt::Vec::from_raw_parts(
+                                    l11.cast(),
+                                    len13,
+                                    len13,
+                                );
+                                _rt::string_lift(bytes13)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Start a server
+            pub fn start_server(server_id: ServerId) -> Result<u16, _rt::String> {
+                unsafe {
+                    #[repr(align(4))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 12]);
+                    let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "start-server"]
+                        fn wit_import(_: i64, _: *mut u8);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(_: i64, _: *mut u8) {
+                        unreachable!()
+                    }
+                    wit_import(_rt::as_i64(server_id), ptr0);
+                    let l1 = i32::from(*ptr0.add(0).cast::<u8>());
+                    match l1 {
+                        0 => {
+                            let e = {
+                                let l2 = i32::from(*ptr0.add(4).cast::<u16>());
+                                l2 as u16
+                            };
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l3 = *ptr0.add(4).cast::<*mut u8>();
+                                let l4 = *ptr0.add(8).cast::<usize>();
+                                let len5 = l4;
+                                let bytes5 = _rt::Vec::from_raw_parts(
+                                    l3.cast(),
+                                    len5,
+                                    len5,
+                                );
+                                _rt::string_lift(bytes5)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Stop a server
+            pub fn stop_server(server_id: ServerId) -> Result<(), _rt::String> {
+                unsafe {
+                    #[repr(align(4))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 12]);
+                    let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "stop-server"]
+                        fn wit_import(_: i64, _: *mut u8);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(_: i64, _: *mut u8) {
+                        unreachable!()
+                    }
+                    wit_import(_rt::as_i64(server_id), ptr0);
+                    let l1 = i32::from(*ptr0.add(0).cast::<u8>());
+                    match l1 {
+                        0 => {
+                            let e = ();
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l2 = *ptr0.add(4).cast::<*mut u8>();
+                                let l3 = *ptr0.add(8).cast::<usize>();
+                                let len4 = l3;
+                                let bytes4 = _rt::Vec::from_raw_parts(
+                                    l2.cast(),
+                                    len4,
+                                    len4,
+                                );
+                                _rt::string_lift(bytes4)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Remove a server completely
+            pub fn destroy_server(server_id: ServerId) -> Result<(), _rt::String> {
+                unsafe {
+                    #[repr(align(4))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 12]);
+                    let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "destroy-server"]
+                        fn wit_import(_: i64, _: *mut u8);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(_: i64, _: *mut u8) {
+                        unreachable!()
+                    }
+                    wit_import(_rt::as_i64(server_id), ptr0);
+                    let l1 = i32::from(*ptr0.add(0).cast::<u8>());
+                    match l1 {
+                        0 => {
+                            let e = ();
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l2 = *ptr0.add(4).cast::<*mut u8>();
+                                let l3 = *ptr0.add(8).cast::<usize>();
+                                let len4 = l3;
+                                let bytes4 = _rt::Vec::from_raw_parts(
+                                    l2.cast(),
+                                    len4,
+                                    len4,
+                                );
+                                _rt::string_lift(bytes4)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Handler registration
+            /// Register a handler by name (the name is used to identify the handler function in the component)
+            pub fn register_handler(
+                handler_name: &str,
+            ) -> Result<HandlerId, _rt::String> {
+                unsafe {
+                    #[repr(align(8))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 16]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 16]);
+                    let vec0 = handler_name;
+                    let ptr0 = vec0.as_ptr().cast::<u8>();
+                    let len0 = vec0.len();
+                    let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "register-handler"]
+                        fn wit_import(_: *mut u8, _: usize, _: *mut u8);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(_: *mut u8, _: usize, _: *mut u8) {
+                        unreachable!()
+                    }
+                    wit_import(ptr0.cast_mut(), len0, ptr1);
+                    let l2 = i32::from(*ptr1.add(0).cast::<u8>());
+                    match l2 {
+                        0 => {
+                            let e = {
+                                let l3 = *ptr1.add(8).cast::<i64>();
+                                l3 as u64
+                            };
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l4 = *ptr1.add(8).cast::<*mut u8>();
+                                let l5 = *ptr1.add(12).cast::<usize>();
+                                let len6 = l5;
+                                let bytes6 = _rt::Vec::from_raw_parts(
+                                    l4.cast(),
+                                    len6,
+                                    len6,
+                                );
+                                _rt::string_lift(bytes6)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Route management
+            /// Add a route to a server
+            pub fn add_route(
+                server_id: ServerId,
+                path: &str,
+                method: &str,
+                handler_id: HandlerId,
+            ) -> Result<RouteId, _rt::String> {
+                unsafe {
+                    #[repr(align(8))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 16]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 16]);
+                    let vec0 = path;
+                    let ptr0 = vec0.as_ptr().cast::<u8>();
+                    let len0 = vec0.len();
+                    let vec1 = method;
+                    let ptr1 = vec1.as_ptr().cast::<u8>();
+                    let len1 = vec1.len();
+                    let ptr2 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "add-route"]
+                        fn wit_import(
+                            _: i64,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                            _: usize,
+                            _: i64,
+                            _: *mut u8,
+                        );
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(
+                        _: i64,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                        _: usize,
+                        _: i64,
+                        _: *mut u8,
+                    ) {
+                        unreachable!()
+                    }
+                    wit_import(
+                        _rt::as_i64(server_id),
+                        ptr0.cast_mut(),
+                        len0,
+                        ptr1.cast_mut(),
+                        len1,
+                        _rt::as_i64(handler_id),
+                        ptr2,
+                    );
+                    let l3 = i32::from(*ptr2.add(0).cast::<u8>());
+                    match l3 {
+                        0 => {
+                            let e = {
+                                let l4 = *ptr2.add(8).cast::<i64>();
+                                l4 as u64
+                            };
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l5 = *ptr2.add(8).cast::<*mut u8>();
+                                let l6 = *ptr2.add(12).cast::<usize>();
+                                let len7 = l6;
+                                let bytes7 = _rt::Vec::from_raw_parts(
+                                    l5.cast(),
+                                    len7,
+                                    len7,
+                                );
+                                _rt::string_lift(bytes7)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Remove a route
+            pub fn remove_route(route_id: RouteId) -> Result<(), _rt::String> {
+                unsafe {
+                    #[repr(align(4))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 12]);
+                    let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "remove-route"]
+                        fn wit_import(_: i64, _: *mut u8);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(_: i64, _: *mut u8) {
+                        unreachable!()
+                    }
+                    wit_import(_rt::as_i64(route_id), ptr0);
+                    let l1 = i32::from(*ptr0.add(0).cast::<u8>());
+                    match l1 {
+                        0 => {
+                            let e = ();
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l2 = *ptr0.add(4).cast::<*mut u8>();
+                                let l3 = *ptr0.add(8).cast::<usize>();
+                                let len4 = l3;
+                                let bytes4 = _rt::Vec::from_raw_parts(
+                                    l2.cast(),
+                                    len4,
+                                    len4,
+                                );
+                                _rt::string_lift(bytes4)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Middleware
+            /// Add middleware to a server path
+            pub fn add_middleware(
+                server_id: ServerId,
+                path: &str,
+                handler_id: HandlerId,
+            ) -> Result<MiddlewareId, _rt::String> {
+                unsafe {
+                    #[repr(align(8))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 16]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 16]);
+                    let vec0 = path;
+                    let ptr0 = vec0.as_ptr().cast::<u8>();
+                    let len0 = vec0.len();
+                    let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "add-middleware"]
+                        fn wit_import(_: i64, _: *mut u8, _: usize, _: i64, _: *mut u8);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(_: i64, _: *mut u8, _: usize, _: i64, _: *mut u8) {
+                        unreachable!()
+                    }
+                    wit_import(
+                        _rt::as_i64(server_id),
+                        ptr0.cast_mut(),
+                        len0,
+                        _rt::as_i64(handler_id),
+                        ptr1,
+                    );
+                    let l2 = i32::from(*ptr1.add(0).cast::<u8>());
+                    match l2 {
+                        0 => {
+                            let e = {
+                                let l3 = *ptr1.add(8).cast::<i64>();
+                                l3 as u64
+                            };
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l4 = *ptr1.add(8).cast::<*mut u8>();
+                                let l5 = *ptr1.add(12).cast::<usize>();
+                                let len6 = l5;
+                                let bytes6 = _rt::Vec::from_raw_parts(
+                                    l4.cast(),
+                                    len6,
+                                    len6,
+                                );
+                                _rt::string_lift(bytes6)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Remove middleware
+            pub fn remove_middleware(
+                middleware_id: MiddlewareId,
+            ) -> Result<(), _rt::String> {
+                unsafe {
+                    #[repr(align(4))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 12]);
+                    let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "remove-middleware"]
+                        fn wit_import(_: i64, _: *mut u8);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(_: i64, _: *mut u8) {
+                        unreachable!()
+                    }
+                    wit_import(_rt::as_i64(middleware_id), ptr0);
+                    let l1 = i32::from(*ptr0.add(0).cast::<u8>());
+                    match l1 {
+                        0 => {
+                            let e = ();
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l2 = *ptr0.add(4).cast::<*mut u8>();
+                                let l3 = *ptr0.add(8).cast::<usize>();
+                                let len4 = l3;
+                                let bytes4 = _rt::Vec::from_raw_parts(
+                                    l2.cast(),
+                                    len4,
+                                    len4,
+                                );
+                                _rt::string_lift(bytes4)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// WebSocket support
+            /// Enable WebSocket support on a path
+            pub fn enable_websocket(
+                server_id: ServerId,
+                path: &str,
+                connect_handler_id: Option<HandlerId>,
+                message_handler_id: HandlerId,
+                disconnect_handler_id: Option<HandlerId>,
+            ) -> Result<(), _rt::String> {
+                unsafe {
+                    #[repr(align(4))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 12]);
+                    let vec0 = path;
+                    let ptr0 = vec0.as_ptr().cast::<u8>();
+                    let len0 = vec0.len();
+                    let (result1_0, result1_1) = match connect_handler_id {
+                        Some(e) => (1i32, _rt::as_i64(e)),
+                        None => (0i32, 0i64),
+                    };
+                    let (result2_0, result2_1) = match disconnect_handler_id {
+                        Some(e) => (1i32, _rt::as_i64(e)),
+                        None => (0i32, 0i64),
+                    };
+                    let ptr3 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "enable-websocket"]
+                        fn wit_import(
+                            _: i64,
+                            _: *mut u8,
+                            _: usize,
+                            _: i32,
+                            _: i64,
+                            _: i64,
+                            _: i32,
+                            _: i64,
+                            _: *mut u8,
+                        );
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(
+                        _: i64,
+                        _: *mut u8,
+                        _: usize,
+                        _: i32,
+                        _: i64,
+                        _: i64,
+                        _: i32,
+                        _: i64,
+                        _: *mut u8,
+                    ) {
+                        unreachable!()
+                    }
+                    wit_import(
+                        _rt::as_i64(server_id),
+                        ptr0.cast_mut(),
+                        len0,
+                        result1_0,
+                        result1_1,
+                        _rt::as_i64(message_handler_id),
+                        result2_0,
+                        result2_1,
+                        ptr3,
+                    );
+                    let l4 = i32::from(*ptr3.add(0).cast::<u8>());
+                    match l4 {
+                        0 => {
+                            let e = ();
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l5 = *ptr3.add(4).cast::<*mut u8>();
+                                let l6 = *ptr3.add(8).cast::<usize>();
+                                let len7 = l6;
+                                let bytes7 = _rt::Vec::from_raw_parts(
+                                    l5.cast(),
+                                    len7,
+                                    len7,
+                                );
+                                _rt::string_lift(bytes7)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Disable WebSocket support on a path
+            pub fn disable_websocket(
+                server_id: ServerId,
+                path: &str,
+            ) -> Result<(), _rt::String> {
+                unsafe {
+                    #[repr(align(4))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 12]);
+                    let vec0 = path;
+                    let ptr0 = vec0.as_ptr().cast::<u8>();
+                    let len0 = vec0.len();
+                    let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "disable-websocket"]
+                        fn wit_import(_: i64, _: *mut u8, _: usize, _: *mut u8);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(_: i64, _: *mut u8, _: usize, _: *mut u8) {
+                        unreachable!()
+                    }
+                    wit_import(_rt::as_i64(server_id), ptr0.cast_mut(), len0, ptr1);
+                    let l2 = i32::from(*ptr1.add(0).cast::<u8>());
+                    match l2 {
+                        0 => {
+                            let e = ();
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l3 = *ptr1.add(4).cast::<*mut u8>();
+                                let l4 = *ptr1.add(8).cast::<usize>();
+                                let len5 = l4;
+                                let bytes5 = _rt::Vec::from_raw_parts(
+                                    l3.cast(),
+                                    len5,
+                                    len5,
+                                );
+                                _rt::string_lift(bytes5)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Send a message to a specific WebSocket connection
+            pub fn send_websocket_message(
+                server_id: ServerId,
+                connection_id: u64,
+                message: &WebsocketMessage,
+            ) -> Result<(), _rt::String> {
+                unsafe {
+                    #[repr(align(4))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 12]);
+                    let super::super::super::ntwk::theater::websocket_types::WebsocketMessage {
+                        ty: ty0,
+                        data: data0,
+                        text: text0,
+                    } = message;
+                    use super::super::super::ntwk::theater::websocket_types::MessageType as V2;
+                    let (result3_0, result3_1, result3_2) = match ty0 {
+                        V2::Text => (0i32, ::core::ptr::null_mut(), 0usize),
+                        V2::Binary => (1i32, ::core::ptr::null_mut(), 0usize),
+                        V2::Connect => (2i32, ::core::ptr::null_mut(), 0usize),
+                        V2::Close => (3i32, ::core::ptr::null_mut(), 0usize),
+                        V2::Ping => (4i32, ::core::ptr::null_mut(), 0usize),
+                        V2::Pong => (5i32, ::core::ptr::null_mut(), 0usize),
+                        V2::Other(e) => {
+                            let vec1 = e;
+                            let ptr1 = vec1.as_ptr().cast::<u8>();
+                            let len1 = vec1.len();
+                            (6i32, ptr1.cast_mut(), len1)
+                        }
+                    };
+                    let (result5_0, result5_1, result5_2) = match data0 {
+                        Some(e) => {
+                            let vec4 = e;
+                            let ptr4 = vec4.as_ptr().cast::<u8>();
+                            let len4 = vec4.len();
+                            (1i32, ptr4.cast_mut(), len4)
+                        }
+                        None => (0i32, ::core::ptr::null_mut(), 0usize),
+                    };
+                    let (result7_0, result7_1, result7_2) = match text0 {
+                        Some(e) => {
+                            let vec6 = e;
+                            let ptr6 = vec6.as_ptr().cast::<u8>();
+                            let len6 = vec6.len();
+                            (1i32, ptr6.cast_mut(), len6)
+                        }
+                        None => (0i32, ::core::ptr::null_mut(), 0usize),
+                    };
+                    let ptr8 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "send-websocket-message"]
+                        fn wit_import(
+                            _: i64,
+                            _: i64,
+                            _: i32,
+                            _: *mut u8,
+                            _: usize,
+                            _: i32,
+                            _: *mut u8,
+                            _: usize,
+                            _: i32,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        );
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(
+                        _: i64,
+                        _: i64,
+                        _: i32,
+                        _: *mut u8,
+                        _: usize,
+                        _: i32,
+                        _: *mut u8,
+                        _: usize,
+                        _: i32,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                    ) {
+                        unreachable!()
+                    }
+                    wit_import(
+                        _rt::as_i64(server_id),
+                        _rt::as_i64(&connection_id),
+                        result3_0,
+                        result3_1,
+                        result3_2,
+                        result5_0,
+                        result5_1,
+                        result5_2,
+                        result7_0,
+                        result7_1,
+                        result7_2,
+                        ptr8,
+                    );
+                    let l9 = i32::from(*ptr8.add(0).cast::<u8>());
+                    match l9 {
+                        0 => {
+                            let e = ();
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l10 = *ptr8.add(4).cast::<*mut u8>();
+                                let l11 = *ptr8.add(8).cast::<usize>();
+                                let len12 = l11;
+                                let bytes12 = _rt::Vec::from_raw_parts(
+                                    l10.cast(),
+                                    len12,
+                                    len12,
+                                );
+                                _rt::string_lift(bytes12)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    }
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Close a specific WebSocket connection
+            pub fn close_websocket(
+                server_id: ServerId,
+                connection_id: u64,
+            ) -> Result<(), _rt::String> {
+                unsafe {
+                    #[repr(align(4))]
+                    struct RetArea([::core::mem::MaybeUninit<u8>; 12]);
+                    let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 12]);
+                    let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "ntwk:theater/http-framework")]
+                    extern "C" {
+                        #[link_name = "close-websocket"]
+                        fn wit_import(_: i64, _: i64, _: *mut u8);
+                    }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    fn wit_import(_: i64, _: i64, _: *mut u8) {
+                        unreachable!()
+                    }
+                    wit_import(
+                        _rt::as_i64(server_id),
+                        _rt::as_i64(&connection_id),
+                        ptr0,
+                    );
+                    let l1 = i32::from(*ptr0.add(0).cast::<u8>());
+                    match l1 {
+                        0 => {
+                            let e = ();
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l2 = *ptr0.add(4).cast::<*mut u8>();
+                                let l3 = *ptr0.add(8).cast::<usize>();
+                                let len4 = l3;
+                                let bytes4 = _rt::Vec::from_raw_parts(
+                                    l2.cast(),
+                                    len4,
+                                    len4,
+                                );
+                                _rt::string_lift(bytes4)
                             };
                             Err(e)
                         }
@@ -1720,402 +2828,6 @@ pub mod exports {
                     [::core::mem::MaybeUninit::uninit(); 24],
                 );
             }
-            /// Interface for handling WebSocket connections and messages
-            #[allow(dead_code, clippy::all)]
-            pub mod websocket_server {
-                #[used]
-                #[doc(hidden)]
-                static __FORCE_SECTION_REF: fn() = super::super::super::super::__link_custom_section_describing_imports;
-                use super::super::super::super::_rt;
-                pub type State = super::super::super::super::ntwk::theater::types::State;
-                /// The type of WebSocket message/event
-                #[derive(Clone)]
-                pub enum MessageType {
-                    /// A text message
-                    Text,
-                    /// A binary message
-                    Binary,
-                    /// A new connection was established
-                    Connect,
-                    /// The connection was closed
-                    Close,
-                    /// A ping message (for keep-alive)
-                    Ping,
-                    /// A pong message (response to ping)
-                    Pong,
-                    /// Any other message type
-                    Other(_rt::String),
-                }
-                impl ::core::fmt::Debug for MessageType {
-                    fn fmt(
-                        &self,
-                        f: &mut ::core::fmt::Formatter<'_>,
-                    ) -> ::core::fmt::Result {
-                        match self {
-                            MessageType::Text => {
-                                f.debug_tuple("MessageType::Text").finish()
-                            }
-                            MessageType::Binary => {
-                                f.debug_tuple("MessageType::Binary").finish()
-                            }
-                            MessageType::Connect => {
-                                f.debug_tuple("MessageType::Connect").finish()
-                            }
-                            MessageType::Close => {
-                                f.debug_tuple("MessageType::Close").finish()
-                            }
-                            MessageType::Ping => {
-                                f.debug_tuple("MessageType::Ping").finish()
-                            }
-                            MessageType::Pong => {
-                                f.debug_tuple("MessageType::Pong").finish()
-                            }
-                            MessageType::Other(e) => {
-                                f.debug_tuple("MessageType::Other").field(e).finish()
-                            }
-                        }
-                    }
-                }
-                /// Represents a message sent or received over a WebSocket connection
-                #[derive(Clone)]
-                pub struct WebsocketMessage {
-                    /// The type of the message
-                    pub ty: MessageType,
-                    /// Binary data payload (used for binary messages)
-                    pub data: Option<_rt::Vec<u8>>,
-                    /// Text payload (used for text messages)
-                    pub text: Option<_rt::String>,
-                }
-                impl ::core::fmt::Debug for WebsocketMessage {
-                    fn fmt(
-                        &self,
-                        f: &mut ::core::fmt::Formatter<'_>,
-                    ) -> ::core::fmt::Result {
-                        f.debug_struct("WebsocketMessage")
-                            .field("ty", &self.ty)
-                            .field("data", &self.data)
-                            .field("text", &self.text)
-                            .finish()
-                    }
-                }
-                /// Response containing messages to send back over the WebSocket
-                #[derive(Clone)]
-                pub struct WebsocketResponse {
-                    /// List of messages to send back to the client
-                    pub messages: _rt::Vec<WebsocketMessage>,
-                }
-                impl ::core::fmt::Debug for WebsocketResponse {
-                    fn fmt(
-                        &self,
-                        f: &mut ::core::fmt::Formatter<'_>,
-                    ) -> ::core::fmt::Result {
-                        f.debug_struct("WebsocketResponse")
-                            .field("messages", &self.messages)
-                            .finish()
-                    }
-                }
-                #[doc(hidden)]
-                #[allow(non_snake_case)]
-                pub unsafe fn _export_handle_message_cabi<T: Guest>(
-                    arg0: i32,
-                    arg1: *mut u8,
-                    arg2: usize,
-                    arg3: i32,
-                    arg4: *mut u8,
-                    arg5: usize,
-                    arg6: i32,
-                    arg7: *mut u8,
-                    arg8: usize,
-                    arg9: i32,
-                    arg10: *mut u8,
-                    arg11: usize,
-                ) -> *mut u8 {
-                    #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
-                    let v2 = match arg3 {
-                        0 => MessageType::Text,
-                        1 => MessageType::Binary,
-                        2 => MessageType::Connect,
-                        3 => MessageType::Close,
-                        4 => MessageType::Ping,
-                        5 => MessageType::Pong,
-                        n => {
-                            debug_assert_eq!(n, 6, "invalid enum discriminant");
-                            let e2 = {
-                                let len1 = arg5;
-                                let bytes1 = _rt::Vec::from_raw_parts(
-                                    arg4.cast(),
-                                    len1,
-                                    len1,
-                                );
-                                _rt::string_lift(bytes1)
-                            };
-                            MessageType::Other(e2)
-                        }
-                    };
-                    let result5 = T::handle_message(
-                        match arg0 {
-                            0 => None,
-                            1 => {
-                                let e = {
-                                    let len0 = arg2;
-                                    _rt::Vec::from_raw_parts(arg1.cast(), len0, len0)
-                                };
-                                Some(e)
-                            }
-                            _ => _rt::invalid_enum_discriminant(),
-                        },
-                        (
-                            WebsocketMessage {
-                                ty: v2,
-                                data: match arg6 {
-                                    0 => None,
-                                    1 => {
-                                        let e = {
-                                            let len3 = arg8;
-                                            _rt::Vec::from_raw_parts(arg7.cast(), len3, len3)
-                                        };
-                                        Some(e)
-                                    }
-                                    _ => _rt::invalid_enum_discriminant(),
-                                },
-                                text: match arg9 {
-                                    0 => None,
-                                    1 => {
-                                        let e = {
-                                            let len4 = arg11;
-                                            let bytes4 = _rt::Vec::from_raw_parts(
-                                                arg10.cast(),
-                                                len4,
-                                                len4,
-                                            );
-                                            _rt::string_lift(bytes4)
-                                        };
-                                        Some(e)
-                                    }
-                                    _ => _rt::invalid_enum_discriminant(),
-                                },
-                            },
-                        ),
-                    );
-                    let ptr6 = _RET_AREA.0.as_mut_ptr().cast::<u8>();
-                    match result5 {
-                        Ok(e) => {
-                            *ptr6.add(0).cast::<u8>() = (0i32) as u8;
-                            let (t7_0, t7_1) = e;
-                            match t7_0 {
-                                Some(e) => {
-                                    *ptr6.add(4).cast::<u8>() = (1i32) as u8;
-                                    let vec8 = (e).into_boxed_slice();
-                                    let ptr8 = vec8.as_ptr().cast::<u8>();
-                                    let len8 = vec8.len();
-                                    ::core::mem::forget(vec8);
-                                    *ptr6.add(12).cast::<usize>() = len8;
-                                    *ptr6.add(8).cast::<*mut u8>() = ptr8.cast_mut();
-                                }
-                                None => {
-                                    *ptr6.add(4).cast::<u8>() = (0i32) as u8;
-                                }
-                            };
-                            let (t9_0,) = t7_1;
-                            let WebsocketResponse { messages: messages10 } = t9_0;
-                            let vec15 = messages10;
-                            let len15 = vec15.len();
-                            let layout15 = _rt::alloc::Layout::from_size_align_unchecked(
-                                vec15.len() * 36,
-                                4,
-                            );
-                            let result15 = if layout15.size() != 0 {
-                                let ptr = _rt::alloc::alloc(layout15).cast::<u8>();
-                                if ptr.is_null() {
-                                    _rt::alloc::handle_alloc_error(layout15);
-                                }
-                                ptr
-                            } else {
-                                ::core::ptr::null_mut()
-                            };
-                            for (i, e) in vec15.into_iter().enumerate() {
-                                let base = result15.add(i * 36);
-                                {
-                                    let WebsocketMessage {
-                                        ty: ty11,
-                                        data: data11,
-                                        text: text11,
-                                    } = e;
-                                    match ty11 {
-                                        MessageType::Text => {
-                                            *base.add(0).cast::<u8>() = (0i32) as u8;
-                                        }
-                                        MessageType::Binary => {
-                                            *base.add(0).cast::<u8>() = (1i32) as u8;
-                                        }
-                                        MessageType::Connect => {
-                                            *base.add(0).cast::<u8>() = (2i32) as u8;
-                                        }
-                                        MessageType::Close => {
-                                            *base.add(0).cast::<u8>() = (3i32) as u8;
-                                        }
-                                        MessageType::Ping => {
-                                            *base.add(0).cast::<u8>() = (4i32) as u8;
-                                        }
-                                        MessageType::Pong => {
-                                            *base.add(0).cast::<u8>() = (5i32) as u8;
-                                        }
-                                        MessageType::Other(e) => {
-                                            *base.add(0).cast::<u8>() = (6i32) as u8;
-                                            let vec12 = (e.into_bytes()).into_boxed_slice();
-                                            let ptr12 = vec12.as_ptr().cast::<u8>();
-                                            let len12 = vec12.len();
-                                            ::core::mem::forget(vec12);
-                                            *base.add(8).cast::<usize>() = len12;
-                                            *base.add(4).cast::<*mut u8>() = ptr12.cast_mut();
-                                        }
-                                    }
-                                    match data11 {
-                                        Some(e) => {
-                                            *base.add(12).cast::<u8>() = (1i32) as u8;
-                                            let vec13 = (e).into_boxed_slice();
-                                            let ptr13 = vec13.as_ptr().cast::<u8>();
-                                            let len13 = vec13.len();
-                                            ::core::mem::forget(vec13);
-                                            *base.add(20).cast::<usize>() = len13;
-                                            *base.add(16).cast::<*mut u8>() = ptr13.cast_mut();
-                                        }
-                                        None => {
-                                            *base.add(12).cast::<u8>() = (0i32) as u8;
-                                        }
-                                    };
-                                    match text11 {
-                                        Some(e) => {
-                                            *base.add(24).cast::<u8>() = (1i32) as u8;
-                                            let vec14 = (e.into_bytes()).into_boxed_slice();
-                                            let ptr14 = vec14.as_ptr().cast::<u8>();
-                                            let len14 = vec14.len();
-                                            ::core::mem::forget(vec14);
-                                            *base.add(32).cast::<usize>() = len14;
-                                            *base.add(28).cast::<*mut u8>() = ptr14.cast_mut();
-                                        }
-                                        None => {
-                                            *base.add(24).cast::<u8>() = (0i32) as u8;
-                                        }
-                                    };
-                                }
-                            }
-                            *ptr6.add(20).cast::<usize>() = len15;
-                            *ptr6.add(16).cast::<*mut u8>() = result15;
-                        }
-                        Err(e) => {
-                            *ptr6.add(0).cast::<u8>() = (1i32) as u8;
-                            let vec16 = (e.into_bytes()).into_boxed_slice();
-                            let ptr16 = vec16.as_ptr().cast::<u8>();
-                            let len16 = vec16.len();
-                            ::core::mem::forget(vec16);
-                            *ptr6.add(8).cast::<usize>() = len16;
-                            *ptr6.add(4).cast::<*mut u8>() = ptr16.cast_mut();
-                        }
-                    };
-                    ptr6
-                }
-                #[doc(hidden)]
-                #[allow(non_snake_case)]
-                pub unsafe fn __post_return_handle_message<T: Guest>(arg0: *mut u8) {
-                    let l0 = i32::from(*arg0.add(0).cast::<u8>());
-                    match l0 {
-                        0 => {
-                            let l1 = i32::from(*arg0.add(4).cast::<u8>());
-                            match l1 {
-                                0 => {}
-                                _ => {
-                                    let l2 = *arg0.add(8).cast::<*mut u8>();
-                                    let l3 = *arg0.add(12).cast::<usize>();
-                                    let base4 = l2;
-                                    let len4 = l3;
-                                    _rt::cabi_dealloc(base4, len4 * 1, 1);
-                                }
-                            }
-                            let l5 = *arg0.add(16).cast::<*mut u8>();
-                            let l6 = *arg0.add(20).cast::<usize>();
-                            let base17 = l5;
-                            let len17 = l6;
-                            for i in 0..len17 {
-                                let base = base17.add(i * 36);
-                                {
-                                    let l7 = i32::from(*base.add(0).cast::<u8>());
-                                    match l7 {
-                                        0 => {}
-                                        1 => {}
-                                        2 => {}
-                                        3 => {}
-                                        4 => {}
-                                        5 => {}
-                                        _ => {
-                                            let l8 = *base.add(4).cast::<*mut u8>();
-                                            let l9 = *base.add(8).cast::<usize>();
-                                            _rt::cabi_dealloc(l8, l9, 1);
-                                        }
-                                    }
-                                    let l10 = i32::from(*base.add(12).cast::<u8>());
-                                    match l10 {
-                                        0 => {}
-                                        _ => {
-                                            let l11 = *base.add(16).cast::<*mut u8>();
-                                            let l12 = *base.add(20).cast::<usize>();
-                                            let base13 = l11;
-                                            let len13 = l12;
-                                            _rt::cabi_dealloc(base13, len13 * 1, 1);
-                                        }
-                                    }
-                                    let l14 = i32::from(*base.add(24).cast::<u8>());
-                                    match l14 {
-                                        0 => {}
-                                        _ => {
-                                            let l15 = *base.add(28).cast::<*mut u8>();
-                                            let l16 = *base.add(32).cast::<usize>();
-                                            _rt::cabi_dealloc(l15, l16, 1);
-                                        }
-                                    }
-                                }
-                            }
-                            _rt::cabi_dealloc(base17, len17 * 36, 4);
-                        }
-                        _ => {
-                            let l18 = *arg0.add(4).cast::<*mut u8>();
-                            let l19 = *arg0.add(8).cast::<usize>();
-                            _rt::cabi_dealloc(l18, l19, 1);
-                        }
-                    }
-                }
-                pub trait Guest {
-                    /// Called for each event on the WebSocket (connections, messages, disconnections)
-                    fn handle_message(
-                        state: State,
-                        params: (WebsocketMessage,),
-                    ) -> Result<(State, (WebsocketResponse,)), _rt::String>;
-                }
-                #[doc(hidden)]
-                macro_rules! __export_ntwk_theater_websocket_server_cabi {
-                    ($ty:ident with_types_in $($path_to_types:tt)*) => {
-                        const _ : () = { #[export_name =
-                        "ntwk:theater/websocket-server#handle-message"] unsafe extern "C"
-                        fn export_handle_message(arg0 : i32, arg1 : * mut u8, arg2 :
-                        usize, arg3 : i32, arg4 : * mut u8, arg5 : usize, arg6 : i32,
-                        arg7 : * mut u8, arg8 : usize, arg9 : i32, arg10 : * mut u8,
-                        arg11 : usize,) -> * mut u8 { $($path_to_types)*::
-                        _export_handle_message_cabi::<$ty > (arg0, arg1, arg2, arg3,
-                        arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) } #[export_name
-                        = "cabi_post_ntwk:theater/websocket-server#handle-message"]
-                        unsafe extern "C" fn _post_return_handle_message(arg0 : * mut
-                        u8,) { $($path_to_types)*:: __post_return_handle_message::<$ty >
-                        (arg0) } };
-                    };
-                }
-                #[doc(hidden)]
-                pub(crate) use __export_ntwk_theater_websocket_server_cabi;
-                #[repr(align(4))]
-                struct _RetArea([::core::mem::MaybeUninit<u8>; 24]);
-                static mut _RET_AREA: _RetArea = _RetArea(
-                    [::core::mem::MaybeUninit::uninit(); 24],
-                );
-            }
             #[allow(dead_code, clippy::all)]
             pub mod actor {
                 #[used]
@@ -2233,8 +2945,10 @@ pub mod exports {
                     [::core::mem::MaybeUninit::uninit(); 16],
                 );
             }
+            /// The HTTP handlers interface defines the callback functions that are used
+            /// to handle HTTP requests and WebSocket events.
             #[allow(dead_code, clippy::all)]
-            pub mod http_server {
+            pub mod http_handlers {
                 #[used]
                 #[doc(hidden)]
                 static __FORCE_SECTION_REF: fn() = super::super::super::super::__link_custom_section_describing_imports;
@@ -2242,29 +2956,33 @@ pub mod exports {
                 pub type State = super::super::super::super::ntwk::theater::types::State;
                 pub type HttpRequest = super::super::super::super::ntwk::theater::http_types::HttpRequest;
                 pub type HttpResponse = super::super::super::super::ntwk::theater::http_types::HttpResponse;
+                pub type WebsocketMessage = super::super::super::super::ntwk::theater::websocket_types::WebsocketMessage;
+                pub type MiddlewareResult = super::super::super::super::ntwk::theater::http_types::MiddlewareResult;
+                pub type HandlerId = super::super::super::super::ntwk::theater::http_framework::HandlerId;
                 #[doc(hidden)]
                 #[allow(non_snake_case)]
                 pub unsafe fn _export_handle_request_cabi<T: Guest>(
                     arg0: i32,
                     arg1: *mut u8,
                     arg2: usize,
-                    arg3: *mut u8,
-                    arg4: usize,
-                    arg5: *mut u8,
-                    arg6: usize,
-                    arg7: *mut u8,
-                    arg8: usize,
-                    arg9: i32,
-                    arg10: *mut u8,
-                    arg11: usize,
+                    arg3: i64,
+                    arg4: *mut u8,
+                    arg5: usize,
+                    arg6: *mut u8,
+                    arg7: usize,
+                    arg8: *mut u8,
+                    arg9: usize,
+                    arg10: i32,
+                    arg11: *mut u8,
+                    arg12: usize,
                 ) -> *mut u8 {
                     #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
-                    let len1 = arg4;
-                    let bytes1 = _rt::Vec::from_raw_parts(arg3.cast(), len1, len1);
-                    let len2 = arg6;
-                    let bytes2 = _rt::Vec::from_raw_parts(arg5.cast(), len2, len2);
-                    let base9 = arg7;
-                    let len9 = arg8;
+                    let len1 = arg5;
+                    let bytes1 = _rt::Vec::from_raw_parts(arg4.cast(), len1, len1);
+                    let len2 = arg7;
+                    let bytes2 = _rt::Vec::from_raw_parts(arg6.cast(), len2, len2);
+                    let base9 = arg8;
+                    let len9 = arg9;
                     let mut result9 = _rt::Vec::with_capacity(len9);
                     for i in 0..len9 {
                         let base = base9.add(i * 16);
@@ -2295,16 +3013,17 @@ pub mod exports {
                             _ => _rt::invalid_enum_discriminant(),
                         },
                         (
+                            arg3 as u64,
                             super::super::super::super::ntwk::theater::http_types::HttpRequest {
                                 method: _rt::string_lift(bytes1),
                                 uri: _rt::string_lift(bytes2),
                                 headers: result9,
-                                body: match arg9 {
+                                body: match arg10 {
                                     0 => None,
                                     1 => {
                                         let e = {
-                                            let len10 = arg11;
-                                            _rt::Vec::from_raw_parts(arg10.cast(), len10, len10)
+                                            let len10 = arg12;
+                                            _rt::Vec::from_raw_parts(arg11.cast(), len10, len10)
                                         };
                                         Some(e)
                                     }
@@ -2454,35 +3173,814 @@ pub mod exports {
                         }
                     }
                 }
-                pub trait Guest {
-                    fn handle_request(
-                        state: State,
-                        params: (HttpRequest,),
-                    ) -> Result<(State, (HttpResponse,)), _rt::String>;
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn _export_handle_middleware_cabi<T: Guest>(
+                    arg0: i32,
+                    arg1: *mut u8,
+                    arg2: usize,
+                    arg3: i64,
+                    arg4: *mut u8,
+                    arg5: usize,
+                    arg6: *mut u8,
+                    arg7: usize,
+                    arg8: *mut u8,
+                    arg9: usize,
+                    arg10: i32,
+                    arg11: *mut u8,
+                    arg12: usize,
+                ) -> *mut u8 {
+                    #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
+                    let len1 = arg5;
+                    let bytes1 = _rt::Vec::from_raw_parts(arg4.cast(), len1, len1);
+                    let len2 = arg7;
+                    let bytes2 = _rt::Vec::from_raw_parts(arg6.cast(), len2, len2);
+                    let base9 = arg8;
+                    let len9 = arg9;
+                    let mut result9 = _rt::Vec::with_capacity(len9);
+                    for i in 0..len9 {
+                        let base = base9.add(i * 16);
+                        let e9 = {
+                            let l3 = *base.add(0).cast::<*mut u8>();
+                            let l4 = *base.add(4).cast::<usize>();
+                            let len5 = l4;
+                            let bytes5 = _rt::Vec::from_raw_parts(l3.cast(), len5, len5);
+                            let l6 = *base.add(8).cast::<*mut u8>();
+                            let l7 = *base.add(12).cast::<usize>();
+                            let len8 = l7;
+                            let bytes8 = _rt::Vec::from_raw_parts(l6.cast(), len8, len8);
+                            (_rt::string_lift(bytes5), _rt::string_lift(bytes8))
+                        };
+                        result9.push(e9);
+                    }
+                    _rt::cabi_dealloc(base9, len9 * 16, 4);
+                    let result11 = T::handle_middleware(
+                        match arg0 {
+                            0 => None,
+                            1 => {
+                                let e = {
+                                    let len0 = arg2;
+                                    _rt::Vec::from_raw_parts(arg1.cast(), len0, len0)
+                                };
+                                Some(e)
+                            }
+                            _ => _rt::invalid_enum_discriminant(),
+                        },
+                        (
+                            arg3 as u64,
+                            super::super::super::super::ntwk::theater::http_types::HttpRequest {
+                                method: _rt::string_lift(bytes1),
+                                uri: _rt::string_lift(bytes2),
+                                headers: result9,
+                                body: match arg10 {
+                                    0 => None,
+                                    1 => {
+                                        let e = {
+                                            let len10 = arg12;
+                                            _rt::Vec::from_raw_parts(arg11.cast(), len10, len10)
+                                        };
+                                        Some(e)
+                                    }
+                                    _ => _rt::invalid_enum_discriminant(),
+                                },
+                            },
+                        ),
+                    );
+                    let ptr12 = _RET_AREA.0.as_mut_ptr().cast::<u8>();
+                    match result11 {
+                        Ok(e) => {
+                            *ptr12.add(0).cast::<u8>() = (0i32) as u8;
+                            let (t13_0, t13_1) = e;
+                            match t13_0 {
+                                Some(e) => {
+                                    *ptr12.add(4).cast::<u8>() = (1i32) as u8;
+                                    let vec14 = (e).into_boxed_slice();
+                                    let ptr14 = vec14.as_ptr().cast::<u8>();
+                                    let len14 = vec14.len();
+                                    ::core::mem::forget(vec14);
+                                    *ptr12.add(12).cast::<usize>() = len14;
+                                    *ptr12.add(8).cast::<*mut u8>() = ptr14.cast_mut();
+                                }
+                                None => {
+                                    *ptr12.add(4).cast::<u8>() = (0i32) as u8;
+                                }
+                            };
+                            let (t15_0,) = t13_1;
+                            let super::super::super::super::ntwk::theater::http_types::MiddlewareResult {
+                                proceed: proceed16,
+                                request: request16,
+                            } = t15_0;
+                            *ptr12.add(16).cast::<u8>() = (match proceed16 {
+                                true => 1,
+                                false => 0,
+                            }) as u8;
+                            let super::super::super::super::ntwk::theater::http_types::HttpRequest {
+                                method: method17,
+                                uri: uri17,
+                                headers: headers17,
+                                body: body17,
+                            } = request16;
+                            let vec18 = (method17.into_bytes()).into_boxed_slice();
+                            let ptr18 = vec18.as_ptr().cast::<u8>();
+                            let len18 = vec18.len();
+                            ::core::mem::forget(vec18);
+                            *ptr12.add(24).cast::<usize>() = len18;
+                            *ptr12.add(20).cast::<*mut u8>() = ptr18.cast_mut();
+                            let vec19 = (uri17.into_bytes()).into_boxed_slice();
+                            let ptr19 = vec19.as_ptr().cast::<u8>();
+                            let len19 = vec19.len();
+                            ::core::mem::forget(vec19);
+                            *ptr12.add(32).cast::<usize>() = len19;
+                            *ptr12.add(28).cast::<*mut u8>() = ptr19.cast_mut();
+                            let vec23 = headers17;
+                            let len23 = vec23.len();
+                            let layout23 = _rt::alloc::Layout::from_size_align_unchecked(
+                                vec23.len() * 16,
+                                4,
+                            );
+                            let result23 = if layout23.size() != 0 {
+                                let ptr = _rt::alloc::alloc(layout23).cast::<u8>();
+                                if ptr.is_null() {
+                                    _rt::alloc::handle_alloc_error(layout23);
+                                }
+                                ptr
+                            } else {
+                                ::core::ptr::null_mut()
+                            };
+                            for (i, e) in vec23.into_iter().enumerate() {
+                                let base = result23.add(i * 16);
+                                {
+                                    let (t20_0, t20_1) = e;
+                                    let vec21 = (t20_0.into_bytes()).into_boxed_slice();
+                                    let ptr21 = vec21.as_ptr().cast::<u8>();
+                                    let len21 = vec21.len();
+                                    ::core::mem::forget(vec21);
+                                    *base.add(4).cast::<usize>() = len21;
+                                    *base.add(0).cast::<*mut u8>() = ptr21.cast_mut();
+                                    let vec22 = (t20_1.into_bytes()).into_boxed_slice();
+                                    let ptr22 = vec22.as_ptr().cast::<u8>();
+                                    let len22 = vec22.len();
+                                    ::core::mem::forget(vec22);
+                                    *base.add(12).cast::<usize>() = len22;
+                                    *base.add(8).cast::<*mut u8>() = ptr22.cast_mut();
+                                }
+                            }
+                            *ptr12.add(40).cast::<usize>() = len23;
+                            *ptr12.add(36).cast::<*mut u8>() = result23;
+                            match body17 {
+                                Some(e) => {
+                                    *ptr12.add(44).cast::<u8>() = (1i32) as u8;
+                                    let vec24 = (e).into_boxed_slice();
+                                    let ptr24 = vec24.as_ptr().cast::<u8>();
+                                    let len24 = vec24.len();
+                                    ::core::mem::forget(vec24);
+                                    *ptr12.add(52).cast::<usize>() = len24;
+                                    *ptr12.add(48).cast::<*mut u8>() = ptr24.cast_mut();
+                                }
+                                None => {
+                                    *ptr12.add(44).cast::<u8>() = (0i32) as u8;
+                                }
+                            };
+                        }
+                        Err(e) => {
+                            *ptr12.add(0).cast::<u8>() = (1i32) as u8;
+                            let vec25 = (e.into_bytes()).into_boxed_slice();
+                            let ptr25 = vec25.as_ptr().cast::<u8>();
+                            let len25 = vec25.len();
+                            ::core::mem::forget(vec25);
+                            *ptr12.add(8).cast::<usize>() = len25;
+                            *ptr12.add(4).cast::<*mut u8>() = ptr25.cast_mut();
+                        }
+                    };
+                    ptr12
                 }
                 #[doc(hidden)]
-                macro_rules! __export_ntwk_theater_http_server_cabi {
+                #[allow(non_snake_case)]
+                pub unsafe fn __post_return_handle_middleware<T: Guest>(arg0: *mut u8) {
+                    let l0 = i32::from(*arg0.add(0).cast::<u8>());
+                    match l0 {
+                        0 => {
+                            let l1 = i32::from(*arg0.add(4).cast::<u8>());
+                            match l1 {
+                                0 => {}
+                                _ => {
+                                    let l2 = *arg0.add(8).cast::<*mut u8>();
+                                    let l3 = *arg0.add(12).cast::<usize>();
+                                    let base4 = l2;
+                                    let len4 = l3;
+                                    _rt::cabi_dealloc(base4, len4 * 1, 1);
+                                }
+                            }
+                            let l5 = *arg0.add(20).cast::<*mut u8>();
+                            let l6 = *arg0.add(24).cast::<usize>();
+                            _rt::cabi_dealloc(l5, l6, 1);
+                            let l7 = *arg0.add(28).cast::<*mut u8>();
+                            let l8 = *arg0.add(32).cast::<usize>();
+                            _rt::cabi_dealloc(l7, l8, 1);
+                            let l9 = *arg0.add(36).cast::<*mut u8>();
+                            let l10 = *arg0.add(40).cast::<usize>();
+                            let base15 = l9;
+                            let len15 = l10;
+                            for i in 0..len15 {
+                                let base = base15.add(i * 16);
+                                {
+                                    let l11 = *base.add(0).cast::<*mut u8>();
+                                    let l12 = *base.add(4).cast::<usize>();
+                                    _rt::cabi_dealloc(l11, l12, 1);
+                                    let l13 = *base.add(8).cast::<*mut u8>();
+                                    let l14 = *base.add(12).cast::<usize>();
+                                    _rt::cabi_dealloc(l13, l14, 1);
+                                }
+                            }
+                            _rt::cabi_dealloc(base15, len15 * 16, 4);
+                            let l16 = i32::from(*arg0.add(44).cast::<u8>());
+                            match l16 {
+                                0 => {}
+                                _ => {
+                                    let l17 = *arg0.add(48).cast::<*mut u8>();
+                                    let l18 = *arg0.add(52).cast::<usize>();
+                                    let base19 = l17;
+                                    let len19 = l18;
+                                    _rt::cabi_dealloc(base19, len19 * 1, 1);
+                                }
+                            }
+                        }
+                        _ => {
+                            let l20 = *arg0.add(4).cast::<*mut u8>();
+                            let l21 = *arg0.add(8).cast::<usize>();
+                            _rt::cabi_dealloc(l20, l21, 1);
+                        }
+                    }
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn _export_handle_websocket_connect_cabi<T: Guest>(
+                    arg0: i32,
+                    arg1: *mut u8,
+                    arg2: usize,
+                    arg3: i64,
+                    arg4: i64,
+                    arg5: *mut u8,
+                    arg6: usize,
+                    arg7: i32,
+                    arg8: *mut u8,
+                    arg9: usize,
+                ) -> *mut u8 {
+                    #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
+                    let len1 = arg6;
+                    let bytes1 = _rt::Vec::from_raw_parts(arg5.cast(), len1, len1);
+                    let result3 = T::handle_websocket_connect(
+                        match arg0 {
+                            0 => None,
+                            1 => {
+                                let e = {
+                                    let len0 = arg2;
+                                    _rt::Vec::from_raw_parts(arg1.cast(), len0, len0)
+                                };
+                                Some(e)
+                            }
+                            _ => _rt::invalid_enum_discriminant(),
+                        },
+                        (
+                            arg3 as u64,
+                            arg4 as u64,
+                            _rt::string_lift(bytes1),
+                            match arg7 {
+                                0 => None,
+                                1 => {
+                                    let e = {
+                                        let len2 = arg9;
+                                        let bytes2 = _rt::Vec::from_raw_parts(
+                                            arg8.cast(),
+                                            len2,
+                                            len2,
+                                        );
+                                        _rt::string_lift(bytes2)
+                                    };
+                                    Some(e)
+                                }
+                                _ => _rt::invalid_enum_discriminant(),
+                            },
+                        ),
+                    );
+                    let ptr4 = _RET_AREA.0.as_mut_ptr().cast::<u8>();
+                    match result3 {
+                        Ok(e) => {
+                            *ptr4.add(0).cast::<u8>() = (0i32) as u8;
+                            let (t5_0,) = e;
+                            match t5_0 {
+                                Some(e) => {
+                                    *ptr4.add(4).cast::<u8>() = (1i32) as u8;
+                                    let vec6 = (e).into_boxed_slice();
+                                    let ptr6 = vec6.as_ptr().cast::<u8>();
+                                    let len6 = vec6.len();
+                                    ::core::mem::forget(vec6);
+                                    *ptr4.add(12).cast::<usize>() = len6;
+                                    *ptr4.add(8).cast::<*mut u8>() = ptr6.cast_mut();
+                                }
+                                None => {
+                                    *ptr4.add(4).cast::<u8>() = (0i32) as u8;
+                                }
+                            };
+                        }
+                        Err(e) => {
+                            *ptr4.add(0).cast::<u8>() = (1i32) as u8;
+                            let vec7 = (e.into_bytes()).into_boxed_slice();
+                            let ptr7 = vec7.as_ptr().cast::<u8>();
+                            let len7 = vec7.len();
+                            ::core::mem::forget(vec7);
+                            *ptr4.add(8).cast::<usize>() = len7;
+                            *ptr4.add(4).cast::<*mut u8>() = ptr7.cast_mut();
+                        }
+                    };
+                    ptr4
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn __post_return_handle_websocket_connect<T: Guest>(
+                    arg0: *mut u8,
+                ) {
+                    let l0 = i32::from(*arg0.add(0).cast::<u8>());
+                    match l0 {
+                        0 => {
+                            let l1 = i32::from(*arg0.add(4).cast::<u8>());
+                            match l1 {
+                                0 => {}
+                                _ => {
+                                    let l2 = *arg0.add(8).cast::<*mut u8>();
+                                    let l3 = *arg0.add(12).cast::<usize>();
+                                    let base4 = l2;
+                                    let len4 = l3;
+                                    _rt::cabi_dealloc(base4, len4 * 1, 1);
+                                }
+                            }
+                        }
+                        _ => {
+                            let l5 = *arg0.add(4).cast::<*mut u8>();
+                            let l6 = *arg0.add(8).cast::<usize>();
+                            _rt::cabi_dealloc(l5, l6, 1);
+                        }
+                    }
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn _export_handle_websocket_message_cabi<T: Guest>(
+                    arg0: i32,
+                    arg1: *mut u8,
+                    arg2: usize,
+                    arg3: i64,
+                    arg4: i64,
+                    arg5: i32,
+                    arg6: *mut u8,
+                    arg7: usize,
+                    arg8: i32,
+                    arg9: *mut u8,
+                    arg10: usize,
+                    arg11: i32,
+                    arg12: *mut u8,
+                    arg13: usize,
+                ) -> *mut u8 {
+                    #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
+                    use super::super::super::super::ntwk::theater::websocket_types::MessageType as V2;
+                    let v2 = match arg5 {
+                        0 => V2::Text,
+                        1 => V2::Binary,
+                        2 => V2::Connect,
+                        3 => V2::Close,
+                        4 => V2::Ping,
+                        5 => V2::Pong,
+                        n => {
+                            debug_assert_eq!(n, 6, "invalid enum discriminant");
+                            let e2 = {
+                                let len1 = arg7;
+                                let bytes1 = _rt::Vec::from_raw_parts(
+                                    arg6.cast(),
+                                    len1,
+                                    len1,
+                                );
+                                _rt::string_lift(bytes1)
+                            };
+                            V2::Other(e2)
+                        }
+                    };
+                    let result5 = T::handle_websocket_message(
+                        match arg0 {
+                            0 => None,
+                            1 => {
+                                let e = {
+                                    let len0 = arg2;
+                                    _rt::Vec::from_raw_parts(arg1.cast(), len0, len0)
+                                };
+                                Some(e)
+                            }
+                            _ => _rt::invalid_enum_discriminant(),
+                        },
+                        (
+                            arg3 as u64,
+                            arg4 as u64,
+                            super::super::super::super::ntwk::theater::websocket_types::WebsocketMessage {
+                                ty: v2,
+                                data: match arg8 {
+                                    0 => None,
+                                    1 => {
+                                        let e = {
+                                            let len3 = arg10;
+                                            _rt::Vec::from_raw_parts(arg9.cast(), len3, len3)
+                                        };
+                                        Some(e)
+                                    }
+                                    _ => _rt::invalid_enum_discriminant(),
+                                },
+                                text: match arg11 {
+                                    0 => None,
+                                    1 => {
+                                        let e = {
+                                            let len4 = arg13;
+                                            let bytes4 = _rt::Vec::from_raw_parts(
+                                                arg12.cast(),
+                                                len4,
+                                                len4,
+                                            );
+                                            _rt::string_lift(bytes4)
+                                        };
+                                        Some(e)
+                                    }
+                                    _ => _rt::invalid_enum_discriminant(),
+                                },
+                            },
+                        ),
+                    );
+                    let ptr6 = _RET_AREA.0.as_mut_ptr().cast::<u8>();
+                    match result5 {
+                        Ok(e) => {
+                            *ptr6.add(0).cast::<u8>() = (0i32) as u8;
+                            let (t7_0, t7_1) = e;
+                            match t7_0 {
+                                Some(e) => {
+                                    *ptr6.add(4).cast::<u8>() = (1i32) as u8;
+                                    let vec8 = (e).into_boxed_slice();
+                                    let ptr8 = vec8.as_ptr().cast::<u8>();
+                                    let len8 = vec8.len();
+                                    ::core::mem::forget(vec8);
+                                    *ptr6.add(12).cast::<usize>() = len8;
+                                    *ptr6.add(8).cast::<*mut u8>() = ptr8.cast_mut();
+                                }
+                                None => {
+                                    *ptr6.add(4).cast::<u8>() = (0i32) as u8;
+                                }
+                            };
+                            let (t9_0,) = t7_1;
+                            let vec15 = t9_0;
+                            let len15 = vec15.len();
+                            let layout15 = _rt::alloc::Layout::from_size_align_unchecked(
+                                vec15.len() * 36,
+                                4,
+                            );
+                            let result15 = if layout15.size() != 0 {
+                                let ptr = _rt::alloc::alloc(layout15).cast::<u8>();
+                                if ptr.is_null() {
+                                    _rt::alloc::handle_alloc_error(layout15);
+                                }
+                                ptr
+                            } else {
+                                ::core::ptr::null_mut()
+                            };
+                            for (i, e) in vec15.into_iter().enumerate() {
+                                let base = result15.add(i * 36);
+                                {
+                                    let super::super::super::super::ntwk::theater::websocket_types::WebsocketMessage {
+                                        ty: ty10,
+                                        data: data10,
+                                        text: text10,
+                                    } = e;
+                                    use super::super::super::super::ntwk::theater::websocket_types::MessageType as V12;
+                                    match ty10 {
+                                        V12::Text => {
+                                            *base.add(0).cast::<u8>() = (0i32) as u8;
+                                        }
+                                        V12::Binary => {
+                                            *base.add(0).cast::<u8>() = (1i32) as u8;
+                                        }
+                                        V12::Connect => {
+                                            *base.add(0).cast::<u8>() = (2i32) as u8;
+                                        }
+                                        V12::Close => {
+                                            *base.add(0).cast::<u8>() = (3i32) as u8;
+                                        }
+                                        V12::Ping => {
+                                            *base.add(0).cast::<u8>() = (4i32) as u8;
+                                        }
+                                        V12::Pong => {
+                                            *base.add(0).cast::<u8>() = (5i32) as u8;
+                                        }
+                                        V12::Other(e) => {
+                                            *base.add(0).cast::<u8>() = (6i32) as u8;
+                                            let vec11 = (e.into_bytes()).into_boxed_slice();
+                                            let ptr11 = vec11.as_ptr().cast::<u8>();
+                                            let len11 = vec11.len();
+                                            ::core::mem::forget(vec11);
+                                            *base.add(8).cast::<usize>() = len11;
+                                            *base.add(4).cast::<*mut u8>() = ptr11.cast_mut();
+                                        }
+                                    }
+                                    match data10 {
+                                        Some(e) => {
+                                            *base.add(12).cast::<u8>() = (1i32) as u8;
+                                            let vec13 = (e).into_boxed_slice();
+                                            let ptr13 = vec13.as_ptr().cast::<u8>();
+                                            let len13 = vec13.len();
+                                            ::core::mem::forget(vec13);
+                                            *base.add(20).cast::<usize>() = len13;
+                                            *base.add(16).cast::<*mut u8>() = ptr13.cast_mut();
+                                        }
+                                        None => {
+                                            *base.add(12).cast::<u8>() = (0i32) as u8;
+                                        }
+                                    };
+                                    match text10 {
+                                        Some(e) => {
+                                            *base.add(24).cast::<u8>() = (1i32) as u8;
+                                            let vec14 = (e.into_bytes()).into_boxed_slice();
+                                            let ptr14 = vec14.as_ptr().cast::<u8>();
+                                            let len14 = vec14.len();
+                                            ::core::mem::forget(vec14);
+                                            *base.add(32).cast::<usize>() = len14;
+                                            *base.add(28).cast::<*mut u8>() = ptr14.cast_mut();
+                                        }
+                                        None => {
+                                            *base.add(24).cast::<u8>() = (0i32) as u8;
+                                        }
+                                    };
+                                }
+                            }
+                            *ptr6.add(20).cast::<usize>() = len15;
+                            *ptr6.add(16).cast::<*mut u8>() = result15;
+                        }
+                        Err(e) => {
+                            *ptr6.add(0).cast::<u8>() = (1i32) as u8;
+                            let vec16 = (e.into_bytes()).into_boxed_slice();
+                            let ptr16 = vec16.as_ptr().cast::<u8>();
+                            let len16 = vec16.len();
+                            ::core::mem::forget(vec16);
+                            *ptr6.add(8).cast::<usize>() = len16;
+                            *ptr6.add(4).cast::<*mut u8>() = ptr16.cast_mut();
+                        }
+                    };
+                    ptr6
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn __post_return_handle_websocket_message<T: Guest>(
+                    arg0: *mut u8,
+                ) {
+                    let l0 = i32::from(*arg0.add(0).cast::<u8>());
+                    match l0 {
+                        0 => {
+                            let l1 = i32::from(*arg0.add(4).cast::<u8>());
+                            match l1 {
+                                0 => {}
+                                _ => {
+                                    let l2 = *arg0.add(8).cast::<*mut u8>();
+                                    let l3 = *arg0.add(12).cast::<usize>();
+                                    let base4 = l2;
+                                    let len4 = l3;
+                                    _rt::cabi_dealloc(base4, len4 * 1, 1);
+                                }
+                            }
+                            let l5 = *arg0.add(16).cast::<*mut u8>();
+                            let l6 = *arg0.add(20).cast::<usize>();
+                            let base17 = l5;
+                            let len17 = l6;
+                            for i in 0..len17 {
+                                let base = base17.add(i * 36);
+                                {
+                                    let l7 = i32::from(*base.add(0).cast::<u8>());
+                                    match l7 {
+                                        0 => {}
+                                        1 => {}
+                                        2 => {}
+                                        3 => {}
+                                        4 => {}
+                                        5 => {}
+                                        _ => {
+                                            let l8 = *base.add(4).cast::<*mut u8>();
+                                            let l9 = *base.add(8).cast::<usize>();
+                                            _rt::cabi_dealloc(l8, l9, 1);
+                                        }
+                                    }
+                                    let l10 = i32::from(*base.add(12).cast::<u8>());
+                                    match l10 {
+                                        0 => {}
+                                        _ => {
+                                            let l11 = *base.add(16).cast::<*mut u8>();
+                                            let l12 = *base.add(20).cast::<usize>();
+                                            let base13 = l11;
+                                            let len13 = l12;
+                                            _rt::cabi_dealloc(base13, len13 * 1, 1);
+                                        }
+                                    }
+                                    let l14 = i32::from(*base.add(24).cast::<u8>());
+                                    match l14 {
+                                        0 => {}
+                                        _ => {
+                                            let l15 = *base.add(28).cast::<*mut u8>();
+                                            let l16 = *base.add(32).cast::<usize>();
+                                            _rt::cabi_dealloc(l15, l16, 1);
+                                        }
+                                    }
+                                }
+                            }
+                            _rt::cabi_dealloc(base17, len17 * 36, 4);
+                        }
+                        _ => {
+                            let l18 = *arg0.add(4).cast::<*mut u8>();
+                            let l19 = *arg0.add(8).cast::<usize>();
+                            _rt::cabi_dealloc(l18, l19, 1);
+                        }
+                    }
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn _export_handle_websocket_disconnect_cabi<T: Guest>(
+                    arg0: i32,
+                    arg1: *mut u8,
+                    arg2: usize,
+                    arg3: i64,
+                    arg4: i64,
+                ) -> *mut u8 {
+                    #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
+                    let result1 = T::handle_websocket_disconnect(
+                        match arg0 {
+                            0 => None,
+                            1 => {
+                                let e = {
+                                    let len0 = arg2;
+                                    _rt::Vec::from_raw_parts(arg1.cast(), len0, len0)
+                                };
+                                Some(e)
+                            }
+                            _ => _rt::invalid_enum_discriminant(),
+                        },
+                        (arg3 as u64, arg4 as u64),
+                    );
+                    let ptr2 = _RET_AREA.0.as_mut_ptr().cast::<u8>();
+                    match result1 {
+                        Ok(e) => {
+                            *ptr2.add(0).cast::<u8>() = (0i32) as u8;
+                            let (t3_0,) = e;
+                            match t3_0 {
+                                Some(e) => {
+                                    *ptr2.add(4).cast::<u8>() = (1i32) as u8;
+                                    let vec4 = (e).into_boxed_slice();
+                                    let ptr4 = vec4.as_ptr().cast::<u8>();
+                                    let len4 = vec4.len();
+                                    ::core::mem::forget(vec4);
+                                    *ptr2.add(12).cast::<usize>() = len4;
+                                    *ptr2.add(8).cast::<*mut u8>() = ptr4.cast_mut();
+                                }
+                                None => {
+                                    *ptr2.add(4).cast::<u8>() = (0i32) as u8;
+                                }
+                            };
+                        }
+                        Err(e) => {
+                            *ptr2.add(0).cast::<u8>() = (1i32) as u8;
+                            let vec5 = (e.into_bytes()).into_boxed_slice();
+                            let ptr5 = vec5.as_ptr().cast::<u8>();
+                            let len5 = vec5.len();
+                            ::core::mem::forget(vec5);
+                            *ptr2.add(8).cast::<usize>() = len5;
+                            *ptr2.add(4).cast::<*mut u8>() = ptr5.cast_mut();
+                        }
+                    };
+                    ptr2
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn __post_return_handle_websocket_disconnect<T: Guest>(
+                    arg0: *mut u8,
+                ) {
+                    let l0 = i32::from(*arg0.add(0).cast::<u8>());
+                    match l0 {
+                        0 => {
+                            let l1 = i32::from(*arg0.add(4).cast::<u8>());
+                            match l1 {
+                                0 => {}
+                                _ => {
+                                    let l2 = *arg0.add(8).cast::<*mut u8>();
+                                    let l3 = *arg0.add(12).cast::<usize>();
+                                    let base4 = l2;
+                                    let len4 = l3;
+                                    _rt::cabi_dealloc(base4, len4 * 1, 1);
+                                }
+                            }
+                        }
+                        _ => {
+                            let l5 = *arg0.add(4).cast::<*mut u8>();
+                            let l6 = *arg0.add(8).cast::<usize>();
+                            _rt::cabi_dealloc(l5, l6, 1);
+                        }
+                    }
+                }
+                pub trait Guest {
+                    /// Called to handle an HTTP request
+                    fn handle_request(
+                        state: State,
+                        params: (HandlerId, HttpRequest),
+                    ) -> Result<(State, (HttpResponse,)), _rt::String>;
+                    /// Called to process a request through middleware
+                    fn handle_middleware(
+                        state: State,
+                        params: (HandlerId, HttpRequest),
+                    ) -> Result<(State, (MiddlewareResult,)), _rt::String>;
+                    /// Called when a WebSocket connection is established
+                    fn handle_websocket_connect(
+                        state: State,
+                        params: (HandlerId, u64, _rt::String, Option<_rt::String>),
+                    ) -> Result<(State,), _rt::String>;
+                    /// Called when a WebSocket message is received
+                    fn handle_websocket_message(
+                        state: State,
+                        params: (HandlerId, u64, WebsocketMessage),
+                    ) -> Result<(State, (_rt::Vec<WebsocketMessage>,)), _rt::String>;
+                    /// Called when a WebSocket connection is closed
+                    fn handle_websocket_disconnect(
+                        state: State,
+                        params: (HandlerId, u64),
+                    ) -> Result<(State,), _rt::String>;
+                }
+                #[doc(hidden)]
+                macro_rules! __export_ntwk_theater_http_handlers_cabi {
                     ($ty:ident with_types_in $($path_to_types:tt)*) => {
                         const _ : () = { #[export_name =
-                        "ntwk:theater/http-server#handle-request"] unsafe extern "C" fn
+                        "ntwk:theater/http-handlers#handle-request"] unsafe extern "C" fn
                         export_handle_request(arg0 : i32, arg1 : * mut u8, arg2 : usize,
-                        arg3 : * mut u8, arg4 : usize, arg5 : * mut u8, arg6 : usize,
-                        arg7 : * mut u8, arg8 : usize, arg9 : i32, arg10 : * mut u8,
-                        arg11 : usize,) -> * mut u8 { $($path_to_types)*::
+                        arg3 : i64, arg4 : * mut u8, arg5 : usize, arg6 : * mut u8, arg7
+                        : usize, arg8 : * mut u8, arg9 : usize, arg10 : i32, arg11 : *
+                        mut u8, arg12 : usize,) -> * mut u8 { $($path_to_types)*::
                         _export_handle_request_cabi::<$ty > (arg0, arg1, arg2, arg3,
-                        arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) } #[export_name
-                        = "cabi_post_ntwk:theater/http-server#handle-request"] unsafe
+                        arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12) }
+                        #[export_name =
+                        "cabi_post_ntwk:theater/http-handlers#handle-request"] unsafe
                         extern "C" fn _post_return_handle_request(arg0 : * mut u8,) {
                         $($path_to_types)*:: __post_return_handle_request::<$ty > (arg0)
-                        } };
+                        } #[export_name = "ntwk:theater/http-handlers#handle-middleware"]
+                        unsafe extern "C" fn export_handle_middleware(arg0 : i32, arg1 :
+                        * mut u8, arg2 : usize, arg3 : i64, arg4 : * mut u8, arg5 :
+                        usize, arg6 : * mut u8, arg7 : usize, arg8 : * mut u8, arg9 :
+                        usize, arg10 : i32, arg11 : * mut u8, arg12 : usize,) -> * mut u8
+                        { $($path_to_types)*:: _export_handle_middleware_cabi::<$ty >
+                        (arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9,
+                        arg10, arg11, arg12) } #[export_name =
+                        "cabi_post_ntwk:theater/http-handlers#handle-middleware"] unsafe
+                        extern "C" fn _post_return_handle_middleware(arg0 : * mut u8,) {
+                        $($path_to_types)*:: __post_return_handle_middleware::<$ty >
+                        (arg0) } #[export_name =
+                        "ntwk:theater/http-handlers#handle-websocket-connect"] unsafe
+                        extern "C" fn export_handle_websocket_connect(arg0 : i32, arg1 :
+                        * mut u8, arg2 : usize, arg3 : i64, arg4 : i64, arg5 : * mut u8,
+                        arg6 : usize, arg7 : i32, arg8 : * mut u8, arg9 : usize,) -> *
+                        mut u8 { $($path_to_types)*::
+                        _export_handle_websocket_connect_cabi::<$ty > (arg0, arg1, arg2,
+                        arg3, arg4, arg5, arg6, arg7, arg8, arg9) } #[export_name =
+                        "cabi_post_ntwk:theater/http-handlers#handle-websocket-connect"]
+                        unsafe extern "C" fn _post_return_handle_websocket_connect(arg0 :
+                        * mut u8,) { $($path_to_types)*::
+                        __post_return_handle_websocket_connect::<$ty > (arg0) }
+                        #[export_name =
+                        "ntwk:theater/http-handlers#handle-websocket-message"] unsafe
+                        extern "C" fn export_handle_websocket_message(arg0 : i32, arg1 :
+                        * mut u8, arg2 : usize, arg3 : i64, arg4 : i64, arg5 : i32, arg6
+                        : * mut u8, arg7 : usize, arg8 : i32, arg9 : * mut u8, arg10 :
+                        usize, arg11 : i32, arg12 : * mut u8, arg13 : usize,) -> * mut u8
+                        { $($path_to_types)*::
+                        _export_handle_websocket_message_cabi::<$ty > (arg0, arg1, arg2,
+                        arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12,
+                        arg13) } #[export_name =
+                        "cabi_post_ntwk:theater/http-handlers#handle-websocket-message"]
+                        unsafe extern "C" fn _post_return_handle_websocket_message(arg0 :
+                        * mut u8,) { $($path_to_types)*::
+                        __post_return_handle_websocket_message::<$ty > (arg0) }
+                        #[export_name =
+                        "ntwk:theater/http-handlers#handle-websocket-disconnect"] unsafe
+                        extern "C" fn export_handle_websocket_disconnect(arg0 : i32, arg1
+                        : * mut u8, arg2 : usize, arg3 : i64, arg4 : i64,) -> * mut u8 {
+                        $($path_to_types)*::
+                        _export_handle_websocket_disconnect_cabi::<$ty > (arg0, arg1,
+                        arg2, arg3, arg4) } #[export_name =
+                        "cabi_post_ntwk:theater/http-handlers#handle-websocket-disconnect"]
+                        unsafe extern "C" fn
+                        _post_return_handle_websocket_disconnect(arg0 : * mut u8,) {
+                        $($path_to_types)*::
+                        __post_return_handle_websocket_disconnect::<$ty > (arg0) } };
                     };
                 }
                 #[doc(hidden)]
-                pub(crate) use __export_ntwk_theater_http_server_cabi;
+                pub(crate) use __export_ntwk_theater_http_handlers_cabi;
                 #[repr(align(4))]
-                struct _RetArea([::core::mem::MaybeUninit<u8>; 40]);
+                struct _RetArea([::core::mem::MaybeUninit<u8>; 56]);
                 static mut _RET_AREA: _RetArea = _RetArea(
-                    [::core::mem::MaybeUninit::uninit(); 40],
+                    [::core::mem::MaybeUninit::uninit(); 56],
                 );
             }
         }
@@ -2525,10 +4023,6 @@ mod _rt {
         }
     }
     pub use alloc_crate::alloc;
-    #[cfg(target_arch = "wasm32")]
-    pub fn run_ctors_once() {
-        wit_bindgen_rt::run_ctors_once();
-    }
     pub fn as_i32<T: AsI32>(t: T) -> i32 {
         t.as_i32()
     }
@@ -2588,6 +4082,33 @@ mod _rt {
             self as i32
         }
     }
+    pub fn as_i64<T: AsI64>(t: T) -> i64 {
+        t.as_i64()
+    }
+    pub trait AsI64 {
+        fn as_i64(self) -> i64;
+    }
+    impl<'a, T: Copy + AsI64> AsI64 for &'a T {
+        fn as_i64(self) -> i64 {
+            (*self).as_i64()
+        }
+    }
+    impl AsI64 for i64 {
+        #[inline]
+        fn as_i64(self) -> i64 {
+            self as i64
+        }
+    }
+    impl AsI64 for u64 {
+        #[inline]
+        fn as_i64(self) -> i64 {
+            self as i64
+        }
+    }
+    #[cfg(target_arch = "wasm32")]
+    pub fn run_ctors_once() {
+        wit_bindgen_rt::run_ctors_once();
+    }
     extern crate alloc as alloc_crate;
 }
 /// Generates `#[no_mangle]` functions to export the specified type as the
@@ -2617,14 +4138,11 @@ macro_rules! __export_single_chat_impl {
         exports::ntwk::theater::message_server_client::__export_ntwk_theater_message_server_client_cabi!($ty
         with_types_in $($path_to_types_root)*::
         exports::ntwk::theater::message_server_client); $($path_to_types_root)*::
-        exports::ntwk::theater::websocket_server::__export_ntwk_theater_websocket_server_cabi!($ty
-        with_types_in $($path_to_types_root)*::
-        exports::ntwk::theater::websocket_server); $($path_to_types_root)*::
         exports::ntwk::theater::actor::__export_ntwk_theater_actor_cabi!($ty
         with_types_in $($path_to_types_root)*:: exports::ntwk::theater::actor);
         $($path_to_types_root)*::
-        exports::ntwk::theater::http_server::__export_ntwk_theater_http_server_cabi!($ty
-        with_types_in $($path_to_types_root)*:: exports::ntwk::theater::http_server);
+        exports::ntwk::theater::http_handlers::__export_ntwk_theater_http_handlers_cabi!($ty
+        with_types_in $($path_to_types_root)*:: exports::ntwk::theater::http_handlers);
     };
 }
 #[doc(inline)]
@@ -2632,14 +4150,14 @@ pub(crate) use __export_single_chat_impl as export;
 #[cfg(target_arch = "wasm32")]
 #[link_section = "component-type:wit-bindgen:0.36.0:ntwk:theater:single-chat:encoded world"]
 #[doc(hidden)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 2290] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xf0\x10\x01A\x02\x01\
-A\x1d\x01B\x0f\x01p}\x04\0\x04json\x03\0\0\x01p}\x01k\x02\x04\0\x05state\x03\0\x03\
-\x01s\x04\0\x08actor-id\x03\0\x05\x01kw\x01r\x03\x0aevent-types\x06parent\x07\x04\
-data\x01\x04\0\x05event\x03\0\x08\x01r\x02\x04hashw\x05event\x09\x04\0\x0ameta-e\
-vent\x03\0\x0a\x01p\x0b\x01r\x01\x06events\x0c\x04\0\x05chain\x03\0\x0d\x03\0\x12\
-ntwk:theater/types\x05\0\x02\x03\0\0\x04json\x02\x03\0\0\x05chain\x02\x03\0\0\x08\
-actor-id\x01B\x0a\x02\x03\x02\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\x02\x04\
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 3790] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xcc\x1c\x01A\x02\x01\
+A%\x01B\x0f\x01p}\x04\0\x04json\x03\0\0\x01p}\x01k\x02\x04\0\x05state\x03\0\x03\x01\
+s\x04\0\x08actor-id\x03\0\x05\x01kw\x01r\x03\x0aevent-types\x06parent\x07\x04dat\
+a\x01\x04\0\x05event\x03\0\x08\x01r\x02\x04hashw\x05event\x09\x04\0\x0ameta-even\
+t\x03\0\x0a\x01p\x0b\x01r\x01\x06events\x0c\x04\0\x05chain\x03\0\x0d\x03\0\x12nt\
+wk:theater/types\x05\0\x02\x03\0\0\x04json\x02\x03\0\0\x05chain\x02\x03\0\0\x08a\
+ctor-id\x01B\x0a\x02\x03\x02\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\x02\x04\
 \0\x05chain\x03\0\x02\x02\x03\x02\x01\x03\x04\0\x08actor-id\x03\0\x04\x01@\x01\x03\
 msgs\x01\0\x04\0\x03log\x01\x06\x01@\0\0\x03\x04\0\x09get-chain\x01\x07\x03\0\x14\
 ntwk:theater/runtime\x05\x04\x01B\x17\x01p}\x01j\x01\0\x01s\x01@\x01\x04paths\0\x01\
@@ -2661,34 +4179,68 @@ ldren\x01\x07\x01j\0\x01s\x01@\x01\x08child-ids\0\x08\x04\0\x0astop-child\x01\x0
 \x04\0\x0drestart-child\x01\x09\x01j\x01\x01\x01s\x01@\x01\x08child-ids\0\x0a\x04\
 \0\x0fget-child-state\x01\x0b\x01p\x03\x01j\x01\x0c\x01s\x01@\x01\x08child-ids\0\
 \x0d\x04\0\x10get-child-events\x01\x0e\x03\0\x17ntwk:theater/supervisor\x05\x07\x01\
-B\x09\x01p}\x04\0\x05bytes\x03\0\0\x01o\x02ss\x01p\x02\x01k\x01\x01r\x04\x06meth\
+B\x14\x01p}\x04\0\x05bytes\x03\0\0\x01o\x02ss\x01p\x02\x01k\x01\x01r\x04\x06meth\
 ods\x03uris\x07headers\x03\x04body\x04\x04\0\x0chttp-request\x03\0\x05\x01r\x03\x06\
-status{\x07headers\x03\x04body\x04\x04\0\x0dhttp-response\x03\0\x07\x03\0\x17ntw\
-k:theater/http-types\x05\x08\x02\x03\0\x05\x0chttp-request\x02\x03\0\x05\x0dhttp\
--response\x01B\x09\x02\x03\x02\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\x09\
-\x04\0\x0chttp-request\x03\0\x02\x02\x03\x02\x01\x0a\x04\0\x0dhttp-response\x03\0\
-\x04\x01j\x01\x05\x01s\x01@\x01\x03req\x03\0\x06\x04\0\x09send-http\x01\x07\x03\0\
-\x18ntwk:theater/http-client\x05\x0b\x02\x03\0\0\x05event\x01B\x0e\x02\x03\x02\x01\
-\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\x0c\x04\0\x05event\x03\0\x02\x01k\x01\
-\x01o\x01\x01\x01o\x01\x04\x01j\x01\x06\x01s\x01@\x02\x05state\x04\x06params\x05\
-\0\x07\x04\0\x0bhandle-send\x01\x08\x01o\x02\x04\x05\x01j\x01\x09\x01s\x01@\x02\x05\
-state\x04\x06params\x05\0\x0a\x04\0\x0ehandle-request\x01\x0b\x04\0\"ntwk:theate\
-r/message-server-client\x05\x0d\x02\x03\0\0\x05state\x01B\x12\x02\x03\x02\x01\x0e\
-\x04\0\x05state\x03\0\0\x01q\x07\x04text\0\0\x06binary\0\0\x07connect\0\0\x05clo\
-se\0\0\x04ping\0\0\x04pong\0\0\x05other\x01s\0\x04\0\x0cmessage-type\x03\0\x02\x01\
-p}\x01k\x04\x01ks\x01r\x03\x02ty\x03\x04data\x05\x04text\x06\x04\0\x11websocket-\
-message\x03\0\x07\x01p\x08\x01r\x01\x08messages\x09\x04\0\x12websocket-response\x03\
-\0\x0a\x01o\x01\x08\x01o\x01\x0b\x01o\x02\x01\x0d\x01j\x01\x0e\x01s\x01@\x02\x05\
-state\x01\x06params\x0c\0\x0f\x04\0\x0ehandle-message\x01\x10\x04\0\x1dntwk:thea\
-ter/websocket-server\x05\x0f\x01B\x07\x02\x03\x02\x01\x0e\x04\0\x05state\x03\0\0\
-\x01o\x01s\x01o\x01\x01\x01j\x01\x03\x01s\x01@\x02\x05state\x01\x06params\x02\0\x04\
-\x04\0\x04init\x01\x05\x04\0\x12ntwk:theater/actor\x05\x10\x01B\x0c\x02\x03\x02\x01\
-\x0e\x04\0\x05state\x03\0\0\x02\x03\x02\x01\x09\x04\0\x0chttp-request\x03\0\x02\x02\
-\x03\x02\x01\x0a\x04\0\x0dhttp-response\x03\0\x04\x01o\x01\x03\x01o\x01\x05\x01o\
-\x02\x01\x07\x01j\x01\x08\x01s\x01@\x02\x05state\x01\x06params\x06\0\x09\x04\0\x0e\
-handle-request\x01\x0a\x04\0\x18ntwk:theater/http-server\x05\x11\x04\0\x18ntwk:t\
-heater/single-chat\x04\0\x0b\x11\x01\0\x0bsingle-chat\x03\0\0\0G\x09producers\x01\
-\x0cprocessed-by\x02\x0dwit-component\x070.220.1\x10wit-bindgen-rust\x060.36.0";
+status{\x07headers\x03\x04body\x04\x04\0\x0dhttp-response\x03\0\x07\x01r\x02\x09\
+cert-paths\x08key-paths\x04\0\x0atls-config\x03\0\x09\x01k{\x01ks\x01k\x0a\x01r\x03\
+\x04port\x0b\x04host\x0c\x0atls-config\x0d\x04\0\x0dserver-config\x03\0\x0e\x01r\
+\x07\x02idw\x04port{\x04hosts\x07running\x7f\x0croutes-county\x10middleware-coun\
+ty\x11websocket-enabled\x7f\x04\0\x0bserver-info\x03\0\x10\x01r\x02\x07proceed\x7f\
+\x07request\x06\x04\0\x11middleware-result\x03\0\x12\x03\0\x17ntwk:theater/http-\
+types\x05\x08\x02\x03\0\x05\x0chttp-request\x02\x03\0\x05\x0dhttp-response\x01B\x07\
+\x02\x03\x02\x01\x09\x04\0\x0chttp-request\x03\0\0\x02\x03\x02\x01\x0a\x04\0\x0d\
+http-response\x03\0\x02\x01j\x01\x03\x01s\x01@\x01\x03req\x01\0\x04\x04\0\x09sen\
+d-http\x01\x05\x03\0\x18ntwk:theater/http-client\x05\x0b\x01B\x07\x01q\x07\x04te\
+xt\0\0\x06binary\0\0\x07connect\0\0\x05close\0\0\x04ping\0\0\x04pong\0\0\x05othe\
+r\x01s\0\x04\0\x0cmessage-type\x03\0\0\x01p}\x01k\x02\x01ks\x01r\x03\x02ty\x01\x04\
+data\x03\x04text\x04\x04\0\x11websocket-message\x03\0\x05\x03\0\x1cntwk:theater/\
+websocket-types\x05\x0c\x02\x03\0\0\x05state\x02\x03\0\x05\x0dserver-config\x02\x03\
+\0\x05\x0bserver-info\x02\x03\0\x05\x0atls-config\x02\x03\0\x07\x11websocket-mes\
+sage\x01B9\x02\x03\x02\x01\x0d\x04\0\x05state\x03\0\0\x02\x03\x02\x01\x09\x04\0\x0c\
+http-request\x03\0\x02\x02\x03\x02\x01\x0a\x04\0\x0dhttp-response\x03\0\x04\x02\x03\
+\x02\x01\x0e\x04\0\x0dserver-config\x03\0\x06\x02\x03\x02\x01\x0f\x04\0\x0bserve\
+r-info\x03\0\x08\x02\x03\x02\x01\x10\x04\0\x0atls-config\x03\0\x0a\x02\x03\x02\x01\
+\x11\x04\0\x11websocket-message\x03\0\x0c\x01w\x04\0\x09server-id\x03\0\x0e\x01w\
+\x04\0\x0ahandler-id\x03\0\x10\x01w\x04\0\x08route-id\x03\0\x12\x01w\x04\0\x0dmi\
+ddleware-id\x03\0\x14\x01j\x01\x0f\x01s\x01@\x01\x06config\x07\0\x16\x04\0\x0dcr\
+eate-server\x01\x17\x01j\x01\x09\x01s\x01@\x01\x09server-id\x0f\0\x18\x04\0\x0fg\
+et-server-info\x01\x19\x01j\x01{\x01s\x01@\x01\x09server-id\x0f\0\x1a\x04\0\x0cs\
+tart-server\x01\x1b\x01j\0\x01s\x01@\x01\x09server-id\x0f\0\x1c\x04\0\x0bstop-se\
+rver\x01\x1d\x04\0\x0edestroy-server\x01\x1d\x01j\x01\x11\x01s\x01@\x01\x0chandl\
+er-names\0\x1e\x04\0\x10register-handler\x01\x1f\x01j\x01\x13\x01s\x01@\x04\x09s\
+erver-id\x0f\x04paths\x06methods\x0ahandler-id\x11\0\x20\x04\0\x09add-route\x01!\
+\x01@\x01\x08route-id\x13\0\x1c\x04\0\x0cremove-route\x01\"\x01j\x01\x15\x01s\x01\
+@\x03\x09server-id\x0f\x04paths\x0ahandler-id\x11\0#\x04\0\x0eadd-middleware\x01\
+$\x01@\x01\x0dmiddleware-id\x15\0\x1c\x04\0\x11remove-middleware\x01%\x01k\x11\x01\
+@\x05\x09server-id\x0f\x04paths\x12connect-handler-id&\x12message-handler-id\x11\
+\x15disconnect-handler-id&\0\x1c\x04\0\x10enable-websocket\x01'\x01@\x02\x09serv\
+er-id\x0f\x04paths\0\x1c\x04\0\x11disable-websocket\x01(\x01@\x03\x09server-id\x0f\
+\x0dconnection-idw\x07message\x0d\0\x1c\x04\0\x16send-websocket-message\x01)\x01\
+@\x02\x09server-id\x0f\x0dconnection-idw\0\x1c\x04\0\x0fclose-websocket\x01*\x03\
+\0\x1bntwk:theater/http-framework\x05\x12\x02\x03\0\0\x05event\x01B\x0e\x02\x03\x02\
+\x01\x01\x04\0\x04json\x03\0\0\x02\x03\x02\x01\x13\x04\0\x05event\x03\0\x02\x01k\
+\x01\x01o\x01\x01\x01o\x01\x04\x01j\x01\x06\x01s\x01@\x02\x05state\x04\x06params\
+\x05\0\x07\x04\0\x0bhandle-send\x01\x08\x01o\x02\x04\x05\x01j\x01\x09\x01s\x01@\x02\
+\x05state\x04\x06params\x05\0\x0a\x04\0\x0ehandle-request\x01\x0b\x04\0\"ntwk:th\
+eater/message-server-client\x05\x14\x01B\x07\x02\x03\x02\x01\x0d\x04\0\x05state\x03\
+\0\0\x01o\x01s\x01o\x01\x01\x01j\x01\x03\x01s\x01@\x02\x05state\x01\x06params\x02\
+\0\x04\x04\0\x04init\x01\x05\x04\0\x12ntwk:theater/actor\x05\x15\x02\x03\0\x05\x11\
+middleware-result\x02\x03\0\x08\x0ahandler-id\x01B'\x02\x03\x02\x01\x0d\x04\0\x05\
+state\x03\0\0\x02\x03\x02\x01\x09\x04\0\x0chttp-request\x03\0\x02\x02\x03\x02\x01\
+\x0a\x04\0\x0dhttp-response\x03\0\x04\x02\x03\x02\x01\x11\x04\0\x11websocket-mes\
+sage\x03\0\x06\x02\x03\x02\x01\x16\x04\0\x11middleware-result\x03\0\x08\x02\x03\x02\
+\x01\x17\x04\0\x0ahandler-id\x03\0\x0a\x01o\x02\x0b\x03\x01o\x01\x05\x01o\x02\x01\
+\x0d\x01j\x01\x0e\x01s\x01@\x02\x05state\x01\x06params\x0c\0\x0f\x04\0\x0ehandle\
+-request\x01\x10\x01o\x01\x09\x01o\x02\x01\x11\x01j\x01\x12\x01s\x01@\x02\x05sta\
+te\x01\x06params\x0c\0\x13\x04\0\x11handle-middleware\x01\x14\x01ks\x01o\x04\x0b\
+ws\x15\x01o\x01\x01\x01j\x01\x17\x01s\x01@\x02\x05state\x01\x06params\x16\0\x18\x04\
+\0\x18handle-websocket-connect\x01\x19\x01o\x03\x0bw\x07\x01p\x07\x01o\x01\x1b\x01\
+o\x02\x01\x1c\x01j\x01\x1d\x01s\x01@\x02\x05state\x01\x06params\x1a\0\x1e\x04\0\x18\
+handle-websocket-message\x01\x1f\x01o\x02\x0bw\x01@\x02\x05state\x01\x06params\x20\
+\0\x18\x04\0\x1bhandle-websocket-disconnect\x01!\x04\0\x1antwk:theater/http-hand\
+lers\x05\x18\x04\0\x18ntwk:theater/single-chat\x04\0\x0b\x11\x01\0\x0bsingle-cha\
+t\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.220.1\x10\
+wit-bindgen-rust\x060.36.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {
