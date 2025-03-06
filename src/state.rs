@@ -229,7 +229,7 @@ impl State {
                 };
                 
                 // Use the HTTP framework to send the message
-                if let Err(e) = send_websocket_message(self.server_id, connection_id, websocket_message) {
+                if let Err(e) = send_websocket_message(self.server_id, connection_id, &websocket_message) {
                     log(&format!("Failed to send WebSocket message: {}", e));
                 }
             }

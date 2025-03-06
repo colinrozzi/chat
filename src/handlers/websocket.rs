@@ -1,11 +1,14 @@
-use crate::bindings::exports::ntwk::theater::websocket_server::{
-    MessageType, WebsocketMessage, WebsocketResponse,
-};
+use crate::bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::bindings::ntwk::theater::types::Json;
 use crate::children::scan_available_children;
 use crate::state::State;
 use serde_json::{json, Value};
+
+// Define a new type for WebsocketResponse to match the old API
+pub struct WebsocketResponse {
+    pub messages: Vec<WebsocketMessage>,
+}
 
 // Helper function to create a messages_updated response
 fn create_messages_updated_response(head: &Option<String>) -> WebsocketResponse {
@@ -36,8 +39,8 @@ pub fn handle_message(
 
     match msg.ty {
         MessageType::Text => {
-            if let Some(text) = msg.text {
-                if let Ok(command) = serde_json::from_str::<Value>(&text) {
+            if let Some(ref text) = msg.text {
+                if let Ok(command) = serde_json::from_str::<Value>(text) {
                     match command["type"].as_str() {
                         Some("get_available_children") => {
                             handle_get_available_children(&current_state)

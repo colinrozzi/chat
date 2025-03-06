@@ -131,7 +131,7 @@ impl HttpHandlersGuest for Component {
         };
         
         // Use the existing HTTP handler
-        let (new_state, (old_response)) = handlers::http::handle_request(old_request, state.unwrap())?;
+        let (new_state, old_response) = handlers::http::handle_request(old_request, state.unwrap())?;
         
         // Convert the old HttpResponse to FrameworkHttpResponse
         let framework_response = FrameworkHttpResponse {

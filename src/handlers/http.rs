@@ -1,4 +1,4 @@
-use crate::bindings::exports::ntwk::theater::http_server::{HttpRequest, HttpResponse};
+use crate::bindings::ntwk::theater::http_client::{HttpRequest, HttpResponse};
 use crate::bindings::ntwk::theater::filesystem::read_file;
 use crate::bindings::ntwk::theater::types::Json;
 use crate::state::State;
