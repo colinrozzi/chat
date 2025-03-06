@@ -8,14 +8,14 @@ mod state;
 use bindings::exports::ntwk::theater::actor::Guest as ActorGuest;
 use bindings::exports::ntwk::theater::http_handlers::Guest as HttpHandlersGuest;
 use bindings::exports::ntwk::theater::message_server_client::Guest as MessageServerClientGuest;
-use bindings::ntwk::theater::http_framework::{self, add_middleware, add_route, create_server, enable_websocket, register_handler, start_server, ServerConfig};
+use bindings::ntwk::theater::http_framework::{add_route, create_server, enable_websocket, register_handler, start_server, ServerConfig};
 use bindings::ntwk::theater::http_types::{HttpRequest as FrameworkHttpRequest, HttpResponse as FrameworkHttpResponse, MiddlewareResult};
 use bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
 use bindings::ntwk::theater::filesystem::read_file;
-use bindings::ntwk::theater::http_client::{HttpRequest as ClientHttpRequest, HttpResponse as ClientHttpResponse};
+use bindings::ntwk::theater::http_client::{HttpRequest as ClientHttpRequest};
 use bindings::ntwk::theater::runtime::log;
 use bindings::ntwk::theater::supervisor::spawn;
-use bindings::ntwk::theater::types::Json;
+
 use serde::{Deserialize, Serialize};
 use state::State;
 
@@ -27,7 +27,7 @@ struct InitData {
 
 struct Component;
 
-fn setup_http_server(websocket_port: u16) -> Result<u64, String> {
+fn setup_http_server(_websocket_port: u16) -> Result<u64, String> {
     log("Setting up HTTP server");
 
     // Create server configuration for main HTTP server
@@ -131,7 +131,8 @@ impl HttpHandlersGuest for Component {
         };
         
         // Use the existing HTTP handler
-        let (new_state, old_response) = handlers::http::handle_request(old_request, state.unwrap())?;
+        let (new_state, old_response_tuple) = handlers::http::handle_request(old_request, state.unwrap())?;
+        let old_response = old_response_tuple.0;
         
         // Convert the old HttpResponse to FrameworkHttpResponse
         let framework_response = FrameworkHttpResponse {
@@ -161,7 +162,7 @@ impl HttpHandlersGuest for Component {
         state: Option<Vec<u8>>,
         params: (u64, u64, String, Option<String>),
     ) -> Result<(Option<Vec<u8>>,), String> {
-        let (handler_id, connection_id, path, query) = params;
+        let (handler_id, connection_id, path, _query) = params;
         log(&format!("WebSocket connected - Handler: {}, Connection: {}, Path: {}", 
             handler_id, connection_id, path));
         
@@ -190,16 +191,18 @@ impl HttpHandlersGuest for Component {
                     log(&format!("Text message received: {}", text));
                     
                     // Create a WebsocketMessage from the old format
-                    let old_websocket_message = bindings::exports::ntwk::theater::websocket_server::WebsocketMessage {
+                    // Using a custom WebsocketMessage directly
+                    let old_websocket_message = crate::handlers::websocket::WebsocketMessage {
                         data: message.data.clone(),
                         text: message.text.clone(),
                     };
                     
                     // Use the existing WebSocket handler
-                    let (new_state, (old_response)) = handlers::websocket::handle_message(
+                    let (new_state, old_response_tuple) = handlers::websocket::handle_message(
                         old_websocket_message, 
                         state.unwrap()
                     )?;
+                    let old_response = old_response_tuple.0;
                     
                     // Convert old responses to new format
                     let mut responses = Vec::new();

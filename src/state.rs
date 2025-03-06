@@ -134,7 +134,7 @@ impl State {
                         match (last_msg, &msg) {
                             (
                                 Message::User {
-                                    content: last_content,
+                                    content: _last_content,
                                 },
                                 Message::User { content },
                             ) => {
@@ -165,7 +165,7 @@ impl State {
                                 Some(Message::Assistant { .. }) => {
                                     messages.push(Message::User { content: actor_msg });
                                 }
-                                Some(Message::User { content }) => {
+                                Some(Message::User { content: _ }) => {
                                     if let Some(Message::User { content }) = messages.last_mut() {
                                         content.push_str(&actor_msg);
                                     }
