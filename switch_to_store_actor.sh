@@ -23,11 +23,14 @@ cp src/lib_store_actor.rs src/lib.rs
 echo "Restoring original state.rs implementation"
 cp src/state_store_actor.rs src/state.rs
 
-# 4. Remove any switch_store.rs file if it exists
-if [ -f src/messages/switch_store.rs ]; then
-    echo "Removing switch_store.rs"
-    rm src/messages/switch_store.rs
-fi
+# 4. Update the state_trait.rs to use the original state
+echo "Updating state_trait.rs to use original state"
+cat <<EOF > src/state_trait.rs
+// This module provides a common interface for both state implementations
+
+// Re-export the State type from the current state implementation
+pub use crate::state::State;
+EOF
 
 echo "Done! The chat actor now uses the original store actor."
 echo "To build and run: cargo build --target wasm32-unknown-unknown"

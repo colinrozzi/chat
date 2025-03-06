@@ -3,7 +3,7 @@ mod bindings;
 mod children;
 mod handlers;
 mod messages;
-mod state_runtime_store;
+mod state;
 
 use bindings::exports::ntwk::theater::actor::Guest as ActorGuest;
 use bindings::exports::ntwk::theater::http_handlers::Guest as HttpHandlersGuest;
@@ -19,9 +19,9 @@ use bindings::ntwk::theater::http_types::{
 use bindings::ntwk::theater::runtime::log;
 use bindings::ntwk::theater::store;
 use bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
+use state::State;
 
 use serde::{Deserialize, Serialize};
-use state_runtime_store::State;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct InitData {
@@ -198,23 +198,31 @@ impl HttpHandlersGuest for Component {
             connection_id,
             current_state.connected_clients.len()
         ));
-        
+
         // Send the current head to the new client
         if current_state.head.is_some() {
             use bindings::ntwk::theater::http_framework::send_websocket_message;
             use bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
-            
+
             let head_message = WebsocketMessage {
                 ty: MessageType::Text,
-                text: Some(serde_json::to_string(&serde_json::json!({
-                    "type": "head",
-                    "head": current_state.head.clone()
-                })).unwrap()),
+                text: Some(
+                    serde_json::to_string(&serde_json::json!({
+                        "type": "head",
+                        "head": current_state.head.clone()
+                    }))
+                    .unwrap(),
+                ),
                 data: None,
             };
-            
-            if let Err(e) = send_websocket_message(current_state.server_id, connection_id, &head_message) {
-                log(&format!("Failed to send initial head update to new client: {}", e));
+
+            if let Err(e) =
+                send_websocket_message(current_state.server_id, connection_id, &head_message)
+            {
+                log(&format!(
+                    "Failed to send initial head update to new client: {}",
+                    e
+                ));
             }
         }
 

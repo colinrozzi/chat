@@ -20,10 +20,13 @@ cp src/lib_runtime_store.rs src/lib.rs
 echo "Installing runtime store implementation of state.rs"
 cp src/state_runtime_store.rs src/state.rs
 
-echo "Switching to use external store module instead of default store module"
-cat <<EOF > src/messages/switch_store.rs
-// This file redirects imports from messages::store to messages::runtime_store
-pub use crate::messages::runtime_store::*;
+# 5. Update the state_trait.rs to use the runtime store state
+echo "Updating state_trait.rs to use runtime_store state"
+cat <<EOF > src/state_trait.rs
+// This module provides a common interface for both state implementations
+
+// Re-export the State type from the current state implementation
+pub use crate::state_runtime_store::State;
 EOF
 
 echo "Done! The chat actor now uses the Theater runtime store."

@@ -1,5 +1,5 @@
-use crate::bindings::ntwk::theater::http_client::{HttpRequest, HttpResponse};
 use crate::bindings::ntwk::theater::filesystem::read_file;
+use crate::bindings::ntwk::theater::http_client::{HttpRequest, HttpResponse};
 use crate::bindings::ntwk::theater::types::Json;
 use crate::state::State;
 use serde_json::json;
@@ -36,7 +36,7 @@ pub fn handle_request(
             let str_content = String::from_utf8(raw_content).unwrap();
             let _current_state: State = serde_json::from_slice(&state).unwrap();
             // Use the same port for WebSocket since we now use the http-framework
-        let content = str_content.replace(
+            let content = str_content.replace(
                 "{{WEBSOCKET_PORT}}",
                 "8084", // Use HTTP port for WebSocket with path /ws
             );

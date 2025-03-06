@@ -2,7 +2,7 @@ use crate::api::claude::ClaudeClient;
 use crate::bindings::ntwk::theater::message_server_host::request;
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::bindings::ntwk::theater::supervisor::spawn;
-use crate::messages::runtime_store::MessageStore;
+use crate::messages::store::MessageStore;
 use crate::messages::{ChainEntry, ChildMessage, Message, MessageData};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -37,7 +37,7 @@ impl State {
         websocket_port: u16,
         head: Option<String>,
     ) -> Self {
-        let state = Self {
+        let mut state = Self {
             id,
             head,
             claude_client: ClaudeClient::new(api_key.clone()),
@@ -48,14 +48,14 @@ impl State {
             children: HashMap::new(),
             actor_messages: HashMap::new(),
         };
-        
+
         // If head is None, try to get it from the store
         if state.head.is_none() {
             if let Ok(Some(head_entry)) = state.store.get_head() {
                 state.head = head_entry.id.clone();
             }
         }
-        
+
         state
     }
 
@@ -66,7 +66,7 @@ impl State {
             id: None,
             data,
         };
-        
+
         // Save to runtime store
         let entry = match self.store.save_message(entry) {
             Ok(entry) => entry,
@@ -75,15 +75,18 @@ impl State {
                 panic!("Failed to save message: {}", e);
             }
         };
-        
+
         self.head = Some(entry.id.clone().unwrap());
         log(&format!("Added message to chain: {:?}", entry));
-        
+
         // Notify all clients about head update
         if let Err(e) = self.notify_head_update() {
-            log(&format!("Failed to notify clients about head update: {}", e));
+            log(&format!(
+                "Failed to notify clients about head update: {}",
+                e
+            ));
         }
-        
+
         entry
     }
 
@@ -109,10 +112,13 @@ impl State {
                 log(&format!("Failed to generate completion: {}", e));
                 // Notify clients about the error
                 let error_message = format!("Failed to generate AI response: {}", e);
-                let _ = self.broadcast_websocket_message(&serde_json::to_string(&serde_json::json!({
-                    "type": "error",
-                    "message": error_message
-                })).unwrap());
+                let _ = self.broadcast_websocket_message(
+                    &serde_json::to_string(&serde_json::json!({
+                        "type": "error",
+                        "message": error_message
+                    }))
+                    .unwrap(),
+                );
             }
         }
     }
@@ -256,7 +262,7 @@ impl State {
     pub fn broadcast_websocket_message(&self, message: &str) -> Result<(), String> {
         use crate::bindings::ntwk::theater::http_framework::send_websocket_message;
         use crate::bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
-        
+
         for client_id in self.connected_clients.keys() {
             if let Ok(connection_id) = client_id.parse::<u64>() {
                 let websocket_message = WebsocketMessage {
@@ -264,24 +270,27 @@ impl State {
                     text: Some(message.to_string()),
                     data: None,
                 };
-                
+
                 // Use the HTTP framework to send the message
-                if let Err(e) = send_websocket_message(self.server_id, connection_id, &websocket_message) {
+                if let Err(e) =
+                    send_websocket_message(self.server_id, connection_id, &websocket_message)
+                {
                     log(&format!("Failed to send WebSocket message: {}", e));
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     pub fn notify_head_update(&self) -> Result<(), String> {
         // Format head update notification
         let message = serde_json::to_string(&serde_json::json!({
             "type": "messages_updated",
             "head": self.head
-        })).unwrap();
-        
+        }))
+        .unwrap();
+
         self.broadcast_websocket_message(&message)
     }
 

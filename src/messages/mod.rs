@@ -27,7 +27,7 @@ pub enum Message {
         stop_sequence: Option<String>,
         message_type: String,
         usage: Usage,
-    }
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -44,4 +44,3 @@ pub struct ChildMessage {
 }
 
 pub mod store;
-pub mod runtime_store;
