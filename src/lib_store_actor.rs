@@ -3,7 +3,7 @@ mod bindings;
 mod children;
 mod handlers;
 mod messages;
-mod state_runtime_store;
+mod state;
 
 use bindings::exports::ntwk::theater::actor::Guest as ActorGuest;
 use bindings::exports::ntwk::theater::http_handlers::Guest as HttpHandlersGuest;
@@ -17,11 +17,11 @@ use bindings::ntwk::theater::http_types::{
     HttpRequest as FrameworkHttpRequest, HttpResponse as FrameworkHttpResponse, MiddlewareResult,
 };
 use bindings::ntwk::theater::runtime::log;
-use bindings::ntwk::theater::store;
+use bindings::ntwk::theater::supervisor::spawn;
 use bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
 
 use serde::{Deserialize, Serialize};
-use state_runtime_store::State;
+use state::State;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct InitData {
@@ -79,7 +79,7 @@ fn setup_http_server(_websocket_port: u16) -> Result<u64, String> {
 
 impl ActorGuest for Component {
     fn init(data: Option<Vec<u8>>, params: (String,)) -> Result<(Option<Vec<u8>>,), String> {
-        log("Initializing chat actor with runtime store");
+        log("Initializing chat actor");
         log(format!("{:?}", data).as_str());
         let id = params.0;
         let data = data.unwrap();
@@ -97,10 +97,9 @@ impl ActorGuest for Component {
             }
         };
 
-        // Create a new runtime store
-        log("Creating runtime store");
-        let store_id = store::new()?;
-        log(&format!("Created runtime store with ID: {}", store_id));
+        // spawn the store actor
+        log("Spawning store actor");
+        let store_id = spawn("/Users/colinrozzi/work/actors/store/actor.toml", None)?;
 
         // Set up the HTTP server
         log("Setting up HTTP server...");

@@ -2,7 +2,7 @@ use crate::api::claude::ClaudeClient;
 use crate::bindings::ntwk::theater::message_server_host::request;
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::bindings::ntwk::theater::supervisor::spawn;
-use crate::messages::runtime_store::MessageStore;
+use crate::messages::store::MessageStore;
 use crate::messages::{ChainEntry, ChildMessage, Message, MessageData};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -37,7 +37,7 @@ impl State {
         websocket_port: u16,
         head: Option<String>,
     ) -> Self {
-        let state = Self {
+        Self {
             id,
             head,
             claude_client: ClaudeClient::new(api_key.clone()),
@@ -47,16 +47,7 @@ impl State {
             websocket_port,
             children: HashMap::new(),
             actor_messages: HashMap::new(),
-        };
-        
-        // If head is None, try to get it from the store
-        if state.head.is_none() {
-            if let Ok(Some(head_entry)) = state.store.get_head() {
-                state.head = head_entry.id.clone();
-            }
         }
-        
-        state
     }
 
     pub fn add_to_chain(&mut self, data: MessageData) -> ChainEntry {
@@ -66,16 +57,7 @@ impl State {
             id: None,
             data,
         };
-        
-        // Save to runtime store
-        let entry = match self.store.save_message(entry) {
-            Ok(entry) => entry,
-            Err(e) => {
-                log(&format!("Error saving message: {}", e));
-                panic!("Failed to save message: {}", e);
-            }
-        };
-        
+        let entry = self.store.save_message(entry).unwrap();
         self.head = Some(entry.id.clone().unwrap());
         log(&format!("Added message to chain: {:?}", entry));
         
@@ -216,19 +198,11 @@ impl State {
     pub fn get_chain(&mut self) -> Vec<ChainEntry> {
         let mut chain = vec![];
 
-        // If we have a head in state, follow the parent links
         let mut current_id = self.head.clone();
         while let Some(id) = current_id {
-            match self.store.load_message(&id) {
-                Ok(entry) => {
-                    current_id = entry.parent.clone();
-                    chain.push(entry);
-                }
-                Err(e) => {
-                    log(&format!("Error loading message {}: {}", id, e));
-                    break;
-                }
-            }
+            let entry = self.store.load_message(&id).unwrap();
+            current_id = entry.parent.clone();
+            chain.push(entry);
         }
 
         chain.reverse();
