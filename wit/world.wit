@@ -3,9 +3,11 @@ package ntwk:theater;
 world single-chat {
     import runtime;
     import filesystem;
+    import store;
     import message-server-host;
     import supervisor;
     import http-client;
+
     export message-server-client;
     export actor;
 
