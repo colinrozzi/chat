@@ -8,12 +8,8 @@ let runningChildren = [];
 let ws = null;
 let reconnectAttempts = 0;
 let totalCost = 0;
-let headPollingInterval = null;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 1000;
-const HEAD_POLLING_INTERVAL = 1000; // Poll every second
-
-// Removed polling functions since we now use server-side push
 
 // DOM Elements
 const elements = {
@@ -28,37 +24,14 @@ const elements = {
     availableActors: document.getElementById('availableActors'),
     runningActors: document.getElementById('runningActors'),
     headId: document.getElementById('headId'),
-    // Add a chat selector to the DOM when creating the UI
-    chatSelector: document.createElement('div')
+    chatSidebar: document.getElementById('chatSidebar'),
+    chatList: document.getElementById('chatList'),
+    currentChatName: document.getElementById('currentChatName'),
+    newChatButton: document.getElementById('newChatButton'),
+    branchChatButton: document.getElementById('branchChatButton'),
+    collapseChatSidebarButton: document.getElementById('collapseChatSidebarButton'),
+    expandChatSidebarButton: document.getElementById('expandChatSidebarButton')
 };
-
-// Initialize chat selector
-function initializeChatSelector() {
-    elements.chatSelector.className = 'chat-selector';
-    elements.chatSelector.innerHTML = `
-        <div class="chat-selector-header">
-            <h3>Chats</h3>
-            <button id="newChatButton" class="new-chat-button">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                New Chat
-            </button>
-        </div>
-        <div id="chatList" class="chat-list"></div>
-    `;
-    
-    // Insert chat selector into the DOM
-    const header = document.querySelector('.header-content');
-    header.insertBefore(elements.chatSelector, header.firstChild);
-    
-    // Add event listener for new chat button
-    document.getElementById('newChatButton').addEventListener('click', createNewChat);
-    
-    // Create an additional reference for the chat list
-    elements.chatList = document.getElementById('chatList');
-}
 
 // WebSocket setup
 function connectWebSocket() {
@@ -77,8 +50,6 @@ function connectWebSocket() {
         sendWebSocketMessage({ type: 'get_head' });  // Initial head query
         sendWebSocketMessage({ type: 'get_available_children' });
         sendWebSocketMessage({ type: 'get_running_children' });
-        
-        // No longer need to start polling - server pushes updates
     };
     
     ws.onclose = () => {
@@ -87,7 +58,6 @@ function connectWebSocket() {
         elements.sendButton.disabled = true;
         
         // Disconnection handling
-        
         if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
             reconnectAttempts++;
             setTimeout(connectWebSocket, RECONNECT_DELAY * Math.min(reconnectAttempts, 30));
@@ -97,11 +67,11 @@ function connectWebSocket() {
     ws.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data);
-            console.log('Received WebSocket message:', data);  // Debug log
+            console.log('Received WebSocket message:', data);
             handleWebSocketMessage(data);
         } catch (error) {
-            console.error('WebSocket message processing error:', error);  // Debug log
-            console.error('Raw message:', event.data);  // Debug log
+            console.error('WebSocket message processing error:', error);
+            console.error('Raw message:', event.data);
             showError('Failed to process server message');
         }
     };
@@ -131,7 +101,8 @@ function handleWebSocketMessage(data) {
         case 'head':
             if (data.current_chat_id && data.current_chat_id !== currentChatId) {
                 currentChatId = data.current_chat_id;
-                renderChatSelector();
+                updateCurrentChatName();
+                renderChatList();
             }
             if (data.head) {
                 // Check if head has changed
@@ -156,7 +127,8 @@ function handleWebSocketMessage(data) {
                 if (data.current_chat_id) {
                     currentChatId = data.current_chat_id;
                 }
-                renderChatSelector();
+                renderChatList();
+                updateCurrentChatName();
             }
             break;
             
@@ -168,7 +140,8 @@ function handleWebSocketMessage(data) {
                 }
                 // Update current chat ID
                 currentChatId = data.chat.id;
-                renderChatSelector();
+                renderChatList();
+                updateCurrentChatName();
             }
             break;
             
@@ -178,7 +151,8 @@ function handleWebSocketMessage(data) {
                 const index = chats.findIndex(c => c.id === data.chat.id);
                 if (index !== -1) {
                     chats[index] = { ...chats[index], ...data.chat };
-                    renderChatSelector();
+                    renderChatList();
+                    updateCurrentChatName();
                 }
             }
             break;
@@ -187,7 +161,8 @@ function handleWebSocketMessage(data) {
             if (data.chat_id) {
                 // Remove chat from array
                 chats = chats.filter(c => c.id !== data.chat_id);
-                renderChatSelector();
+                renderChatList();
+                updateCurrentChatName();
             }
             break;
             
@@ -480,9 +455,14 @@ function sortMessageChain() {
 }
 
 // Chat management functions
-function renderChatSelector() {
-    // Sort chats by updated_at (newest first)
-    const sortedChats = [...chats].sort((a, b) => b.updated_at - a.updated_at);
+function renderChatList() {
+    // Sort chats by updated_at (newest first) if available, or fallback to sorting by ID
+    const sortedChats = [...chats].sort((a, b) => {
+        if (a.updated_at && b.updated_at) {
+            return b.updated_at - a.updated_at;
+        }
+        return a.id.localeCompare(b.id);
+    });
     
     elements.chatList.innerHTML = sortedChats.length ?
         sortedChats.map(chat => `
@@ -504,6 +484,18 @@ function renderChatSelector() {
             </div>
         `).join('') :
         '<div class="empty-state">No chats available</div>';
+}
+
+function updateCurrentChatName() {
+    const currentChat = chats.find(chat => chat.id === currentChatId);
+    elements.currentChatName.textContent = currentChat ? currentChat.name : 'No Chat Selected';
+    
+    // Make the chat name editable
+    elements.currentChatName.onclick = () => {
+        if (currentChatId) {
+            showRenameChat(currentChatId, elements.currentChatName.textContent);
+        }
+    };
 }
 
 function createNewChat() {
@@ -700,13 +692,40 @@ function sendMessage() {
     });
 }
 
+// Toggle chat sidebar
+function toggleChatSidebar() {
+    elements.chatSidebar.classList.toggle('collapsed');
+    if (elements.chatSidebar.classList.contains('collapsed')) {
+        elements.expandChatSidebarButton.classList.add('visible');
+    } else {
+        elements.expandChatSidebarButton.classList.remove('visible');
+    }
+}
+
+// Toggle child message content
+function toggleChildMessage(header) {
+    const content = header.nextElementSibling;
+    content.classList.toggle('expanded');
+    header.classList.toggle('collapsed');
+}
+
+// Toggle section
+function toggleSection(sectionId) {
+    const section = document.getElementById(sectionId).closest('.section');
+    section.classList.toggle('collapsed');
+}
+
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize WebSocket
     connectWebSocket();
     
-    // Initialize chat selector
-    initializeChatSelector();
+    // Auto-resize textarea
+    elements.messageInput.addEventListener('input', () => {
+        elements.messageInput.style.height = 'auto';
+        elements.messageInput.style.height = Math.min(elements.messageInput.scrollHeight, 120) + 'px';
+        elements.sendButton.disabled = !elements.messageInput.value.trim();
+    });
     
     // Add keyboard shortcut for focusing message input
     document.addEventListener('keydown', (event) => {
@@ -714,13 +733,6 @@ document.addEventListener('DOMContentLoaded', () => {
             event.preventDefault(); // Prevent the \ from being typed
             elements.messageInput.focus();
         }
-    });
-    
-    // Auto-resize textarea
-    elements.messageInput.addEventListener('input', () => {
-        elements.messageInput.style.height = 'auto';
-        elements.messageInput.style.height = Math.min(elements.messageInput.scrollHeight, 120) + 'px';
-        elements.sendButton.disabled = !elements.messageInput.value.trim();
     });
     
     // Send message handlers
@@ -733,7 +745,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     elements.sendButton.addEventListener('click', sendMessage);
     
-    // Panel toggle handlers
+    // Chat sidebar toggle handlers
+    elements.collapseChatSidebarButton.addEventListener('click', toggleChatSidebar);
+    elements.expandChatSidebarButton.addEventListener('click', toggleChatSidebar);
+    
+    // Actor panel toggle handlers
     elements.collapseButton.addEventListener('click', () => {
         elements.actorPanel.classList.add('collapsed');
         elements.expandButton.classList.add('visible');
@@ -744,39 +760,12 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.expandButton.classList.remove('visible');
     });
     
-    // Add branch chat button to header
-    const headerContent = document.querySelector('.header-content');
-    const branchButton = document.createElement('button');
-    branchButton.id = 'branchChatButton';
-    branchButton.className = 'branch-chat-button';
-    branchButton.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M6 3v12"></path>
-            <path d="M18 9a3 3 0 0 0 0 6"></path>
-            <path d="M6 15a3 3 0 0 0 0 6"></path>
-            <path d="M18 9a3 3 0 0 1 0-6"></path>
-            <path d="M6 15h12"></path>
-        </svg>
-        Branch Chat
-    `;
-    branchButton.addEventListener('click', branchChat);
+    // New chat button
+    elements.newChatButton.addEventListener('click', createNewChat);
     
-    // Insert after chat selector but before other elements
-    headerContent.insertBefore(branchButton, elements.chatSelector.nextSibling);
+    // Branch chat button
+    elements.branchChatButton.addEventListener('click', branchChat);
 });
-
-// Section toggling
-function toggleSection(sectionId) {
-    const section = document.getElementById(sectionId).closest('.section');
-    section.classList.toggle('collapsed');
-}
-
-// Toggle child message content
-function toggleChildMessage(header) {
-    const content = header.nextElementSibling;
-    content.classList.toggle('expanded');
-    header.classList.toggle('collapsed');
-}
 
 // Cleanup
 window.addEventListener('unload', () => {

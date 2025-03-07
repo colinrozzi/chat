@@ -10,15 +10,57 @@
 
 <body>
     <div class="app">
-        <button id="expandButton" class="expand-button">
+        <!-- Chat Sidebar (New) -->
+        <aside id="chatSidebar" class="chat-sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    Chats
+                </div>
+                <button id="newChatButton" class="new-chat-button">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    New Chat
+                </button>
+                <button id="collapseChatSidebarButton" class="collapse-button">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+            </div>
+            <div class="sidebar-content">
+                <div id="chatList" class="chat-list">
+                    <!-- Chats will be rendered here -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Toggle Button for Chat Sidebar -->
+        <button id="expandChatSidebarButton" class="expand-chat-sidebar-button">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M15 19l-7-7 7-7" />
+                <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
-            Actors
         </button>
+
+        <!-- Main Chat Container -->
         <main class="chat-container">
             <header class="header">
                 <div class="header-content">
+                    <div id="currentChatName" class="current-chat-name" title="Click to edit chat name"></div>
+                    <button id="branchChatButton" class="branch-chat-button">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 3v12"></path>
+                            <path d="M18 9a3 3 0 0 0 0 6"></path>
+                            <path d="M6 15a3 3 0 0 0 0 6"></path>
+                            <path d="M18 9a3 3 0 0 1 0-6"></path>
+                            <path d="M6 15h12"></path>
+                        </svg>
+                        Branch Chat
+                    </button>
                     <div id="connectionStatus" class="connection-status disconnected">
                         <div class="status-indicator"></div>
                         <span>Disconnected</span>
@@ -61,6 +103,7 @@
             </div>
         </main>
 
+        <!-- Actor Panel (Right Sidebar) -->
         <aside id="actorPanel" class="actor-panel">
             <div class="panel-header">
                 <div class="panel-title">
