@@ -58,16 +58,28 @@ impl State {
             state.current_chat_id = Some(chat_id);
         } else {
             // Get the list of chats
-            if let Ok(chat_ids) = state.store.list_chat_ids() {
-                if !chat_ids.is_empty() {
+            match state.store.list_chat_ids() {
+                Ok(chat_ids) if !chat_ids.is_empty() => {
                     // Use the first chat by default
                     state.current_chat_id = Some(chat_ids[0].clone());
                     log(&format!("Using existing chat: {}", chat_ids[0]));
-                } else {
+                }
+                _ => {
                     // Create a default chat if none exists
-                    if let Ok(chat_info) = state.store.create_chat("New Chat".to_string(), None) {
-                        state.current_chat_id = Some(chat_info.id.clone());
-                        log(&format!("Created default chat: {}", chat_info.id));
+                    log("No existing chats found, attempting to create a default chat");
+                    match state.store.create_chat("New Chat".to_string(), None) {
+                        Ok(chat_info) => {
+                            state.current_chat_id = Some(chat_info.id.clone());
+                            log(&format!("Created default chat: {}", chat_info.id));
+                        }
+                        Err(e) => {
+                            // Just log the error but don't panic - we'll create a chat on first message
+                            log(&format!(
+                                "Failed to create default chat during initialization: {}",
+                                e
+                            ));
+                            log("Will create chat when first message is sent");
+                        }
                     }
                 }
             }
@@ -166,11 +178,26 @@ impl State {
         // Ensure we have a current chat
         if self.current_chat_id.is_none() {
             log("No current chat, creating a new one");
-            if let Ok(chat_info) = self.store.create_chat("New Chat".to_string(), None) {
-                self.current_chat_id = Some(chat_info.id.clone());
-                log(&format!("Created new chat: {}", chat_info.id));
-            } else {
-                panic!("Failed to create a new chat");
+            match self.store.create_chat("New Chat".to_string(), None) {
+                Ok(chat_info) => {
+                    self.current_chat_id = Some(chat_info.id.clone());
+                    log(&format!("Created new chat: {}", chat_info.id));
+                }
+                Err(e) => {
+                    // Log the error but continue with a fallback chat ID
+                    log(&format!("Failed to create a new chat: {}", e));
+
+                    // Create a fallback chat ID
+                    let fallback_id = format!(
+                        "{}",
+                        SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs()
+                    );
+                    log(&format!("Using fallback chat ID: {}", fallback_id));
+                    self.current_chat_id = Some(fallback_id);
+                }
             }
         }
 

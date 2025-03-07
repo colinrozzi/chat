@@ -59,10 +59,10 @@ fn setup_http_server(_websocket_port: u16) -> Result<u64, String> {
     add_route(server_id, "/index.html", "GET", api_handler_id)?;
     add_route(server_id, "/styles.css", "GET", api_handler_id)?;
     add_route(server_id, "/chat.js", "GET", api_handler_id)?;
-    
+
     // Message API routes
     add_route(server_id, "/api/messages", "GET", api_handler_id)?;
-    
+
     // Chat API routes
     add_route(server_id, "/api/chats", "GET", api_handler_id)?;
     add_route(server_id, "/api/chats", "POST", api_handler_id)?;
@@ -235,7 +235,7 @@ impl HttpHandlersGuest for Component {
                     e
                 ));
             }
-            
+
             // Also send the list of available chats
             let mut chats = Vec::new();
             if let Ok(chat_ids) = current_state.store.list_chat_ids() {
@@ -251,7 +251,7 @@ impl HttpHandlersGuest for Component {
                     }
                 }
             }
-            
+
             let chats_message = WebsocketMessage {
                 ty: MessageType::Text,
                 text: Some(
@@ -264,7 +264,7 @@ impl HttpHandlersGuest for Component {
                 ),
                 data: None,
             };
-            
+
             if let Err(e) =
                 send_websocket_message(current_state.server_id, connection_id, &chats_message)
             {
