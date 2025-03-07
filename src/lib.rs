@@ -59,7 +59,16 @@ fn setup_http_server(_websocket_port: u16) -> Result<u64, String> {
     add_route(server_id, "/index.html", "GET", api_handler_id)?;
     add_route(server_id, "/styles.css", "GET", api_handler_id)?;
     add_route(server_id, "/chat.js", "GET", api_handler_id)?;
+    
+    // Message API routes
     add_route(server_id, "/api/messages", "GET", api_handler_id)?;
+    
+    // Chat API routes
+    add_route(server_id, "/api/chats", "GET", api_handler_id)?;
+    add_route(server_id, "/api/chats", "POST", api_handler_id)?;
+    add_route(server_id, "/api/chats/*", "GET", api_handler_id)?;
+    add_route(server_id, "/api/chats/*", "PUT", api_handler_id)?;
+    add_route(server_id, "/api/chats/*", "DELETE", api_handler_id)?;
 
     // Enable WebSocket
     enable_websocket(
@@ -200,16 +209,18 @@ impl HttpHandlersGuest for Component {
         ));
 
         // Send the current head to the new client
-        if current_state.head.is_some() {
+        {
             use bindings::ntwk::theater::http_framework::send_websocket_message;
             use bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
 
+            // Send head message
             let head_message = WebsocketMessage {
                 ty: MessageType::Text,
                 text: Some(
                     serde_json::to_string(&serde_json::json!({
                         "type": "head",
-                        "head": current_state.head.clone()
+                        "head": current_state.head.clone(),
+                        "current_chat_id": current_state.current_chat_id.clone()
                     }))
                     .unwrap(),
                 ),
@@ -221,6 +232,44 @@ impl HttpHandlersGuest for Component {
             {
                 log(&format!(
                     "Failed to send initial head update to new client: {}",
+                    e
+                ));
+            }
+            
+            // Also send the list of available chats
+            let mut chats = Vec::new();
+            if let Ok(chat_ids) = current_state.store.list_chat_ids() {
+                for chat_id in chat_ids {
+                    if let Ok(Some(chat_info)) = current_state.store.get_chat_info(&chat_id) {
+                        chats.push(serde_json::json!({
+                            "id": chat_info.id,
+                            "name": chat_info.name,
+                            "updated_at": chat_info.updated_at,
+                            "created_at": chat_info.created_at,
+                            "icon": chat_info.icon
+                        }));
+                    }
+                }
+            }
+            
+            let chats_message = WebsocketMessage {
+                ty: MessageType::Text,
+                text: Some(
+                    serde_json::to_string(&serde_json::json!({
+                        "type": "chats_update",
+                        "chats": chats,
+                        "current_chat_id": current_state.current_chat_id.clone()
+                    }))
+                    .unwrap(),
+                ),
+                data: None,
+            };
+            
+            if let Err(e) =
+                send_websocket_message(current_state.server_id, connection_id, &chats_message)
+            {
+                log(&format!(
+                    "Failed to send initial chats list to new client: {}",
                     e
                 ));
             }

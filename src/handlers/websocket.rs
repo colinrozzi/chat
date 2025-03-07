@@ -11,14 +11,15 @@ pub struct WebsocketResponse {
 }
 
 // Helper function to create a messages_updated response
-fn create_messages_updated_response(head: &Option<String>) -> WebsocketResponse {
+fn create_messages_updated_response(state: &State) -> WebsocketResponse {
     WebsocketResponse {
         messages: vec![WebsocketMessage {
             ty: MessageType::Text,
             text: Some(
                 json!({
                     "type": "messages_updated",
-                    "head": head,
+                    "head": state.head,
+                    "current_chat_id": state.current_chat_id
                 })
                 .to_string(),
             ),
@@ -32,7 +33,6 @@ pub fn handle_message(
     state: Json,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     log("Handling WebSocket message");
-
     log(&format!("Message: {:?}", msg));
 
     let mut current_state: State = serde_json::from_slice(&state).unwrap();
@@ -42,6 +42,36 @@ pub fn handle_message(
             if let Some(ref text) = msg.text {
                 if let Ok(command) = serde_json::from_str::<Value>(text) {
                     match command["type"].as_str() {
+                        // Chat management commands
+                        Some("list_chats") => handle_list_chats(&current_state),
+                        Some("create_chat") => {
+                            let name = command["name"].as_str().unwrap_or("New Chat");
+                            let starting_head = command["starting_head"].as_str().map(String::from);
+                            handle_create_chat(&mut current_state, name, starting_head)
+                        }
+                        Some("switch_chat") => {
+                            if let Some(chat_id) = command["chat_id"].as_str() {
+                                handle_switch_chat(&mut current_state, chat_id)
+                            } else {
+                                default_response(&current_state)
+                            }
+                        }
+                        Some("rename_chat") => {
+                            if let (Some(chat_id), Some(name)) = (command["chat_id"].as_str(), command["name"].as_str()) {
+                                handle_rename_chat(&mut current_state, chat_id, name)
+                            } else {
+                                default_response(&current_state)
+                            }
+                        }
+                        Some("delete_chat") => {
+                            if let Some(chat_id) = command["chat_id"].as_str() {
+                                handle_delete_chat(&mut current_state, chat_id)
+                            } else {
+                                default_response(&current_state)
+                            }
+                        }
+
+                        // Child actor commands
                         Some("get_available_children") => {
                             handle_get_available_children(&current_state)
                         }
@@ -60,6 +90,8 @@ pub fn handle_message(
                                 default_response(&current_state)
                             }
                         }
+
+                        // Message commands
                         Some("send_message") => {
                             if let Some(content) = command["content"].as_str() {
                                 handle_send_message(&mut current_state, content)
@@ -69,23 +101,7 @@ pub fn handle_message(
                         }
                         Some("get_message") => {
                             if let Some(message_id) = command["message_id"].as_str() {
-                                let message = current_state.get_message(message_id).unwrap();
-                                Ok((
-                                    Some(serde_json::to_vec(&current_state).unwrap()),
-                                    (WebsocketResponse {
-                                        messages: vec![WebsocketMessage {
-                                            ty: MessageType::Text,
-                                            text: Some(
-                                                json!({
-                                                    "type": "message",
-                                                    "message": message
-                                                })
-                                                .to_string(),
-                                            ),
-                                            data: None,
-                                        }],
-                                    },),
-                                ))
+                                handle_get_message(&mut current_state, message_id)
                             } else {
                                 default_response(&current_state)
                             }
@@ -95,44 +111,12 @@ pub fn handle_message(
                                 (command["child_id"].as_str(), command["text"].as_str())
                             {
                                 let data = command["data"].clone();
-
-                                // Create a child message
-                                let child_message = crate::messages::ChildMessage {
-                                    child_id: child_id.to_string(),
-                                    text: text.to_string(),
-                                    data,
-                                };
-
-                                // Add it to the chain
-                                current_state.add_child_message(child_message);
-
-                                Ok((
-                                    Some(serde_json::to_vec(&current_state).unwrap()),
-                                    (create_messages_updated_response(&current_state.head),),
-                                ))
+                                handle_child_message(&mut current_state, child_id, text, data)
                             } else {
                                 default_response(&current_state)
                             }
                         }
-                        Some("get_head") => {
-                            // Efficiently handle head polling by skipping message recreation if not needed
-                            Ok((
-                                Some(serde_json::to_vec(&current_state).unwrap()),
-                                (WebsocketResponse {
-                                    messages: vec![WebsocketMessage {
-                                        ty: MessageType::Text,
-                                        text: Some(
-                                            json!({
-                                                "type": "head",
-                                                "head": current_state.head
-                                            })
-                                            .to_string(),
-                                        ),
-                                        data: None,
-                                    }],
-                                },),
-                            ))
-                        }
+                        Some("get_head") => handle_get_head(&current_state),
 
                         _ => default_response(&current_state),
                     }
@@ -147,6 +131,320 @@ pub fn handle_message(
     }
 }
 
+// Chat management handlers
+fn handle_list_chats(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    // Send a chats update message to the client
+    if let Err(e) = state.notify_chats_update() {
+        log(&format!("Failed to notify chats update: {}", e));
+    }
+
+    // Return a direct response as well (redundant but safe)
+    let mut chats = Vec::new();
+    if let Ok(chat_ids) = state.store.list_chat_ids() {
+        for chat_id in chat_ids {
+            if let Ok(Some(chat_info)) = state.store.get_chat_info(&chat_id) {
+                chats.push(json!({
+                    "id": chat_info.id,
+                    "name": chat_info.name,
+                    "updated_at": chat_info.updated_at,
+                    "created_at": chat_info.created_at,
+                    "icon": chat_info.icon,
+                }));
+            }
+        }
+    }
+
+    Ok((
+        Some(serde_json::to_vec(state).unwrap()),
+        (WebsocketResponse {
+            messages: vec![WebsocketMessage {
+                ty: MessageType::Text,
+                text: Some(
+                    json!({
+                        "type": "chats_update",
+                        "chats": chats,
+                        "current_chat_id": state.current_chat_id
+                    })
+                    .to_string(),
+                ),
+                data: None,
+            }],
+        },),
+    ))
+}
+
+fn handle_create_chat(
+    state: &mut State,
+    name: &str,
+    starting_head: Option<String>,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    match state.create_chat(name.to_string(), starting_head) {
+        Ok(chat_info) => {
+            // Notify all clients about chats update
+            if let Err(e) = state.notify_chats_update() {
+                log(&format!("Failed to notify chats update: {}", e));
+            }
+
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![
+                        WebsocketMessage {
+                            ty: MessageType::Text,
+                            text: Some(
+                                json!({
+                                    "type": "chat_created",
+                                    "chat": {
+                                        "id": chat_info.id,
+                                        "name": chat_info.name,
+                                        "updated_at": chat_info.updated_at,
+                                        "created_at": chat_info.created_at,
+                                    }
+                                })
+                                .to_string(),
+                            ),
+                            data: None,
+                        },
+                        WebsocketMessage {
+                            ty: MessageType::Text,
+                            text: Some(
+                                json!({
+                                    "type": "messages_updated",
+                                    "head": state.head,
+                                    "current_chat_id": state.current_chat_id
+                                })
+                                .to_string(),
+                            ),
+                            data: None,
+                        },
+                    ],
+                },),
+            ))
+        }
+        Err(e) => {
+            log(&format!("Failed to create chat: {}", e));
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "error",
+                                "message": format!("Failed to create chat: {}", e)
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+    }
+}
+
+fn handle_switch_chat(
+    state: &mut State,
+    chat_id: &str,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    match state.switch_chat(chat_id) {
+        Ok(_) => {
+            // Head update is already sent by the switch_chat method
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (create_messages_updated_response(state),),
+            ))
+        }
+        Err(e) => {
+            log(&format!("Failed to switch chat: {}", e));
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "error",
+                                "message": format!("Failed to switch chat: {}", e)
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+    }
+}
+
+fn handle_rename_chat(
+    state: &mut State,
+    chat_id: &str,
+    name: &str,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    // Get the current chat info
+    match state.store.get_chat_info(chat_id) {
+        Ok(Some(mut chat_info)) => {
+            // Update the name
+            chat_info.name = name.to_string();
+            chat_info.updated_at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+            // Save the updated chat info
+            if let Err(e) = state.store.update_chat_info(&chat_info) {
+                log(&format!("Failed to update chat info: {}", e));
+                return Ok((
+                    Some(serde_json::to_vec(state).unwrap()),
+                    (WebsocketResponse {
+                        messages: vec![WebsocketMessage {
+                            ty: MessageType::Text,
+                            text: Some(
+                                json!({
+                                    "type": "error",
+                                    "message": format!("Failed to rename chat: {}", e)
+                                })
+                                .to_string(),
+                            ),
+                            data: None,
+                        }],
+                    },),
+                ));
+            }
+
+            // Notify all clients about chats update
+            if let Err(e) = state.notify_chats_update() {
+                log(&format!("Failed to notify chats update: {}", e));
+            }
+
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "chat_renamed",
+                                "chat": {
+                                    "id": chat_info.id,
+                                    "name": chat_info.name,
+                                    "updated_at": chat_info.updated_at,
+                                }
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+        Ok(None) => {
+            log(&format!("Chat not found: {}", chat_id));
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "error",
+                                "message": format!("Chat not found: {}", chat_id)
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+        Err(e) => {
+            log(&format!("Failed to get chat info: {}", e));
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "error",
+                                "message": format!("Failed to get chat info: {}", e)
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+    }
+}
+
+fn handle_delete_chat(
+    state: &mut State,
+    chat_id: &str,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    match state.delete_chat(chat_id) {
+        Ok(_) => {
+            // Notify all clients about chats update
+            if let Err(e) = state.notify_chats_update() {
+                log(&format!("Failed to notify chats update: {}", e));
+            }
+
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![
+                        WebsocketMessage {
+                            ty: MessageType::Text,
+                            text: Some(
+                                json!({
+                                    "type": "chat_deleted",
+                                    "chat_id": chat_id
+                                })
+                                .to_string(),
+                            ),
+                            data: None,
+                        },
+                        WebsocketMessage {
+                            ty: MessageType::Text,
+                            text: Some(
+                                json!({
+                                    "type": "messages_updated",
+                                    "head": state.head,
+                                    "current_chat_id": state.current_chat_id
+                                })
+                                .to_string(),
+                            ),
+                            data: None,
+                        },
+                    ],
+                },),
+            ))
+        }
+        Err(e) => {
+            log(&format!("Failed to delete chat: {}", e));
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "error",
+                                "message": format!("Failed to delete chat: {}", e)
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+    }
+}
+
+// Child actor handlers
 fn handle_get_available_children(
     state: &State,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
@@ -182,16 +480,7 @@ fn handle_get_available_children(
 fn handle_get_running_children(
     state: &State,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    let running_children: Vec<Value> = state
-        .children
-        .iter()
-        .map(|(actor_id, child)| {
-            json!({
-                "actor_id": actor_id,
-                "manifest_name": child.manifest_name
-            })
-        })
-        .collect();
+    let running_children = state.list_running_children();
 
     Ok((
         Some(serde_json::to_vec(state).unwrap()),
@@ -215,51 +504,61 @@ fn handle_start_child(
     state: &mut State,
     manifest_name: &str,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    if let Ok(_actor_id) = state.start_child(manifest_name) {
-        // After starting a child, also send a messages_updated response
-        // because the child's introduction message is added to the chain
-        let running_children: Vec<Value> = state
-            .children
-            .iter()
-            .map(|(actor_id, child)| {
-                json!({
-                    "actor_id": actor_id,
-                    "manifest_name": child.manifest_name
-                })
-            })
-            .collect();
+    match state.start_child(manifest_name) {
+        Ok(_actor_id) => {
+            // Get the updated running children
+            let running_children = state.list_running_children();
 
-        // Use the updated helper function
-        let children_update = WebsocketResponse {
-            messages: vec![
-                WebsocketMessage {
-                    ty: MessageType::Text,
-                    text: Some(
-                        json!({
-                            "type": "children_update",
-                            "running_children": running_children
-                        })
-                        .to_string(),
-                    ),
-                    data: None,
-                },
-                WebsocketMessage {
-                    ty: MessageType::Text,
-                    text: Some(
-                        json!({
-                            "type": "messages_updated",
-                            "head": state.head
-                        })
-                        .to_string(),
-                    ),
-                    data: None,
-                },
-            ],
-        };
-
-        Ok((Some(serde_json::to_vec(state).unwrap()), (children_update,)))
-    } else {
-        default_response(state)
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![
+                        WebsocketMessage {
+                            ty: MessageType::Text,
+                            text: Some(
+                                json!({
+                                    "type": "children_update",
+                                    "running_children": running_children
+                                })
+                                .to_string(),
+                            ),
+                            data: None,
+                        },
+                        WebsocketMessage {
+                            ty: MessageType::Text,
+                            text: Some(
+                                json!({
+                                    "type": "messages_updated",
+                                    "head": state.head,
+                                    "current_chat_id": state.current_chat_id
+                                })
+                                .to_string(),
+                            ),
+                            data: None,
+                        },
+                    ],
+                },),
+            ))
+        }
+        Err(e) => {
+            log(&format!("Failed to start child: {}", e));
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "error",
+                                "message": format!("Failed to start child: {}", e)
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
     }
 }
 
@@ -267,37 +566,51 @@ fn handle_stop_child(
     state: &mut State,
     actor_id: &str,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    state.children.remove(actor_id);
+    match state.stop_child(actor_id) {
+        Ok(_) => {
+            // Get the updated running children
+            let running_children = state.list_running_children();
 
-    let running_children: Vec<Value> = state
-        .children
-        .iter()
-        .map(|(actor_id, child)| {
-            json!({
-                "actor_id": actor_id,
-                "manifest_name": child.manifest_name
-            })
-        })
-        .collect();
-
-    Ok((
-        Some(serde_json::to_vec(state).unwrap()),
-        (WebsocketResponse {
-            messages: vec![WebsocketMessage {
-                ty: MessageType::Text,
-                text: Some(
-                    json!({
-                        "type": "children_update",
-                        "running_children": running_children
-                    })
-                    .to_string(),
-                ),
-                data: None,
-            }],
-        },),
-    ))
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "children_update",
+                                "running_children": running_children
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+        Err(e) => {
+            log(&format!("Failed to stop child: {}", e));
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "error",
+                                "message": format!("Failed to stop child: {}", e)
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+    }
 }
 
+// Message handlers
 fn handle_send_message(
     state: &mut State,
     content: &str,
@@ -307,7 +620,95 @@ fn handle_send_message(
     // Use the helper function to create standardized response
     Ok((
         Some(serde_json::to_vec(state).unwrap()),
-        (create_messages_updated_response(&state.head),),
+        (create_messages_updated_response(state),),
+    ))
+}
+
+fn handle_get_message(
+    state: &mut State,
+    message_id: &str,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    match state.get_message(message_id) {
+        Ok(message) => {
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "message",
+                                "message": message
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+        Err(e) => {
+            log(&format!("Failed to get message: {}", e));
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "error",
+                                "message": format!("Failed to get message: {}", e)
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+    }
+}
+
+fn handle_child_message(
+    state: &mut State,
+    child_id: &str,
+    text: &str,
+    data: Value,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    // Create a child message
+    let child_message = crate::messages::ChildMessage {
+        child_id: child_id.to_string(),
+        text: text.to_string(),
+        data,
+    };
+
+    // Add it to the chain
+    state.add_child_message(child_message);
+
+    // Use the helper function to create standardized response
+    Ok((
+        Some(serde_json::to_vec(state).unwrap()),
+        (create_messages_updated_response(state),),
+    ))
+}
+
+fn handle_get_head(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    Ok((
+        Some(serde_json::to_vec(state).unwrap()),
+        (WebsocketResponse {
+            messages: vec![WebsocketMessage {
+                ty: MessageType::Text,
+                text: Some(
+                    json!({
+                        "type": "head",
+                        "head": state.head,
+                        "current_chat_id": state.current_chat_id
+                    })
+                    .to_string(),
+                ),
+                data: None,
+            }],
+        },),
     ))
 }
 
