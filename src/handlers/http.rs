@@ -78,7 +78,7 @@ pub fn handle_request(
         // API endpoints for chats
         ("GET", "/api/chats") => {
             let current_state: State = serde_json::from_slice(&state).unwrap();
-            
+
             // Get list of chats
             let mut chats = Vec::new();
             if let Ok(chat_ids) = current_state.store.list_chat_ids() {
@@ -87,8 +87,6 @@ pub fn handle_request(
                         chats.push(json!({
                             "id": chat_info.id,
                             "name": chat_info.name,
-                            "updated_at": chat_info.updated_at,
-                            "created_at": chat_info.created_at,
                             "icon": chat_info.icon,
                             "head": chat_info.head,
                             "children_count": chat_info.children.len()
@@ -96,7 +94,7 @@ pub fn handle_request(
                     }
                 }
             }
-            
+
             Ok((
                 Some(state),
                 (HttpResponse {
@@ -113,11 +111,11 @@ pub fn handle_request(
                 },),
             ))
         }
-        
+
         // API endpoint to get a specific chat
         ("GET", uri) if uri.starts_with("/api/chats/") => {
             let current_state: State = serde_json::from_slice(&state).unwrap();
-            
+
             // Extract the chat ID from the path parameter
             let path_parts: Vec<&str> = uri.split('/').collect();
             if path_parts.len() < 4 {
@@ -136,16 +134,14 @@ pub fn handle_request(
                     },),
                 ));
             }
-            
+
             let chat_id = path_parts[3]; // /api/chats/{id} -> id is at index 3
-            
+
             match current_state.store.get_chat_info(chat_id) {
                 Ok(Some(chat_info)) => {
                     let chat_json = json!({
                         "id": chat_info.id,
                         "name": chat_info.name,
-                        "updated_at": chat_info.updated_at,
-                        "created_at": chat_info.created_at,
                         "icon": chat_info.icon,
                         "head": chat_info.head,
                         "children_count": chat_info.children.len(),
@@ -156,12 +152,15 @@ pub fn handle_request(
                             })
                         }).collect::<Vec<_>>()
                     });
-                    
+
                     Ok((
                         Some(state),
                         (HttpResponse {
                             status: 200,
-                            headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                            headers: vec![(
+                                "Content-Type".to_string(),
+                                "application/json".to_string(),
+                            )],
                             body: Some(
                                 serde_json::to_vec(&json!({
                                     "status": "success",
@@ -172,97 +171,96 @@ pub fn handle_request(
                         },),
                     ))
                 }
-                Ok(None) => {
-                    Ok((
-                        Some(state),
-                        (HttpResponse {
-                            status: 404,
-                            headers: vec![("Content-Type".to_string(), "application/json".to_string())],
-                            body: Some(
-                                serde_json::to_vec(&json!({
-                                    "status": "error",
-                                    "message": format!("Chat not found: {}", chat_id)
-                                }))
-                                .unwrap(),
-                            ),
-                        },),
-                    ))
-                }
-                Err(e) => {
-                    Ok((
-                        Some(state),
-                        (HttpResponse {
-                            status: 500,
-                            headers: vec![("Content-Type".to_string(), "application/json".to_string())],
-                            body: Some(
-                                serde_json::to_vec(&json!({
-                                    "status": "error",
-                                    "message": format!("Failed to get chat: {}", e)
-                                }))
-                                .unwrap(),
-                            ),
-                        },),
-                    ))
-                }
+                Ok(None) => Ok((
+                    Some(state),
+                    (HttpResponse {
+                        status: 404,
+                        headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                        body: Some(
+                            serde_json::to_vec(&json!({
+                                "status": "error",
+                                "message": format!("Chat not found: {}", chat_id)
+                            }))
+                            .unwrap(),
+                        ),
+                    },),
+                )),
+                Err(e) => Ok((
+                    Some(state),
+                    (HttpResponse {
+                        status: 500,
+                        headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                        body: Some(
+                            serde_json::to_vec(&json!({
+                                "status": "error",
+                                "message": format!("Failed to get chat: {}", e)
+                            }))
+                            .unwrap(),
+                        ),
+                    },),
+                )),
             }
         }
-        
+
         // API endpoint to create a new chat
         ("POST", "/api/chats") => {
             let mut current_state: State = serde_json::from_slice(&state).unwrap();
-            
+
             // Parse the request body
             if let Some(body) = &req.body {
                 if let Ok(data) = serde_json::from_slice::<serde_json::Value>(body) {
                     let name = data["name"].as_str().unwrap_or("New Chat").to_string();
                     let starting_head = data["starting_head"].as_str().map(String::from);
-                    
+
                     match current_state.create_chat(name, starting_head) {
-                        Ok(chat_info) => {
-                            Ok((
-                                Some(serde_json::to_vec(&current_state).unwrap()),
-                                (HttpResponse {
-                                    status: 201,
-                                    headers: vec![("Content-Type".to_string(), "application/json".to_string())],
-                                    body: Some(
-                                        serde_json::to_vec(&json!({
-                                            "status": "success",
-                                            "chat": {
-                                                "id": chat_info.id,
-                                                "name": chat_info.name,
-                                                "updated_at": chat_info.updated_at,
-                                                "created_at": chat_info.created_at,
-                                                "head": chat_info.head
-                                            }
-                                        }))
-                                        .unwrap(),
-                                    ),
-                                },),
-                            ))
-                        }
-                        Err(e) => {
-                            Ok((
-                                Some(state),
-                                (HttpResponse {
-                                    status: 500,
-                                    headers: vec![("Content-Type".to_string(), "application/json".to_string())],
-                                    body: Some(
-                                        serde_json::to_vec(&json!({
-                                            "status": "error",
-                                            "message": format!("Failed to create chat: {}", e)
-                                        }))
-                                        .unwrap(),
-                                    ),
-                                },),
-                            ))
-                        }
+                        Ok(chat_info) => Ok((
+                            Some(serde_json::to_vec(&current_state).unwrap()),
+                            (HttpResponse {
+                                status: 201,
+                                headers: vec![(
+                                    "Content-Type".to_string(),
+                                    "application/json".to_string(),
+                                )],
+                                body: Some(
+                                    serde_json::to_vec(&json!({
+                                        "status": "success",
+                                        "chat": {
+                                            "id": chat_info.id,
+                                            "name": chat_info.name,
+                                            "head": chat_info.head
+                                        }
+                                    }))
+                                    .unwrap(),
+                                ),
+                            },),
+                        )),
+                        Err(e) => Ok((
+                            Some(state),
+                            (HttpResponse {
+                                status: 500,
+                                headers: vec![(
+                                    "Content-Type".to_string(),
+                                    "application/json".to_string(),
+                                )],
+                                body: Some(
+                                    serde_json::to_vec(&json!({
+                                        "status": "error",
+                                        "message": format!("Failed to create chat: {}", e)
+                                    }))
+                                    .unwrap(),
+                                ),
+                            },),
+                        )),
                     }
                 } else {
                     Ok((
                         Some(state),
                         (HttpResponse {
                             status: 400,
-                            headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                            headers: vec![(
+                                "Content-Type".to_string(),
+                                "application/json".to_string(),
+                            )],
                             body: Some(
                                 serde_json::to_vec(&json!({
                                     "status": "error",
@@ -276,114 +274,52 @@ pub fn handle_request(
             } else {
                 // If no body provided, create with default name
                 match current_state.create_chat("New Chat".to_string(), None) {
-                    Ok(chat_info) => {
-                        Ok((
-                            Some(serde_json::to_vec(&current_state).unwrap()),
-                            (HttpResponse {
-                                status: 201,
-                                headers: vec![("Content-Type".to_string(), "application/json".to_string())],
-                                body: Some(
-                                    serde_json::to_vec(&json!({
-                                        "status": "success",
-                                        "chat": {
-                                            "id": chat_info.id,
-                                            "name": chat_info.name,
-                                            "updated_at": chat_info.updated_at,
-                                            "created_at": chat_info.created_at,
-                                            "head": chat_info.head
-                                        }
-                                    }))
-                                    .unwrap(),
-                                ),
-                            },),
-                        ))
-                    }
-                    Err(e) => {
-                        Ok((
-                            Some(state),
-                            (HttpResponse {
-                                status: 500,
-                                headers: vec![("Content-Type".to_string(), "application/json".to_string())],
-                                body: Some(
-                                    serde_json::to_vec(&json!({
-                                        "status": "error",
-                                        "message": format!("Failed to create chat: {}", e)
-                                    }))
-                                    .unwrap(),
-                                ),
-                            },),
-                        ))
-                    }
-                }
-            }
-        }
-        
-        // API endpoint to delete a chat
-        ("DELETE", uri) if uri.starts_with("/api/chats/") => {
-            let mut current_state: State = serde_json::from_slice(&state).unwrap();
-            
-            // Extract the chat ID from the path parameter
-            let path_parts: Vec<&str> = uri.split('/').collect();
-            if path_parts.len() < 4 {
-                return Ok((
-                    Some(state),
-                    (HttpResponse {
-                        status: 400,
-                        headers: vec![("Content-Type".to_string(), "application/json".to_string())],
-                        body: Some(
-                            serde_json::to_vec(&json!({
-                                "status": "error",
-                                "message": "Invalid chat ID format"
-                            }))
-                            .unwrap(),
-                        ),
-                    },),
-                ));
-            }
-            
-            let chat_id = path_parts[3]; // /api/chats/{id} -> id is at index 3
-            
-            match current_state.delete_chat(chat_id) {
-                Ok(_) => {
-                    Ok((
+                    Ok(chat_info) => Ok((
                         Some(serde_json::to_vec(&current_state).unwrap()),
                         (HttpResponse {
-                            status: 200,
-                            headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                            status: 201,
+                            headers: vec![(
+                                "Content-Type".to_string(),
+                                "application/json".to_string(),
+                            )],
                             body: Some(
                                 serde_json::to_vec(&json!({
                                     "status": "success",
-                                    "message": "Chat deleted successfully",
-                                    "current_chat_id": current_state.current_chat_id
+                                    "chat": {
+                                        "id": chat_info.id,
+                                        "name": chat_info.name,
+                                        "head": chat_info.head
+                                    }
                                 }))
                                 .unwrap(),
                             ),
                         },),
-                    ))
-                }
-                Err(e) => {
-                    Ok((
+                    )),
+                    Err(e) => Ok((
                         Some(state),
                         (HttpResponse {
                             status: 500,
-                            headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                            headers: vec![(
+                                "Content-Type".to_string(),
+                                "application/json".to_string(),
+                            )],
                             body: Some(
                                 serde_json::to_vec(&json!({
                                     "status": "error",
-                                    "message": format!("Failed to delete chat: {}", e)
+                                    "message": format!("Failed to create chat: {}", e)
                                 }))
                                 .unwrap(),
                             ),
                         },),
-                    ))
+                    )),
                 }
             }
         }
-        
-        // API endpoint to update a chat
-        ("PUT", uri) if uri.starts_with("/api/chats/") => {
-            let current_state: State = serde_json::from_slice(&state).unwrap();
-            
+
+        // API endpoint to delete a chat
+        ("DELETE", uri) if uri.starts_with("/api/chats/") => {
+            let mut current_state: State = serde_json::from_slice(&state).unwrap();
+
             // Extract the chat ID from the path parameter
             let path_parts: Vec<&str> = uri.split('/').collect();
             if path_parts.len() < 4 {
@@ -402,9 +338,67 @@ pub fn handle_request(
                     },),
                 ));
             }
-            
+
             let chat_id = path_parts[3]; // /api/chats/{id} -> id is at index 3
-            
+
+            match current_state.delete_chat(chat_id) {
+                Ok(_) => Ok((
+                    Some(serde_json::to_vec(&current_state).unwrap()),
+                    (HttpResponse {
+                        status: 200,
+                        headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                        body: Some(
+                            serde_json::to_vec(&json!({
+                                "status": "success",
+                                "message": "Chat deleted successfully",
+                                "current_chat_id": current_state.current_chat_id
+                            }))
+                            .unwrap(),
+                        ),
+                    },),
+                )),
+                Err(e) => Ok((
+                    Some(state),
+                    (HttpResponse {
+                        status: 500,
+                        headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                        body: Some(
+                            serde_json::to_vec(&json!({
+                                "status": "error",
+                                "message": format!("Failed to delete chat: {}", e)
+                            }))
+                            .unwrap(),
+                        ),
+                    },),
+                )),
+            }
+        }
+
+        // API endpoint to update a chat
+        ("PUT", uri) if uri.starts_with("/api/chats/") => {
+            let current_state: State = serde_json::from_slice(&state).unwrap();
+
+            // Extract the chat ID from the path parameter
+            let path_parts: Vec<&str> = uri.split('/').collect();
+            if path_parts.len() < 4 {
+                return Ok((
+                    Some(state),
+                    (HttpResponse {
+                        status: 400,
+                        headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                        body: Some(
+                            serde_json::to_vec(&json!({
+                                "status": "error",
+                                "message": "Invalid chat ID format"
+                            }))
+                            .unwrap(),
+                        ),
+                    },),
+                ));
+            }
+
+            let chat_id = path_parts[3]; // /api/chats/{id} -> id is at index 3
+
             // Parse the request body
             if let Some(body) = &req.body {
                 if let Ok(data) = serde_json::from_slice::<serde_json::Value>(body) {
@@ -415,99 +409,98 @@ pub fn handle_request(
                             if let Some(name) = data["name"].as_str() {
                                 chat_info.name = name.to_string();
                             }
-                            
+
                             if let Some(icon) = data["icon"].as_str() {
                                 chat_info.icon = Some(icon.to_string());
                             }
-                            
-                            // Update timestamp
-                            chat_info.updated_at = std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs();
-                            
+
                             // Save the updated chat info
                             match current_state.store.update_chat_info(&chat_info) {
-                                Ok(_) => {
-                                    Ok((
-                                        Some(state),
-                                        (HttpResponse {
-                                            status: 200,
-                                            headers: vec![("Content-Type".to_string(), "application/json".to_string())],
-                                            body: Some(
-                                                serde_json::to_vec(&json!({
-                                                    "status": "success",
-                                                    "chat": {
-                                                        "id": chat_info.id,
-                                                        "name": chat_info.name,
-                                                        "updated_at": chat_info.updated_at,
-                                                        "created_at": chat_info.created_at,
-                                                        "icon": chat_info.icon,
-                                                        "head": chat_info.head
-                                                    }
-                                                }))
-                                                .unwrap(),
-                                            ),
-                                        },),
-                                    ))
-                                }
-                                Err(e) => {
-                                    Ok((
-                                        Some(state),
-                                        (HttpResponse {
-                                            status: 500,
-                                            headers: vec![("Content-Type".to_string(), "application/json".to_string())],
-                                            body: Some(
-                                                serde_json::to_vec(&json!({
-                                                    "status": "error",
-                                                    "message": format!("Failed to update chat: {}", e)
-                                                }))
-                                                .unwrap(),
-                                            ),
-                                        },),
-                                    ))
-                                }
+                                Ok(_) => Ok((
+                                    Some(state),
+                                    (HttpResponse {
+                                        status: 200,
+                                        headers: vec![(
+                                            "Content-Type".to_string(),
+                                            "application/json".to_string(),
+                                        )],
+                                        body: Some(
+                                            serde_json::to_vec(&json!({
+                                                "status": "success",
+                                                "chat": {
+                                                    "id": chat_info.id,
+                                                    "name": chat_info.name,
+                                                    "icon": chat_info.icon,
+                                                    "head": chat_info.head
+                                                }
+                                            }))
+                                            .unwrap(),
+                                        ),
+                                    },),
+                                )),
+                                Err(e) => Ok((
+                                    Some(state),
+                                    (HttpResponse {
+                                        status: 500,
+                                        headers: vec![(
+                                            "Content-Type".to_string(),
+                                            "application/json".to_string(),
+                                        )],
+                                        body: Some(
+                                            serde_json::to_vec(&json!({
+                                                "status": "error",
+                                                "message": format!("Failed to update chat: {}", e)
+                                            }))
+                                            .unwrap(),
+                                        ),
+                                    },),
+                                )),
                             }
                         }
-                        Ok(None) => {
-                            Ok((
-                                Some(state),
-                                (HttpResponse {
-                                    status: 404,
-                                    headers: vec![("Content-Type".to_string(), "application/json".to_string())],
-                                    body: Some(
-                                        serde_json::to_vec(&json!({
-                                            "status": "error",
-                                            "message": format!("Chat not found: {}", chat_id)
-                                        }))
-                                        .unwrap(),
-                                    ),
-                                },),
-                            ))
-                        }
-                        Err(e) => {
-                            Ok((
-                                Some(state),
-                                (HttpResponse {
-                                    status: 500,
-                                    headers: vec![("Content-Type".to_string(), "application/json".to_string())],
-                                    body: Some(
-                                        serde_json::to_vec(&json!({
-                                            "status": "error",
-                                            "message": format!("Failed to get chat: {}", e)
-                                        }))
-                                        .unwrap(),
-                                    ),
-                                },),
-                            ))
-                        }
+                        Ok(None) => Ok((
+                            Some(state),
+                            (HttpResponse {
+                                status: 404,
+                                headers: vec![(
+                                    "Content-Type".to_string(),
+                                    "application/json".to_string(),
+                                )],
+                                body: Some(
+                                    serde_json::to_vec(&json!({
+                                        "status": "error",
+                                        "message": format!("Chat not found: {}", chat_id)
+                                    }))
+                                    .unwrap(),
+                                ),
+                            },),
+                        )),
+                        Err(e) => Ok((
+                            Some(state),
+                            (HttpResponse {
+                                status: 500,
+                                headers: vec![(
+                                    "Content-Type".to_string(),
+                                    "application/json".to_string(),
+                                )],
+                                body: Some(
+                                    serde_json::to_vec(&json!({
+                                        "status": "error",
+                                        "message": format!("Failed to get chat: {}", e)
+                                    }))
+                                    .unwrap(),
+                                ),
+                            },),
+                        )),
                     }
                 } else {
                     Ok((
                         Some(state),
                         (HttpResponse {
                             status: 400,
-                            headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                            headers: vec![(
+                                "Content-Type".to_string(),
+                                "application/json".to_string(),
+                            )],
                             body: Some(
                                 serde_json::to_vec(&json!({
                                     "status": "error",
@@ -535,7 +528,7 @@ pub fn handle_request(
                 ))
             }
         }
-        
+
         // Default 404 response
         _ => Ok((
             Some(state),

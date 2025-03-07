@@ -57,7 +57,9 @@ pub fn handle_message(
                             }
                         }
                         Some("rename_chat") => {
-                            if let (Some(chat_id), Some(name)) = (command["chat_id"].as_str(), command["name"].as_str()) {
+                            if let (Some(chat_id), Some(name)) =
+                                (command["chat_id"].as_str(), command["name"].as_str())
+                            {
                                 handle_rename_chat(&mut current_state, chat_id, name)
                             } else {
                                 default_response(&current_state)
@@ -146,8 +148,6 @@ fn handle_list_chats(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketRespon
                 chats.push(json!({
                     "id": chat_info.id,
                     "name": chat_info.name,
-                    "updated_at": chat_info.updated_at,
-                    "created_at": chat_info.created_at,
                     "icon": chat_info.icon,
                 }));
             }
@@ -197,8 +197,6 @@ fn handle_create_chat(
                                     "chat": {
                                         "id": chat_info.id,
                                         "name": chat_info.name,
-                                        "updated_at": chat_info.updated_at,
-                                        "created_at": chat_info.created_at,
                                     }
                                 })
                                 .to_string(),
@@ -287,11 +285,6 @@ fn handle_rename_chat(
         Ok(Some(mut chat_info)) => {
             // Update the name
             chat_info.name = name.to_string();
-            chat_info.updated_at = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
-
             // Save the updated chat info
             if let Err(e) = state.store.update_chat_info(&chat_info) {
                 log(&format!("Failed to update chat info: {}", e));
@@ -329,7 +322,6 @@ fn handle_rename_chat(
                                 "chat": {
                                     "id": chat_info.id,
                                     "name": chat_info.name,
-                                    "updated_at": chat_info.updated_at,
                                 }
                             })
                             .to_string(),
@@ -629,24 +621,22 @@ fn handle_get_message(
     message_id: &str,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     match state.get_message(message_id) {
-        Ok(message) => {
-            Ok((
-                Some(serde_json::to_vec(state).unwrap()),
-                (WebsocketResponse {
-                    messages: vec![WebsocketMessage {
-                        ty: MessageType::Text,
-                        text: Some(
-                            json!({
-                                "type": "message",
-                                "message": message
-                            })
-                            .to_string(),
-                        ),
-                        data: None,
-                    }],
-                },),
-            ))
-        }
+        Ok(message) => Ok((
+            Some(serde_json::to_vec(state).unwrap()),
+            (WebsocketResponse {
+                messages: vec![WebsocketMessage {
+                    ty: MessageType::Text,
+                    text: Some(
+                        json!({
+                            "type": "message",
+                            "message": message
+                        })
+                        .to_string(),
+                    ),
+                    data: None,
+                }],
+            },),
+        )),
         Err(e) => {
             log(&format!("Failed to get message: {}", e));
             Ok((

@@ -51,44 +51,39 @@ impl State {
             children: HashMap::new(),
             actor_messages: HashMap::new(),
         };
-        if let Ok(Some(chat_id)) = state.store.migrate_legacy_chat() {
-            log(&format!("Using migrated chat: {}", chat_id));
-            state.current_chat_id = Some(chat_id);
-        } else {
-            // Get the list of chats
-            match state.store.list_chat_ids() {
-                Ok(chat_ids) if !chat_ids.is_empty() => {
-                    // Use the first chat by default
-                    state.current_chat_id = Some(chat_ids[0].clone());
-                    log(&format!("Using existing chat: {}", chat_ids[0]));
-                }
-                _ => {
-                    // Create a default chat if none exists
-                    log("No existing chats found, attempting to create a default chat");
 
-                    // Use a safer approach to handle potential errors
-                    let create_result = match state.store.create_chat("New Chat".to_string(), None)
-                    {
-                        Ok(chat_info) => {
-                            state.current_chat_id = Some(chat_info.id.clone());
-                            log(&format!("Created default chat: {}", chat_info.id));
-                            Ok(())
-                        }
-                        Err(e) => {
-                            // Just log the error but don't panic
-                            log(&format!(
-                                "Failed to create default chat during initialization: {}",
-                                e
-                            ));
-                            log("Will create chat when first message is sent");
-                            Err(e)
-                        }
-                    };
+        // Get the list of chats
+        match state.store.list_chat_ids() {
+            Ok(chat_ids) if !chat_ids.is_empty() => {
+                // Use the first chat by default
+                state.current_chat_id = Some(chat_ids[0].clone());
+                log(&format!("Using existing chat: {}", chat_ids[0]));
+            }
+            _ => {
+                // Create a default chat if none exists
+                log("No existing chats found, attempting to create a default chat");
 
-                    // Continue initialization even if chat creation failed
-                    if create_result.is_err() {
-                        log("Continuing initialization without a default chat");
+                // Use a safer approach to handle potential errors
+                let create_result = match state.store.create_chat("New Chat".to_string(), None) {
+                    Ok(chat_info) => {
+                        state.current_chat_id = Some(chat_info.id.clone());
+                        log(&format!("Created default chat: {}", chat_info.id));
+                        Ok(())
                     }
+                    Err(e) => {
+                        // Just log the error but don't panic
+                        log(&format!(
+                            "Failed to create default chat during initialization: {}",
+                            e
+                        ));
+                        log("Will create chat when first message is sent");
+                        Err(e)
+                    }
+                };
+
+                // Continue initialization even if chat creation failed
+                if create_result.is_err() {
+                    log("Continuing initialization without a default chat");
                 }
             }
         }
@@ -495,8 +490,6 @@ impl State {
                     chats.push(json!({
                         "id": chat_info.id,
                         "name": chat_info.name,
-                        "updated_at": chat_info.updated_at,
-                        "created_at": chat_info.created_at,
                         "icon": chat_info.icon,
                     }));
                 }

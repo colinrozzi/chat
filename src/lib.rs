@@ -244,8 +244,6 @@ impl HttpHandlersGuest for Component {
                         chats.push(serde_json::json!({
                             "id": chat_info.id,
                             "name": chat_info.name,
-                            "updated_at": chat_info.updated_at,
-                            "created_at": chat_info.created_at,
                             "icon": chat_info.icon
                         }));
                     }

@@ -4,7 +4,6 @@ use crate::messages::{ChainEntry, ChatInfo};
 use crate::state::ChildActor;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// MessageStore implementation that uses the Theater runtime's built-in content-addressed store
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -47,10 +46,6 @@ impl MessageStore {
 
         // Update the chat head
         chat_info.head = Some(content_ref.hash.clone());
-        chat_info.updated_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
 
         // Save the updated chat info
         self.update_chat_info(&chat_info)?;
@@ -178,20 +173,14 @@ impl MessageStore {
     ) -> Result<ChatInfo, Box<dyn std::error::Error>> {
         log(&format!("Creating new chat: {}", name));
 
-        // Generate a unique ID for the chat
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let id = format!("{}", timestamp);
+        let num_chats = self.list_chat_ids()?.len();
+        let id = format!("{}", num_chats + 1);
 
         // Create the chat info
         let chat_info = ChatInfo {
             id: id.clone(),
             name,
             head: starting_head,
-            created_at: timestamp,
-            updated_at: timestamp,
             icon: None,
             children: HashMap::new(),
         };
