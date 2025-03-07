@@ -725,6 +725,18 @@ function toggleSection(sectionId) {
     section.classList.toggle('collapsed');
 }
 
+// Check if mobile view and collapse sidebar if needed
+function checkMobileView() {
+    const isMobile = window.innerWidth <= 768;
+    
+    if (isMobile && elements.chatSidebar) {
+        elements.chatSidebar.classList.add('collapsed');
+        if (elements.expandChatSidebarButton) {
+            elements.expandChatSidebarButton.classList.add('visible');
+        }
+    }
+}
+
 // Event listeners
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize WebSocket
@@ -787,6 +799,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (elements.branchChatButton) {
         elements.branchChatButton.addEventListener('click', branchChat);
     }
+    
+    // Check for mobile view on load
+    checkMobileView();
+    
+    // Handle window resize
+    window.addEventListener('resize', checkMobileView);
 });
 
 // Cleanup

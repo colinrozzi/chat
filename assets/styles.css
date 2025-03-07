@@ -139,7 +139,7 @@ body {
     display: none;
     align-items: center;
     color: var(--text-secondary);
-    z-index: 10;
+    z-index: 30; /* Increased z-index to ensure visibility */
     transition: all 0.2s ease;
 }
 
@@ -156,7 +156,7 @@ body {
 /* Header */
 .header {
     height: var(--header-height);
-    padding: 0 1.5rem;
+    padding: 0 1.5rem 0 3rem; /* Added left padding to make room for the expand button */
     background: var(--bg-tertiary);
     border-bottom: 1px solid var(--border-color);
     display: flex;
@@ -993,7 +993,7 @@ code {
 
 @media (max-width: 480px) {
     .header {
-        padding: 0 1rem;
+        padding: 0 1rem 0 3rem; /* Keep left padding for expand button */
     }
     
     .header-content {
