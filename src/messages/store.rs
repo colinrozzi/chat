@@ -196,59 +196,137 @@ impl MessageStore {
             children: HashMap::new(),
         };
 
-        // Store the chat info
-        self.update_chat_info(&chat_info)?;
+        // Try to store the chat info with enhanced error handling
+        match self.update_chat_info(&chat_info) {
+            Ok(_) => {
+                log(&format!("Chat info stored successfully for {}", id));
 
-        // Add the chat ID to the list of chats
-        let mut chat_ids = self.list_chat_ids()?;
-        if !chat_ids.contains(&id) {
-            chat_ids.push(id.clone());
-            let content = serde_json::to_vec(&chat_ids)?;
-            let content_ref = store::store(&self.store_id, &content)?;
+                // Add the chat ID to the list of chats with safer operations
+                match self.list_chat_ids() {
+                    Ok(mut chat_ids) => {
+                        if !chat_ids.contains(&id) {
+                            chat_ids.push(id.clone());
 
-            // Check if the chats label exists first
-            log("Checking if chats label exists");
-            if store::get_by_label(&self.store_id, "chats")?.is_some() {
-                log("Chats label exists, replacing it");
-                store::replace_at_label(&self.store_id, "chats", &content_ref)?
-            } else {
-                log("Chats label does not exist, creating it");
-                store::label(&self.store_id, "chats", &content_ref)?
+                            // Serialize with error handling
+                            match serde_json::to_vec(&chat_ids) {
+                                Ok(content) => {
+                                    // Store content with error handling
+                                    match store::store(&self.store_id, &content) {
+                                        Ok(content_ref) => {
+                                            // Update chats label with separate try blocks
+                                            log("Updating chats label");
+                                            let label_result = if let Ok(Some(_)) =
+                                                store::get_by_label(&self.store_id, "chats")
+                                            {
+                                                log("Replacing existing chats label");
+                                                store::replace_at_label(
+                                                    &self.store_id,
+                                                    "chats",
+                                                    &content_ref,
+                                                )
+                                            } else {
+                                                log("Creating new chats label");
+                                                store::label(&self.store_id, "chats", &content_ref)
+                                            };
+
+                                            if let Err(e) = label_result {
+                                                log(&format!(
+                                                    "Warning: Failed to update chats label: {}",
+                                                    e
+                                                ));
+                                                // Continue anyway since the chat itself was created
+                                            }
+                                        }
+                                        Err(e) => {
+                                            log(&format!(
+                                                "Warning: Failed to store chat IDs: {}",
+                                                e
+                                            ));
+                                            // Continue anyway since the chat itself was created
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    log(&format!("Warning: Failed to serialize chat IDs: {}", e));
+                                    // Continue anyway since the chat itself was created
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log(&format!("Warning: Failed to list chat IDs: {}", e));
+                        // Continue anyway since the chat itself was created
+                    }
+                }
+
+                log(&format!("Created chat with ID: {}", id));
+                Ok(chat_info)
+            }
+            Err(e) => {
+                log(&format!("Failed to store chat info: {}", e));
+                Err(e)
             }
         }
-
-        log(&format!("Created chat with ID: {}", id));
-        Ok(chat_info)
     }
 
     /// Update chat information
     pub fn update_chat_info(&self, chat: &ChatInfo) -> Result<(), Box<dyn std::error::Error>> {
         log(&format!("Updating chat info for {}", chat.id));
 
-        // Serialize the chat info
-        let content = serde_json::to_vec(chat)?;
+        // Serialize the chat info with error checking
+        let content = match serde_json::to_vec(chat) {
+            Ok(content) => content,
+            Err(e) => {
+                log(&format!("Failed to serialize chat info: {}", e));
+                return Err(Box::new(e));
+            }
+        };
 
-        // Store in the content-addressed store
-        let content_ref = store::store(&self.store_id, &content)?;
+        // Store in the content-addressed store with error checking
+        let content_ref = match store::store(&self.store_id, &content) {
+            Ok(ref_id) => ref_id,
+            Err(e) => {
+                log(&format!("Failed to store chat content: {}", e));
+                return Err(e.into());
+            }
+        };
 
-        // Update the label
+        // Update the label with safer operations
         let chat_label = format!("chat_{}", chat.id);
 
-        // Check if the chat label exists first
-        log(&format!("Checking if chat label exists: {}", chat_label));
-        if store::get_by_label(&self.store_id, &chat_label)?.is_some() {
-            log(&format!("Chat label exists, replacing it: {}", chat_label));
-            store::replace_at_label(&self.store_id, &chat_label, &content_ref)?
-        } else {
-            log(&format!(
-                "Chat label does not exist, creating it: {}",
-                chat_label
-            ));
-            store::label(&self.store_id, &chat_label, &content_ref)?
-        }
+        // Try to check if label exists, but continue even if check fails
+        let label_exists = match store::get_by_label(&self.store_id, &chat_label) {
+            Ok(Some(_)) => true,
+            Ok(None) => false,
+            Err(e) => {
+                log(&format!(
+                    "Warning: Failed to check if chat label exists: {}",
+                    e
+                ));
+                false // Assume it doesn't exist and try to create it
+            }
+        };
 
-        log(&format!("Updated chat info for {}", chat.id));
-        Ok(())
+        // Create or update label
+        let label_result = if label_exists {
+            log(&format!("Replacing chat label: {}", chat_label));
+            store::replace_at_label(&self.store_id, &chat_label, &content_ref)
+        } else {
+            log(&format!("Creating chat label: {}", chat_label));
+            store::label(&self.store_id, &chat_label, &content_ref)
+        };
+
+        // Handle label operation result
+        match label_result {
+            Ok(_) => {
+                log(&format!("Updated chat info for {}", chat.id));
+                Ok(())
+            }
+            Err(e) => {
+                log(&format!("Failed to update chat label: {}", e));
+                Err(e.into())
+            }
+        }
     }
 
     /// Delete a chat
