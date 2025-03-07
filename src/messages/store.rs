@@ -1,8 +1,10 @@
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::bindings::ntwk::theater::store::{self, ContentRef};
-use crate::messages::ChainEntry;
+use crate::messages::{ChainEntry, ChatInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
+use crate::state::ChildActor;
 
 /// MessageStore implementation that uses the Theater runtime's built-in content-addressed store
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -24,6 +26,7 @@ impl MessageStore {
     pub fn save_message(
         &mut self,
         mut entry: ChainEntry,
+        chat_id: &str,
     ) -> Result<ChainEntry, Box<dyn std::error::Error>> {
         log("Saving message to runtime store");
         
@@ -37,19 +40,19 @@ impl MessageStore {
         // Set the ID based on the content reference hash
         entry.id = Some(content_ref.hash.clone());
         
-        // Update the chat-head label to point to the latest message
-        store::replace_at_label(
-            &self.store_id, 
-            "chat-head", 
-            &content_ref
-        )?;
-        log("Updated chat-head label");
+        // Get the current chat info
+        let mut chat_info = self.get_chat_info(chat_id)?
+            .ok_or_else(|| format!("Chat {} not found", chat_id))?;
         
-        // If this is a root message, also label it as chat-root
-        if entry.parent.is_none() || entry.parent.as_ref().unwrap() == "null" {
-            log("Labeling as chat-root");
-            store::label(&self.store_id, "chat-root", &content_ref)?;
-        }
+        // Update the chat head
+        chat_info.head = Some(content_ref.hash.clone());
+        chat_info.updated_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        
+        // Save the updated chat info
+        self.update_chat_info(&chat_info)?;
         
         // Update cache
         self.cache.insert(content_ref.hash.clone(), entry.clone());
@@ -83,9 +86,28 @@ impl MessageStore {
         Ok(msg)
     }
     
-    /// Get the head (latest) message from the chain
+    /// Get the head (latest) message from a specific chat
+    pub fn get_chat_head(&mut self, chat_id: &str) -> Result<Option<ChainEntry>, Box<dyn std::error::Error>> {
+        log(&format!("Getting head message for chat {}", chat_id));
+        
+        // Get the chat info
+        let chat_info = self.get_chat_info(chat_id)?;
+        
+        if let Some(chat) = chat_info {
+            if let Some(head_id) = chat.head {
+                log(&format!("Head message found with hash: {}", head_id));
+                let result = self.load_message(&head_id)?;
+                return Ok(Some(result));
+            }
+        }
+        
+        log("No head message found for this chat");
+        Ok(None)
+    }
+    
+    /// Get the head (latest) message from the chain (legacy method)
     pub fn get_head(&mut self) -> Result<Option<ChainEntry>, Box<dyn std::error::Error>> {
-        log("Getting head message from chain");
+        log("Getting head message from chain (legacy)");
         
         // Get the head reference from the label
         let head_ref = store::get_by_label(&self.store_id, "chat-head")?;
@@ -100,20 +122,143 @@ impl MessageStore {
         Ok(None)
     }
     
-    /// Get the root (first) message from the chain
-    pub fn get_root(&mut self) -> Result<Option<ChainEntry>, Box<dyn std::error::Error>> {
-        log("Getting root message from chain");
+    /// List all chat IDs
+    pub fn list_chat_ids(&self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        log("Listing all chat IDs");
         
-        // Get the root reference from the label
-        let root_ref = store::get_by_label(&self.store_id, "chat-root")?;
+        // Try to get the chats list from the store
+        let chats_ref = store::get_by_label(&self.store_id, "chats")?;
         
-        if let Some(content_ref) = root_ref {
-            log(&format!("Root message found with hash: {}", content_ref.hash));
-            let result = self.load_message(&content_ref.hash)?;
-            return Ok(Some(result));
+        if let Some(content_ref) = chats_ref {
+            let content = store::get(&self.store_id, &content_ref)?;
+            let chat_ids: Vec<String> = serde_json::from_slice(&content)?;
+            return Ok(chat_ids);
         }
         
-        log("No root message found");
+        // If no chats list exists yet, return empty vector
+        log("No chats list found");
+        Ok(Vec::new())
+    }
+    
+    /// Get chat info by ID
+    pub fn get_chat_info(&self, chat_id: &str) -> Result<Option<ChatInfo>, Box<dyn std::error::Error>> {
+        log(&format!("Getting chat info for {}", chat_id));
+        
+        // Try to get the chat info from the store
+        let chat_label = format!("chat_{}", chat_id);
+        let chat_ref = store::get_by_label(&self.store_id, &chat_label)?;
+        
+        if let Some(content_ref) = chat_ref {
+            let content = store::get(&self.store_id, &content_ref)?;
+            let chat_info: ChatInfo = serde_json::from_slice(&content)?;
+            return Ok(Some(chat_info));
+        }
+        
+        log(&format!("Chat {} not found", chat_id));
         Ok(None)
+    }
+    
+    /// Create a new chat
+    pub fn create_chat(&mut self, name: String, starting_head: Option<String>) -> Result<ChatInfo, Box<dyn std::error::Error>> {
+        log(&format!("Creating new chat: {}", name));
+        
+        // Generate a unique ID for the chat
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let id = format!("{}", timestamp);
+        
+        // Create the chat info
+        let chat_info = ChatInfo {
+            id: id.clone(),
+            name,
+            head: starting_head,
+            created_at: timestamp,
+            updated_at: timestamp,
+            icon: None,
+            children: HashMap::new(),
+        };
+        
+        // Store the chat info
+        self.update_chat_info(&chat_info)?;
+        
+        // Add the chat ID to the list of chats
+        let mut chat_ids = self.list_chat_ids()?;
+        if !chat_ids.contains(&id) {
+            chat_ids.push(id.clone());
+            let content = serde_json::to_vec(&chat_ids)?;
+            let content_ref = store::store(&self.store_id, &content)?;
+            store::replace_at_label(&self.store_id, "chats", &content_ref)?;
+        }
+        
+        log(&format!("Created chat with ID: {}", id));
+        Ok(chat_info)
+    }
+    
+    /// Update chat information
+    pub fn update_chat_info(&self, chat: &ChatInfo) -> Result<(), Box<dyn std::error::Error>> {
+        log(&format!("Updating chat info for {}", chat.id));
+        
+        // Serialize the chat info
+        let content = serde_json::to_vec(chat)?;
+        
+        // Store in the content-addressed store
+        let content_ref = store::store(&self.store_id, &content)?;
+        
+        // Update the label
+        let chat_label = format!("chat_{}", chat.id);
+        store::replace_at_label(&self.store_id, &chat_label, &content_ref)?;
+        
+        log(&format!("Updated chat info for {}", chat.id));
+        Ok(())
+    }
+    
+    /// Delete a chat
+    pub fn delete_chat(&mut self, chat_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+        log(&format!("Deleting chat {}", chat_id));
+        
+        // Remove from the list of chats
+        let mut chat_ids = self.list_chat_ids()?;
+        chat_ids.retain(|id| id != chat_id);
+        
+        // Update the chats list
+        let content = serde_json::to_vec(&chat_ids)?;
+        let content_ref = store::store(&self.store_id, &content)?;
+        store::replace_at_label(&self.store_id, "chats", &content_ref)?;
+        
+        // We don't delete the actual chat data to allow for potential recovery
+        // But we could remove the label if desired
+        // let chat_label = format!("chat_{}", chat_id);
+        // store::remove_label(&self.store_id, &chat_label)?;
+        
+        log(&format!("Deleted chat {}", chat_id));
+        Ok(())
+    }
+    
+    /// Migrate legacy chat to the new format
+    pub fn migrate_legacy_chat(&mut self) -> Result<Option<String>, Box<dyn std::error::Error>> {
+        log("Checking for legacy chat to migrate");
+        
+        // Check if we have any chats already
+        let chat_ids = self.list_chat_ids()?;
+        if !chat_ids.is_empty() {
+            log("Chats already exist, no migration needed");
+            return Ok(None);
+        }
+        
+        // Check if we have a legacy head
+        let legacy_head = self.get_head()?;
+        if legacy_head.is_none() {
+            log("No legacy chat found");
+            return Ok(None);
+        }
+        
+        // Create a new chat with the legacy head
+        let legacy_head = legacy_head.unwrap();
+        let chat_info = self.create_chat("Default Chat".to_string(), legacy_head.id.clone())?;
+        
+        log(&format!("Migrated legacy chat to new format with ID: {}", chat_info.id));
+        Ok(Some(chat_info.id))
     }
 }
