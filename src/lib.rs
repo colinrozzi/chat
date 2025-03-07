@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 struct InitData {
     head: Option<String>,
     websocket_port: u16,
+    store_id: Option<String>,
 }
 
 struct Component;
@@ -108,8 +109,15 @@ impl ActorGuest for Component {
 
         // Create a new runtime store
         log("Creating runtime store");
-        let store_id = store::new()?;
-        log(&format!("Created runtime store with ID: {}", store_id));
+        let store_id: String;
+        if let Some(init_store_id) = init_data.store_id {
+            log(&format!("Using existing store with ID: {}", init_store_id));
+            store_id = init_store_id;
+        } else {
+            log("Creating new store");
+            store_id = store::new()?;
+            log(&format!("Created runtime store with ID: {}", store_id));
+        }
 
         // Set up the HTTP server
         log("Setting up HTTP server...");

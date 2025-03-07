@@ -63,17 +63,17 @@ fn serve_chat_js(state: &mut State) -> Result<(Option<Vec<u8>>, (ClientHttpRespo
         Ok(content) => {
             // Convert content to string
             let content_str = String::from_utf8(content).unwrap_or_else(|_| "".to_string());
-            
+
             // Replace the placeholder with the actual WebSocket port
-            let modified_content = content_str.replace(
-                "{{WEBSOCKET_PORT}}",
-                &state.websocket_port.to_string(),
-            );
-            
+            let modified_content = content_str.replace("{{WEBSOCKET_PORT}}", "8084");
+
             let response = ClientHttpResponse {
                 status: 200,
                 headers: vec![
-                    ("Content-Type".to_string(), "application/javascript".to_string()),
+                    (
+                        "Content-Type".to_string(),
+                        "application/javascript".to_string(),
+                    ),
                     ("Cache-Control".to_string(), "no-cache".to_string()),
                 ],
                 body: Some(modified_content.into_bytes()),
@@ -181,11 +181,11 @@ fn handle_chats_api(
                 .ok_or_else(|| "Missing 'name' field".to_string())?
                 .to_string();
 
-            let starting_head = data["starting_head"]
-                .as_str()
-                .map(|s| s.to_string());
+            let starting_head = data["starting_head"].as_str().map(|s| s.to_string());
 
-            let chat_info = state.create_chat(name, starting_head).map_err(|e| e.to_string())?;
+            let chat_info = state
+                .create_chat(name, starting_head)
+                .map_err(|e| e.to_string())?;
 
             let response = ClientHttpResponse {
                 status: 201,
@@ -291,7 +291,10 @@ fn handle_chat_detail_api(
             }
 
             // Save updated chat info
-            state.store.update_chat_info(&chat_info).map_err(|e| e.to_string())?;
+            state
+                .store
+                .update_chat_info(&chat_info)
+                .map_err(|e| e.to_string())?;
 
             let response = ClientHttpResponse {
                 status: 200,
