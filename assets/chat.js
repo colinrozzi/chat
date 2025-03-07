@@ -12,25 +12,30 @@ const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 1000;
 
 // DOM Elements
+// Get DOM elements with safety (returns null if element doesn't exist)
+function getElement(id) {
+    return document.getElementById(id);
+}
+
 const elements = {
-    messageInput: document.getElementById('messageInput'),
-    sendButton: document.getElementById('sendButton'),
-    messagesContainer: document.getElementById('messagesContainer'),
-    connectionStatus: document.getElementById('connectionStatus'),
-    loadingOverlay: document.getElementById('loadingOverlay'),
-    actorPanel: document.getElementById('actorPanel'),
-    collapseButton: document.getElementById('collapseButton'),
-    expandButton: document.getElementById('expandButton'),
-    availableActors: document.getElementById('availableActors'),
-    runningActors: document.getElementById('runningActors'),
-    headId: document.getElementById('headId'),
-    chatSidebar: document.getElementById('chatSidebar'),
-    chatList: document.getElementById('chatList'),
-    currentChatName: document.getElementById('currentChatName'),
-    newChatButton: document.getElementById('newChatButton'),
-    branchChatButton: document.getElementById('branchChatButton'),
-    collapseChatSidebarButton: document.getElementById('collapseChatSidebarButton'),
-    expandChatSidebarButton: document.getElementById('expandChatSidebarButton')
+    messageInput: getElement('messageInput'),
+    sendButton: getElement('sendButton'),
+    messagesContainer: getElement('messagesContainer'),
+    connectionStatus: getElement('connectionStatus'),
+    loadingOverlay: getElement('loadingOverlay'),
+    actorPanel: getElement('actorPanel'),
+    collapseButton: getElement('collapseButton'),
+    expandButton: getElement('expandButton'),
+    availableActors: getElement('availableActors'),
+    runningActors: getElement('runningActors'),
+    headId: getElement('headId'),
+    chatSidebar: getElement('chatSidebar'),
+    chatList: getElement('chatList'),
+    currentChatName: getElement('currentChatName'),
+    newChatButton: getElement('newChatButton'),
+    branchChatButton: getElement('branchChatButton'),
+    collapseChatSidebarButton: getElement('collapseChatSidebarButton'),
+    expandChatSidebarButton: getElement('expandChatSidebarButton')
 };
 
 // WebSocket setup
@@ -694,11 +699,16 @@ function sendMessage() {
 
 // Toggle chat sidebar
 function toggleChatSidebar() {
+    if (!elements.chatSidebar) return;
+    
     elements.chatSidebar.classList.toggle('collapsed');
-    if (elements.chatSidebar.classList.contains('collapsed')) {
-        elements.expandChatSidebarButton.classList.add('visible');
-    } else {
-        elements.expandChatSidebarButton.classList.remove('visible');
+    
+    if (elements.expandChatSidebarButton) {
+        if (elements.chatSidebar.classList.contains('collapsed')) {
+            elements.expandChatSidebarButton.classList.add('visible');
+        } else {
+            elements.expandChatSidebarButton.classList.remove('visible');
+        }
     }
 }
 
@@ -746,25 +756,37 @@ document.addEventListener('DOMContentLoaded', () => {
     elements.sendButton.addEventListener('click', sendMessage);
     
     // Chat sidebar toggle handlers
-    elements.collapseChatSidebarButton.addEventListener('click', toggleChatSidebar);
-    elements.expandChatSidebarButton.addEventListener('click', toggleChatSidebar);
+    if (elements.collapseChatSidebarButton) {
+        elements.collapseChatSidebarButton.addEventListener('click', toggleChatSidebar);
+    }
+    if (elements.expandChatSidebarButton) {
+        elements.expandChatSidebarButton.addEventListener('click', toggleChatSidebar);
+    }
     
     // Actor panel toggle handlers
-    elements.collapseButton.addEventListener('click', () => {
-        elements.actorPanel.classList.add('collapsed');
-        elements.expandButton.classList.add('visible');
-    });
+    if (elements.collapseButton) {
+        elements.collapseButton.addEventListener('click', () => {
+            if (elements.actorPanel) elements.actorPanel.classList.add('collapsed');
+            if (elements.expandButton) elements.expandButton.classList.add('visible');
+        });
+    }
     
-    elements.expandButton.addEventListener('click', () => {
-        elements.actorPanel.classList.remove('collapsed');
-        elements.expandButton.classList.remove('visible');
-    });
+    if (elements.expandButton) {
+        elements.expandButton.addEventListener('click', () => {
+            if (elements.actorPanel) elements.actorPanel.classList.remove('collapsed');
+            if (elements.expandButton) elements.expandButton.classList.remove('visible');
+        });
+    }
     
     // New chat button
-    elements.newChatButton.addEventListener('click', createNewChat);
+    if (elements.newChatButton) {
+        elements.newChatButton.addEventListener('click', createNewChat);
+    }
     
     // Branch chat button
-    elements.branchChatButton.addEventListener('click', branchChat);
+    if (elements.branchChatButton) {
+        elements.branchChatButton.addEventListener('click', branchChat);
+    }
 });
 
 // Cleanup
