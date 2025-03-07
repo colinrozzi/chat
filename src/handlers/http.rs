@@ -3,7 +3,6 @@ use crate::bindings::ntwk::theater::http_client::HttpResponse as ClientHttpRespo
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::state::State;
 use serde_json::{json, Value};
-use std::collections::HashMap;
 
 pub fn handle_request(
     req: ClientHttpRequest,
@@ -137,7 +136,7 @@ fn handle_chats_api(
     match req.method.as_str() {
         "GET" => {
             // Get all chats
-            let chat_ids = state.store.list_chat_ids()?;
+            let chat_ids = state.store.list_chat_ids().map_err(|e| e.to_string())?;
             let mut chats = Vec::new();
 
             for chat_id in chat_ids {
@@ -186,7 +185,7 @@ fn handle_chats_api(
                 .as_str()
                 .map(|s| s.to_string());
 
-            let chat_info = state.create_chat(name, starting_head)?;
+            let chat_info = state.create_chat(name, starting_head).map_err(|e| e.to_string())?;
 
             let response = ClientHttpResponse {
                 status: 201,
@@ -242,7 +241,8 @@ fn handle_chat_detail_api(
             // Get chat details
             let chat_info = state
                 .store
-                .get_chat_info(&chat_id)?
+                .get_chat_info(&chat_id)
+                .map_err(|e| e.to_string())?
                 .ok_or_else(|| format!("Chat {} not found", chat_id))?;
 
             let response = ClientHttpResponse {
@@ -278,7 +278,8 @@ fn handle_chat_detail_api(
             // Get current chat info
             let mut chat_info = state
                 .store
-                .get_chat_info(&chat_id)?
+                .get_chat_info(&chat_id)
+                .map_err(|e| e.to_string())?
                 .ok_or_else(|| format!("Chat {} not found", chat_id))?;
 
             // Update fields
@@ -290,7 +291,7 @@ fn handle_chat_detail_api(
             }
 
             // Save updated chat info
-            state.store.update_chat_info(&chat_info)?;
+            state.store.update_chat_info(&chat_info).map_err(|e| e.to_string())?;
 
             let response = ClientHttpResponse {
                 status: 200,
@@ -313,7 +314,7 @@ fn handle_chat_detail_api(
         }
         "DELETE" => {
             // Delete chat
-            state.delete_chat(&chat_id)?;
+            state.delete_chat(&chat_id).map_err(|e| e.to_string())?;
 
             let response = ClientHttpResponse {
                 status: 200,

@@ -1,7 +1,6 @@
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::bindings::ntwk::theater::store::{self, ContentRef};
 use crate::messages::{ChainEntry, ChatInfo};
-use crate::state::ChildActor;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
