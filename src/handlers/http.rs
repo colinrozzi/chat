@@ -117,7 +117,27 @@ pub fn handle_request(
         // API endpoint to get a specific chat
         ("GET", uri) if uri.starts_with("/api/chats/") => {
             let current_state: State = serde_json::from_slice(&state).unwrap();
-            let chat_id = uri.trim_start_matches("/api/chats/");
+            
+            // Extract the chat ID from the path parameter
+            let path_parts: Vec<&str> = uri.split('/').collect();
+            if path_parts.len() < 4 {
+                return Ok((
+                    Some(state),
+                    (HttpResponse {
+                        status: 400,
+                        headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                        body: Some(
+                            serde_json::to_vec(&json!({
+                                "status": "error",
+                                "message": "Invalid chat ID format"
+                            }))
+                            .unwrap(),
+                        ),
+                    },),
+                ));
+            }
+            
+            let chat_id = path_parts[3]; // /api/chats/{id} -> id is at index 3
             
             match current_state.store.get_chat_info(chat_id) {
                 Ok(Some(chat_info)) => {
@@ -301,7 +321,27 @@ pub fn handle_request(
         // API endpoint to delete a chat
         ("DELETE", uri) if uri.starts_with("/api/chats/") => {
             let mut current_state: State = serde_json::from_slice(&state).unwrap();
-            let chat_id = uri.trim_start_matches("/api/chats/");
+            
+            // Extract the chat ID from the path parameter
+            let path_parts: Vec<&str> = uri.split('/').collect();
+            if path_parts.len() < 4 {
+                return Ok((
+                    Some(state),
+                    (HttpResponse {
+                        status: 400,
+                        headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                        body: Some(
+                            serde_json::to_vec(&json!({
+                                "status": "error",
+                                "message": "Invalid chat ID format"
+                            }))
+                            .unwrap(),
+                        ),
+                    },),
+                ));
+            }
+            
+            let chat_id = path_parts[3]; // /api/chats/{id} -> id is at index 3
             
             match current_state.delete_chat(chat_id) {
                 Ok(_) => {
@@ -343,7 +383,27 @@ pub fn handle_request(
         // API endpoint to update a chat
         ("PUT", uri) if uri.starts_with("/api/chats/") => {
             let current_state: State = serde_json::from_slice(&state).unwrap();
-            let chat_id = uri.trim_start_matches("/api/chats/");
+            
+            // Extract the chat ID from the path parameter
+            let path_parts: Vec<&str> = uri.split('/').collect();
+            if path_parts.len() < 4 {
+                return Ok((
+                    Some(state),
+                    (HttpResponse {
+                        status: 400,
+                        headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+                        body: Some(
+                            serde_json::to_vec(&json!({
+                                "status": "error",
+                                "message": "Invalid chat ID format"
+                            }))
+                            .unwrap(),
+                        ),
+                    },),
+                ));
+            }
+            
+            let chat_id = path_parts[3]; // /api/chats/{id} -> id is at index 3
             
             // Parse the request body
             if let Some(body) = &req.body {

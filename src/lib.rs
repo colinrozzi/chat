@@ -66,9 +66,9 @@ fn setup_http_server(_websocket_port: u16) -> Result<u64, String> {
     // Chat API routes
     add_route(server_id, "/api/chats", "GET", api_handler_id)?;
     add_route(server_id, "/api/chats", "POST", api_handler_id)?;
-    add_route(server_id, "/api/chats/*", "GET", api_handler_id)?;
-    add_route(server_id, "/api/chats/*", "PUT", api_handler_id)?;
-    add_route(server_id, "/api/chats/*", "DELETE", api_handler_id)?;
+    add_route(server_id, "/api/chats/{id}", "GET", api_handler_id)?;
+    add_route(server_id, "/api/chats/{id}", "PUT", api_handler_id)?;
+    add_route(server_id, "/api/chats/{id}", "DELETE", api_handler_id)?;
 
     // Enable WebSocket
     enable_websocket(
