@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ChainEntry {
-    pub parent: Option<String>,
+    pub parents: Vec<String>,
     pub id: Option<String>,
     pub data: MessageData,
 }

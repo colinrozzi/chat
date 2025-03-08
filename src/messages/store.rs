@@ -55,6 +55,42 @@ impl MessageStore {
         Ok(entry)
     }
 
+    /// Save a message to the store with a specific ID (for committing pending child messages)
+    pub fn save_specific_message(
+        &mut self,
+        entry: ChainEntry,
+        chat_id: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        log("Saving message with specific ID to runtime store");
+
+        // Make sure the entry has an ID
+        if entry.id.is_none() {
+            return Err("Entry must have an ID for save_specific_message".into());
+        }
+
+        // Serialize the entry to bytes
+        let content = serde_json::to_vec(&entry)?;
+
+        // Create a content reference with the specified ID
+        let content_ref = ContentRef {
+            hash: entry.id.clone().unwrap(),
+        };
+
+        // Store the content in the runtime store
+        store::store_with_hash(&self.store_id, &content_ref, &content)?;
+        log(&format!("Stored message with specific hash: {}", content_ref.hash));
+
+        // Get the current chat info (but don't update head in this case)
+        let chat_info = self
+            .get_chat_info(chat_id)?
+            .ok_or_else(|| format!("Chat {} not found", chat_id))?;
+
+        // Update cache
+        self.cache.insert(content_ref.hash.clone(), entry);
+
+        Ok(())
+    }
+
     /// Load a message from the store by its ID
     pub fn load_message(&mut self, id: &str) -> Result<ChainEntry, Box<dyn std::error::Error>> {
         // Check cache first

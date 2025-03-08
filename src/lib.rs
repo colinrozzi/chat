@@ -384,7 +384,8 @@ impl MessageServerClientGuest for Component {
                             match serde_json::from_value::<messages::ChildMessage>(data.clone()) {
                                 Ok(child_message) => {
                                     log(&format!("Processing child message: {:?}", child_message));
-                                    current_state.add_child_message(child_message);
+                                    // Add to pending child messages instead of directly to the chain
+                                    current_state.add_pending_child_message(child_message);
                                 }
                                 Err(e) => {
                                     log(&format!("Failed to parse child message: {}", e));

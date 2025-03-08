@@ -111,6 +111,26 @@ pub fn handle_message(
                                 default_response(&current_state)
                             }
                         }
+                        Some("get_pending_child_messages") => {
+                            handle_get_pending_child_messages(&current_state)
+                        }
+                        Some("toggle_pending_child_message") => {
+                            if let (Some(message_id), Some(selected)) = (
+                                command["message_id"].as_str(),
+                                command["selected"].as_bool(),
+                            ) {
+                                handle_toggle_pending_child_message(&mut current_state, message_id, selected)
+                            } else {
+                                default_response(&current_state)
+                            }
+                        }
+                        Some("remove_pending_child_message") => {
+                            if let Some(message_id) = command["message_id"].as_str() {
+                                handle_remove_pending_child_message(&mut current_state, message_id)
+                            } else {
+                                default_response(&current_state)
+                            }
+                        }
                         Some("get_head") => handle_get_head(&current_state),
 
                         _ => default_response(&current_state),
@@ -686,31 +706,6 @@ fn handle_get_message(
     }
 }
 
-fn handle_child_message(
-    state: &mut State,
-    child_id: &str,
-    text: &str,
-    data: Value,
-    html: Option<String>,
-) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    // Create a child message
-    let child_message = crate::messages::ChildMessage {
-        child_id: child_id.to_string(),
-        text: text.to_string(),
-        data,
-        html,
-    };
-
-    // Add it to the chain
-    state.add_child_message(child_message);
-
-    // Use the helper function to create standardized response
-    Ok((
-        Some(serde_json::to_vec(state).unwrap()),
-        (create_messages_updated_response(state),),
-    ))
-}
-
 fn handle_get_head(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     Ok((
         Some(serde_json::to_vec(state).unwrap()),
@@ -729,6 +724,93 @@ fn handle_get_head(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse
             }],
         },),
     ))
+}
+
+fn handle_get_pending_child_messages(
+    state: &State,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    // The notification is already done by state.notify_pending_child_messages_update()
+    let _ = state.notify_pending_child_messages_update();
+    
+    Ok((
+        Some(serde_json::to_vec(state).unwrap()),
+        (WebsocketResponse {
+            messages: vec![], // Empty messages as we've already sent the notification
+        },),
+    ))
+}
+
+fn handle_toggle_pending_child_message(
+    state: &mut State,
+    message_id: &str,
+    selected: bool,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    match state.toggle_pending_child_message(message_id, selected) {
+        Ok(_) => {
+            // Return empty messages as the notification is already sent
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![],
+                },),
+            ))
+        }
+        Err(e) => {
+            log(&format!("Failed to toggle pending child message: {}", e));
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "error",
+                                "message": format!("Failed to toggle pending child message: {}", e)
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+    }
+}
+
+fn handle_remove_pending_child_message(
+    state: &mut State,
+    message_id: &str,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    match state.remove_pending_child_message(message_id) {
+        Ok(_) => {
+            // Return empty messages as the notification is already sent
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![],
+                },),
+            ))
+        }
+        Err(e) => {
+            log(&format!("Failed to remove pending child message: {}", e));
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "error",
+                                "message": format!("Failed to remove pending child message: {}", e)
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+    }
 }
 
 fn default_response(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {

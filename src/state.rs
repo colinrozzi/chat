@@ -17,6 +17,13 @@ pub struct ChildActor {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PendingChildMessage {
+    pub message: ChildMessage,
+    pub selected: bool,
+    pub timestamp: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct State {
     pub id: String,
     pub head: Option<String>, // Legacy, kept for backward compatibility
@@ -28,6 +35,7 @@ pub struct State {
     pub websocket_port: u16, // Keep for backward compatibility
     pub children: HashMap<String, ChildActor>, // Global children (legacy)
     pub actor_messages: HashMap<String, Vec<u8>>,
+    pub pending_child_messages: HashMap<String, PendingChildMessage>, // Pending child messages (not committed to chain)
 }
 
 impl State {
@@ -50,6 +58,7 @@ impl State {
             websocket_port,
             children: HashMap::new(),
             actor_messages: HashMap::new(),
+            pending_child_messages: HashMap::new(),
         };
 
         // Get the list of chats
@@ -175,7 +184,7 @@ impl State {
         Ok(())
     }
 
-    pub fn add_to_chain(&mut self, data: MessageData) -> ChainEntry {
+    pub fn add_to_chain(&mut self, data: MessageData, parents: Vec<String>) -> ChainEntry {
         log("Adding message to chain");
 
         // Ensure we have a current chat
@@ -207,14 +216,8 @@ impl State {
         // Get chat ID
         let chat_id = self.current_chat_id.clone().unwrap();
 
-        // Get the current head for this chat
-        let current_head = match self.store.get_chat_info(&chat_id) {
-            Ok(Some(chat_info)) => chat_info.head,
-            _ => None,
-        };
-
         let entry = ChainEntry {
-            parent: current_head,
+            parents,
             id: None,
             data,
         };
@@ -248,7 +251,50 @@ impl State {
             content: content.to_string(),
         };
 
-        self.add_to_chain(MessageData::Chat(msg));
+        // Get current head as parent
+        let mut parents = Vec::new();
+        if let Some(chat_id) = &self.current_chat_id {
+            if let Ok(Some(chat_info)) = self.store.get_chat_info(chat_id) {
+                if let Some(head) = chat_info.head {
+                    parents.push(head);
+                }
+            }
+        }
+
+        // Get selected pending child messages as additional parents
+        let selected_child_messages: Vec<String> = self.pending_child_messages.iter()
+            .filter(|(_, pcm)| pcm.selected)
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        // Add selected child messages as parents if any
+        for child_id in &selected_child_messages {
+            parents.push(child_id.clone());
+        }
+
+        // Add user message to chain with all parents
+        self.add_to_chain(MessageData::Chat(msg), parents);
+
+        // Add all selected pending child messages to the chain
+        for child_id in selected_child_messages {
+            if let Some(pcm) = self.pending_child_messages.remove(&child_id) {
+                log(&format!("Committing selected child message: {}", child_id));
+                
+                // Create a ChainEntry for this child message and save it
+                let chat_id = self.current_chat_id.clone().unwrap();
+                let entry = ChainEntry {
+                    parents: parents.clone(), // Same parents as the user message
+                    id: Some(child_id),
+                    data: MessageData::ChildMessage(pcm.message.clone()),
+                };
+                
+                if let Err(e) = self.store.save_specific_message(entry, &chat_id) {
+                    log(&format!("Error saving child message: {}", e));
+                }
+            }
+        }
+
+        // Now that we've committed the selected messages, notify remaining children
         self.notify_children();
     }
     
@@ -257,10 +303,53 @@ impl State {
         let messages = self.get_anthropic_messages();
         log(&format!("Anthropic messages: {:?}", messages));
 
+        // Get current head as parent
+        let mut parents = Vec::new();
+        if let Some(chat_id) = &self.current_chat_id {
+            if let Ok(Some(chat_info)) = self.store.get_chat_info(chat_id) {
+                if let Some(head) = chat_info.head {
+                    parents.push(head);
+                }
+            }
+        }
+
+        // Get selected pending child messages as additional parents
+        let selected_child_messages: Vec<String> = self.pending_child_messages.iter()
+            .filter(|(_, pcm)| pcm.selected)
+            .map(|(id, _)| id.clone())
+            .collect();
+
+        // Add selected child messages as parents if any
+        for child_id in &selected_child_messages {
+            parents.push(child_id.clone());
+        }
+
         match self.claude_client.generate_response(messages) {
             Ok(assistant_msg) => {
                 log(&format!("Generated completion: {:?}", assistant_msg));
-                self.add_to_chain(MessageData::Chat(assistant_msg));
+                
+                // Add LLM response to chain with all parents
+                self.add_to_chain(MessageData::Chat(assistant_msg), parents.clone());
+                
+                // Add all selected pending child messages to the chain
+                for child_id in selected_child_messages {
+                    if let Some(pcm) = self.pending_child_messages.remove(&child_id) {
+                        log(&format!("Committing selected child message: {}", child_id));
+                        
+                        // Create a ChainEntry for this child message and save it
+                        let chat_id = self.current_chat_id.clone().unwrap();
+                        let entry = ChainEntry {
+                            parents: parents.clone(), // Same parents as the assistant message
+                            id: Some(child_id),
+                            data: MessageData::ChildMessage(pcm.message.clone()),
+                        };
+                        
+                        if let Err(e) = self.store.save_specific_message(entry, &chat_id) {
+                            log(&format!("Error saving child message: {}", e));
+                        }
+                    }
+                }
+                
                 self.notify_children();
                 Ok(())
             }
@@ -339,6 +428,7 @@ impl State {
         let chain = self.get_chain();
         log(&format!("Chain: {:?}", chain));
 
+        // Process chain entries (already in chronological order)
         for entry in chain {
             log(&format!("Processing entry: {:?}", entry));
             match entry.data {
@@ -398,14 +488,57 @@ impl State {
             }
         }
 
+        // Add selected pending child messages
+        let selected_pending_messages: Vec<_> = self.pending_child_messages.values()
+            .filter(|pcm| pcm.selected)
+            .collect();
+        
+        if !selected_pending_messages.is_empty() {
+            log(&format!("Adding {} selected pending child messages", selected_pending_messages.len()));
+            
+            // Sort by timestamp to maintain a consistent order
+            let mut sorted_pending = selected_pending_messages.clone();
+            sorted_pending.sort_by_key(|pcm| pcm.timestamp);
+            
+            // Add each selected pending message to the conversation
+            for pcm in sorted_pending {
+                let child_msg = &pcm.message;
+                if !child_msg.text.is_empty() {
+                    // Always use text field for Claude messages, not HTML
+                    let text = child_msg.text.clone();
+                    let actor_msg = format!("\n<actor id={}>{}</actor>", child_msg.child_id, text);
+
+                    if !messages.is_empty() {
+                        match messages.last() {
+                            Some(Message::Assistant { .. }) => {
+                                messages.push(Message::User { content: actor_msg });
+                            }
+                            Some(Message::User { content: _ }) => {
+                                if let Some(Message::User { content }) = messages.last_mut() {
+                                    content.push_str(&actor_msg);
+                                }
+                            }
+                            None => {}
+                        }
+                    } else {
+                        messages.push(Message::User { content: actor_msg });
+                    }
+                }
+            }
+        }
+
         messages
     }
 
     pub fn get_chain(&mut self) -> Vec<ChainEntry> {
-        let mut chain = vec![];
-
-        // Try to get the current chat's head
-        let mut current_id = if let Some(chat_id) = &self.current_chat_id {
+        // Create a set to track processed message IDs
+        let mut processed_ids = std::collections::HashSet::new();
+        
+        // This will store the messages in reverse order (newest first)
+        let mut reverse_chain = Vec::new();
+        
+        // Start with the current head
+        let current_id = if let Some(chat_id) = &self.current_chat_id {
             if let Ok(Some(chat_info)) = self.store.get_chat_info(chat_id) {
                 chat_info.head
             } else {
@@ -414,44 +547,122 @@ impl State {
         } else {
             self.head.clone()
         };
-
-        // If we have a head, follow the parent links
-        while let Some(id) = current_id {
-            match self.store.load_message(&id) {
-                Ok(entry) => {
-                    current_id = entry.parent.clone();
-                    chain.push(entry);
-                }
-                Err(e) => {
-                    log(&format!("Error loading message {}: {}", id, e));
-                    break;
+        
+        // Process messages starting from the head
+        if let Some(head_id) = current_id {
+            self.process_message_chain(&head_id, &mut reverse_chain, &mut processed_ids);
+        }
+        
+        // Reverse to get chronological order (oldest first)
+        reverse_chain.reverse();
+        return reverse_chain;
+    }
+    
+    // Helper method to recursively process the DAG message chain
+    fn process_message_chain(
+        &mut self,
+        message_id: &str,
+        chain: &mut Vec<ChainEntry>,
+        processed_ids: &mut std::collections::HashSet<String>
+    ) {
+        // Skip if already processed
+        if processed_ids.contains(message_id) {
+            return;
+        }
+        
+        // Try to load the message
+        match self.store.load_message(message_id) {
+            Ok(entry) => {
+                // Mark as processed
+                processed_ids.insert(message_id.to_string());
+                
+                // Add to chain
+                chain.push(entry.clone());
+                
+                // Process all parents recursively
+                for parent_id in &entry.parents {
+                    self.process_message_chain(parent_id, chain, processed_ids);
                 }
             }
+            Err(e) => {
+                log(&format!("Error loading message {}: {}", message_id, e));
+            }
         }
-
-        chain.reverse();
-        chain
     }
 
     pub fn get_message(&mut self, message_id: &str) -> Result<ChainEntry, Box<dyn Error>> {
         self.store.load_message(message_id)
     }
 
-    pub fn add_child_message(&mut self, child_message: ChildMessage) {
-        // Only add if the message has content (either text or HTML)
-        if !child_message.text.is_empty() || child_message.html.is_some() {
-            log(&format!(
-                "Adding child message from {}: {}",
-                child_message.child_id, child_message.text
-            ));
-            if child_message.html.is_some() {
-                log("Child message contains HTML content");
-            }
-            self.add_to_chain(MessageData::ChildMessage(child_message));
-
-            // Log that head has been updated (add_to_chain already handles notification)
-            log(&format!("Head has been updated to: {:?}", self.head));
+    pub fn add_pending_child_message(&mut self, child_message: ChildMessage) -> String {
+        // Generate a unique ID for this pending message
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        
+        let id = format!("pending-{}-{}", child_message.child_id, timestamp);
+        
+        // Create a pending child message with default selected state (true)
+        let pending_msg = PendingChildMessage {
+            message: child_message,
+            selected: true,  // Default to selected
+            timestamp,
+        };
+        
+        // Add to pending messages
+        self.pending_child_messages.insert(id.clone(), pending_msg);
+        
+        // Notify clients about the new pending message
+        self.notify_pending_child_messages_update();
+        
+        id
+    }
+    
+    pub fn toggle_pending_child_message(&mut self, id: &str, selected: bool) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(pcm) = self.pending_child_messages.get_mut(id) {
+            pcm.selected = selected;
+            self.notify_pending_child_messages_update();
+            Ok(())
+        } else {
+            Err(format!("Pending child message {} not found", id).into())
         }
+    }
+    
+    pub fn remove_pending_child_message(&mut self, id: &str) -> Result<(), Box<dyn std::error::Error>> {
+        if self.pending_child_messages.remove(id).is_some() {
+            self.notify_pending_child_messages_update();
+            Ok(())
+        } else {
+            Err(format!("Pending child message {} not found", id).into())
+        }
+    }
+    
+    pub fn notify_pending_child_messages_update(&self) -> Result<(), String> {
+        // Prepare a list of pending child messages for the client
+        let pending_messages: Vec<serde_json::Value> = self.pending_child_messages
+            .iter()
+            .map(|(id, pcm)| {
+                json!({
+                    "id": id,
+                    "child_id": pcm.message.child_id,
+                    "text": pcm.message.text,
+                    "html": pcm.message.html,
+                    "data": pcm.message.data,
+                    "selected": pcm.selected,
+                    "timestamp": pcm.timestamp
+                })
+            })
+            .collect();
+        
+        // Send the update to all connected clients
+        self.broadcast_websocket_message(
+            &serde_json::to_string(&serde_json::json!({
+                "type": "pending_child_messages_update",
+                "pending_messages": pending_messages
+            }))
+            .unwrap(),
+        )
     }
 
     pub fn broadcast_websocket_message(&self, message: &str) -> Result<(), String> {
