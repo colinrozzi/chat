@@ -604,8 +604,7 @@ body {
     color: var(--text-muted);
 }
 
-.send-button {
-    background: var(--accent-primary);
+.send-button, .generate-button {
     color: white;
     border: none;
     border-radius: var(--radius-md);
@@ -618,12 +617,29 @@ body {
     transition: all 0.2s ease;
 }
 
-.send-button:hover:not(:disabled) {
-    background: var(--accent-hover);
+.send-button {
+    background: var(--accent-primary);
+}
+
+.generate-button {
+    background: var(--success);
+}
+
+.send-button:hover:not(:disabled),
+.generate-button:hover:not(:disabled) {
     transform: translateY(-1px);
 }
 
-.send-button:disabled {
+.send-button:hover:not(:disabled) {
+    background: var(--accent-hover);
+}
+
+.generate-button:hover:not(:disabled) {
+    background: #0ea572; /* Darker shade of success */
+}
+
+.send-button:disabled,
+.generate-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }

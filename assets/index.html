@@ -88,7 +88,14 @@
             <div class="input-container">
                 <div class="input-wrapper">
                     <textarea id="messageInput" class="message-input"
-                        placeholder="Type your message... (Shift+Enter for new line)" rows="1"></textarea>
+                        placeholder="Type your message... (Press Enter for new line, Shift+Enter to send)" rows="1"></textarea>
+                    <button id="generateButton" class="generate-button" disabled>
+                        Generate
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M21 12s-2.036-5-10-5-10 5-10 5 2.036 5 10 5 10-5 10-5z" stroke-width="2" stroke-linecap="round" />
+                            <circle cx="12" cy="12" r="3" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                    </button>
                     <button id="sendButton" class="send-button" disabled>
                         Send
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">

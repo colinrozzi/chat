@@ -101,6 +101,9 @@ pub fn handle_message(
                                 default_response(&current_state)
                             }
                         }
+                        Some("generate_llm_response") => {
+                            handle_generate_llm_response(&mut current_state)
+                        }
                         Some("get_message") => {
                             if let Some(message_id) = command["message_id"].as_str() {
                                 handle_get_message(&mut current_state, message_id)
@@ -604,6 +607,40 @@ fn handle_send_message(
         Some(serde_json::to_vec(state).unwrap()),
         (create_messages_updated_response(state),),
     ))
+}
+
+fn handle_generate_llm_response(
+    state: &mut State,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    match state.generate_llm_response() {
+        Ok(_) => {
+            // Response success - head will have been updated
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (create_messages_updated_response(state),),
+            ))
+        }
+        Err(e) => {
+            // Error already logged and notified by the generate_llm_response method
+            // Just return the current state
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "error",
+                                "message": format!("Failed to generate LLM response: {}", e)
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+    }
 }
 
 fn handle_get_message(

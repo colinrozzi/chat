@@ -250,7 +250,9 @@ impl State {
 
         self.add_to_chain(MessageData::Chat(msg));
         self.notify_children();
-
+    }
+    
+    pub fn generate_llm_response(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         log("Getting anthropic messages");
         let messages = self.get_anthropic_messages();
         log(&format!("Anthropic messages: {:?}", messages));
@@ -260,6 +262,7 @@ impl State {
                 log(&format!("Generated completion: {:?}", assistant_msg));
                 self.add_to_chain(MessageData::Chat(assistant_msg));
                 self.notify_children();
+                Ok(())
             }
             Err(e) => {
                 log(&format!("Failed to generate completion: {}", e));
@@ -272,6 +275,7 @@ impl State {
                     }))
                     .unwrap(),
                 );
+                Err(e.into())
             }
         }
     }

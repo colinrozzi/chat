@@ -20,6 +20,7 @@ function getElement(id) {
 const elements = {
     messageInput: getElement('messageInput'),
     sendButton: getElement('sendButton'),
+    generateButton: getElement('generateButton'),
     messagesContainer: getElement('messagesContainer'),
     connectionStatus: getElement('connectionStatus'),
     loadingOverlay: getElement('loadingOverlay'),
@@ -214,7 +215,15 @@ function updateConnectionStatus(status) {
         <div class="status-indicator"></div>
         <span>${status.charAt(0).toUpperCase() + status.slice(1)}</span>
     `;
-    elements.sendButton.disabled = status !== 'connected';
+    
+    const isConnected = status === 'connected';
+    elements.sendButton.disabled = !isConnected || !elements.messageInput.value.trim();
+    elements.generateButton.disabled = !isConnected;
+    
+    // Disable generate button if there are no messages yet
+    if (isConnected && messageChain.length === 0) {
+        elements.generateButton.disabled = true;
+    }
 }
 
 function showError(message) {
@@ -820,6 +829,28 @@ function sendMessage() {
     // Add to message chain and render immediately
     messageChain.push(tempMessage);
     renderMessages();
+    scrollToBottom();
+    
+    // Set waiting state
+    elements.messageInput.value = '';
+    elements.messageInput.style.height = 'auto';
+    elements.messageInput.focus();
+    elements.sendButton.disabled = true;
+    
+    // Enable the generate button now that we have a message
+    elements.generateButton.disabled = false;
+    
+    // Send the actual message
+    sendWebSocketMessage({
+        type: 'send_message',
+        content: content
+    });
+}
+
+function generateLlmResponse() {
+    if (!ws || ws.readyState !== WebSocket.OPEN || isWaitingForResponse) {
+        return;
+    }
     
     // Add typing indicator
     addTypingIndicator();
@@ -827,15 +858,12 @@ function sendMessage() {
     
     // Set waiting state
     isWaitingForResponse = true;
-    elements.messageInput.value = '';
-    elements.messageInput.style.height = 'auto';
-    elements.messageInput.focus();
     elements.sendButton.disabled = true;
+    elements.generateButton.disabled = true;
     
-    // Send the actual message
+    // Send the generate request
     sendWebSocketMessage({
-        type: 'send_message',
-        content: content
+        type: 'generate_llm_response'
     });
 }
 
@@ -884,7 +912,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize WebSocket
     connectWebSocket();
     
-    // Auto-resize textarea
+    // Auto-resize textarea and update button states
     elements.messageInput.addEventListener('input', () => {
         elements.messageInput.style.height = 'auto';
         elements.messageInput.style.height = Math.min(elements.messageInput.scrollHeight, 120) + 'px';
@@ -901,13 +929,22 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Send message handlers
     elements.messageInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && !event.shiftKey) {
+        if (event.key === 'Enter' && event.shiftKey) {
             event.preventDefault();
             sendMessage();
         }
     });
     
     elements.sendButton.addEventListener('click', sendMessage);
+    elements.generateButton.addEventListener('click', generateLlmResponse);
+    
+    // Add keyboard shortcut for generate (Ctrl+Enter or Cmd+Enter)
+    elements.messageInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+            event.preventDefault();
+            generateLlmResponse();
+        }
+    });
     
     // Chat sidebar toggle handlers
     if (elements.collapseChatSidebarButton) {
