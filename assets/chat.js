@@ -52,6 +52,15 @@ function connectWebSocket() {
         updateConnectionStatus('connected');
         reconnectAttempts = 0;
         
+        // Log initial state
+        console.log('Initial state:', {
+            messageChain: messageChain.length,
+            currentHead: currentHead,
+            currentChatId: currentChatId,
+            chats: chats.length,
+            pendingChildMessages: pendingChildMessages.length
+        });
+        
         // Request initial state
         sendWebSocketMessage({ type: 'list_chats' });  // Get available chats
         sendWebSocketMessage({ type: 'get_head' });  // Initial head query
@@ -77,7 +86,47 @@ function connectWebSocket() {
         try {
             const data = JSON.parse(event.data);
             console.log('Received WebSocket message:', data);
+            
+            // Enhanced logging for debugging child actor issues
+            if (data.type === 'messages_updated' || data.type === 'head') {
+                console.log('HEAD UPDATE - Before processing:', {
+                    oldHead: currentHead,
+                    newHead: data.head,
+                    messageChainLength: messageChain.length,
+                    messageIDs: messageChain.map(m => m.id)
+                });
+            } else if (data.type === 'message') {
+                console.log('MESSAGE RECEIVED - Details:', {
+                    messageId: data.message?.id,
+                    messageParents: data.message?.parents,
+                    messageType: data.message?.data ? Object.keys(data.message.data)[0] : 'unknown',
+                    currentChainLength: messageChain.length
+                });
+            } else if (data.type === 'children_update') {
+                console.log('CHILDREN UPDATE:', {
+                    availableCount: data.available_children?.length || 0,
+                    runningCount: data.running_children?.length || 0,
+                    currentChainLength: messageChain.length,
+                    currentHead: currentHead
+                });
+            } else if (data.type === 'pending_child_messages_update') {
+                console.log('PENDING CHILD MESSAGES:', {
+                    count: data.pending_messages?.length || 0,
+                    messageIds: data.pending_messages?.map(m => m.id) || [],
+                    childIds: data.pending_messages?.map(m => m.child_id) || []
+                });
+            }
+            
             handleWebSocketMessage(data);
+            
+            // Log after processing certain message types
+            if (data.type === 'messages_updated' || data.type === 'head' || data.type === 'message') {
+                console.log('AFTER HANDLING:', {
+                    messageChainLength: messageChain.length,
+                    currentHead: currentHead,
+                    sortedLength: sortMessageChain().length
+                });
+            }
         } catch (error) {
             console.error('WebSocket message processing error:', error);
             console.error('Raw message:', event.data);
@@ -194,27 +243,43 @@ function handleWebSocketMessage(data) {
 
 function handleNewMessage(message) {
     console.log('Handling new message:', message);
+    console.log('Message chain before handling:', {
+        length: messageChain.length,
+        ids: messageChain.map(m => m.id),
+        currentHead: currentHead
+    });
     
     // Remove temporary message if it exists
+    const tempMessagesCount = messageChain.filter(m => m.id.startsWith('temp-')).length;
     messageChain = messageChain.filter(m => !m.id.startsWith('temp-'));
+    console.log(`Removed ${tempMessagesCount} temporary messages`);
     
     // Add to message chain if not already present
     if (!messageChain.find(m => m.id === message.id)) {
+        console.log(`Adding new message to chain: ${message.id}, parents: ${JSON.stringify(message.parents || [])}`);
         // Add the cost to the total only when a new message is received
         if (message.data && message.data.Chat && message.data.Chat.Assistant) {
             const assistant = message.data.Chat.Assistant;
             calculateMessageCost(assistant.usage, true); // Add to total
         }
         messageChain.push(message);
+    } else {
+        console.log(`Message ${message.id} already exists in chain, skipping`);
     }
 
     // Request parent messages if needed
     if (message.parents && message.parents.length > 0) {
+        console.log(`Message has ${message.parents.length} parents: ${JSON.stringify(message.parents)}`);
         for (const parentId of message.parents) {
             if (!messageChain.find(m => m.id === parentId)) {
+                console.log(`Requesting missing parent: ${parentId}`);
                 requestMessage(parentId);
+            } else {
+                console.log(`Parent already in chain: ${parentId}`);
             }
         }
+    } else {
+        console.log('Message has no parents');
     }
 
     // Reset waiting state and remove typing indicator
@@ -714,6 +779,11 @@ function formatMessageContent(content) {
 }
 
 function sortMessageChain() {
+    console.log('Sorting message chain:', {
+        chainLength: messageChain.length,
+        currentHead: currentHead
+    });
+    
     // Create a map for fast lookups
     const messagesById = {};
     messageChain.forEach(msg => {
@@ -723,21 +793,33 @@ function sortMessageChain() {
     // Track visited messages to handle potential cycles
     const visited = new Set();
     const result = [];
+    const missingParents = new Set();
     
     // For topological sort - start with all head nodes (nodes with no parents)
     // In our DAG traversal, we'll use a recursive DFS approach
     function processMessage(message, level = 0) {
-        if (visited.has(message.id)) return;
+        console.log(`Processing message: ${message.id} at level ${level}`);
+        if (visited.has(message.id)) {
+            console.log(`- Already visited ${message.id}, skipping`);
+            return;
+        }
         visited.add(message.id);
         
         // Process parents first (recursively)
         if (message.parents && message.parents.length > 0) {
+            console.log(`- Message ${message.id} has ${message.parents.length} parents`);
             for (const parentId of message.parents) {
                 const parent = messagesById[parentId];
                 if (parent) {
+                    console.log(`- Processing parent: ${parentId}`);
                     processMessage(parent, level + 1);
+                } else {
+                    console.log(`- MISSING PARENT: ${parentId} for message ${message.id}`);
+                    missingParents.add(parentId);
                 }
             }
+        } else {
+            console.log(`- Message ${message.id} has no parents`);
         }
         
         // Add this message to the result
@@ -746,9 +828,12 @@ function sortMessageChain() {
     
     // Find the head message (latest message)
     if (currentHead && messagesById[currentHead]) {
+        console.log(`Starting traversal from head: ${currentHead}`);
         processMessage(messagesById[currentHead]);
     } else {
+        console.log('No current head or head not found in message chain');
         // Without a clear head, process all messages
+        console.log('Processing all messages as fallback');
         messageChain.forEach(msg => {
             if (!visited.has(msg.id)) {
                 processMessage(msg);
@@ -756,6 +841,11 @@ function sortMessageChain() {
         });
     }
     
+    if (missingParents.size > 0) {
+        console.warn('MISSING PARENTS DETECTED:', Array.from(missingParents));
+    }
+    
+    console.log(`Sorted message chain: ${result.length} messages`);
     return result;
 }
 
@@ -903,6 +993,13 @@ function scrollToBottom() {
 
 // Actor management
 function startActor(manifestName) {
+    console.log(`Starting actor: ${manifestName}`, {
+        currentState: {
+            messageChainLength: messageChain.length,
+            currentHead: currentHead,
+            pendingChildMessages: pendingChildMessages.length
+        }
+    });
     sendWebSocketMessage({
         type: 'start_child',
         manifest_name: manifestName
@@ -948,6 +1045,13 @@ function sendMessage() {
         return;
     }
     
+    console.log('Sending user message:', {
+        messageLength: content.length,
+        messageChainLength: messageChain.length,
+        currentHead: currentHead,
+        pendingChildMessages: pendingChildMessages.length
+    });
+    
     // Create temporary message object for optimistic rendering
     const tempMessage = {
         id: 'temp-' + Date.now(),
@@ -962,6 +1066,7 @@ function sendMessage() {
     
     // Add to message chain and render immediately
     messageChain.push(tempMessage);
+    console.log('Added temporary message to chain, new length:', messageChain.length);
     renderMessages();
     scrollToBottom();
     
@@ -975,6 +1080,7 @@ function sendMessage() {
     elements.generateButton.disabled = false;
     
     // Send the actual message
+    console.log('Sending WebSocket message with user content');
     sendWebSocketMessage({
         type: 'send_message',
         content: content
@@ -986,6 +1092,13 @@ function generateLlmResponse() {
         return;
     }
     
+    console.log('Generating LLM response:', {
+        messageChainLength: messageChain.length,
+        currentHead: currentHead,
+        pendingChildMessages: pendingChildMessages.length,
+        sortedChainLength: sortMessageChain().length
+    });
+    
     // Add typing indicator
     addTypingIndicator();
     scrollToBottom();
@@ -996,6 +1109,7 @@ function generateLlmResponse() {
     elements.generateButton.disabled = true;
     
     // Send the generate request
+    console.log('Sending WebSocket message to generate LLM response');
     sendWebSocketMessage({
         type: 'generate_llm_response'
     });

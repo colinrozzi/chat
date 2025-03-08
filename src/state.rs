@@ -185,19 +185,19 @@ impl State {
     }
 
     pub fn add_to_chain(&mut self, data: MessageData, parents: Vec<String>) -> ChainEntry {
-        log("Adding message to chain");
+        log(&format!("[DEBUG] Adding message to chain with {} parents: {:?}", parents.len(), parents));
 
         // Ensure we have a current chat
         if self.current_chat_id.is_none() {
-            log("No current chat, creating a new one");
+            log("[DEBUG] No current chat, creating a new one");
             match self.store.create_chat("New Chat".to_string(), None) {
                 Ok(chat_info) => {
                     self.current_chat_id = Some(chat_info.id.clone());
-                    log(&format!("Created new chat: {}", chat_info.id));
+                    log(&format!("[DEBUG] Created new chat: {}", chat_info.id));
                 }
                 Err(e) => {
                     // Log the error but continue with a fallback chat ID
-                    log(&format!("Failed to create a new chat: {}", e));
+                    log(&format!("[ERROR] Failed to create a new chat: {}", e));
 
                     // Create a fallback chat ID
                     let fallback_id = format!(
@@ -207,7 +207,7 @@ impl State {
                             .unwrap()
                             .as_secs()
                     );
-                    log(&format!("Using fallback chat ID: {}", fallback_id));
+                    log(&format!("[DEBUG] Using fallback chat ID: {}", fallback_id));
                     self.current_chat_id = Some(fallback_id);
                 }
             }
@@ -247,6 +247,7 @@ impl State {
     }
 
     pub fn add_user_message(&mut self, content: &str) {
+        log("[DEBUG] Adding user message");
         let msg = Message::User {
             content: content.to_string(),
         };
@@ -256,9 +257,16 @@ impl State {
         if let Some(chat_id) = &self.current_chat_id {
             if let Ok(Some(chat_info)) = self.store.get_chat_info(chat_id) {
                 if let Some(head) = chat_info.head {
+                    log(&format!("[DEBUG] Using head as parent: {}", head));
                     parents.push(head);
+                } else {
+                    log("[DEBUG] No head found for current chat");
                 }
+            } else {
+                log("[DEBUG] Could not get chat info for current chat");
             }
+        } else {
+            log("[DEBUG] No current chat ID");
         }
 
         // Get selected pending child messages as additional parents
@@ -267,19 +275,24 @@ impl State {
             .map(|(id, _)| id.clone())
             .collect();
 
+        log(&format!("[DEBUG] Found {} selected pending child messages", selected_child_messages.len()));
+
         // Add selected child messages as parents if any
         for child_id in &selected_child_messages {
+            log(&format!("[DEBUG] Adding pending child message as parent: {}", child_id));
             parents.push(child_id.clone());
         }
 
         // Add user message to chain with all parents
         let parents_clone = parents.clone();
-        self.add_to_chain(MessageData::Chat(msg), parents);
+        log(&format!("[DEBUG] Adding user message to chain with {} parents", parents.len()));
+        let user_entry = self.add_to_chain(MessageData::Chat(msg), parents);
+        log(&format!("[DEBUG] User message added with ID: {:?}", user_entry.id));
         
         // Add all selected pending child messages to the chain
         for child_id in selected_child_messages {
             if let Some(pcm) = self.pending_child_messages.remove(&child_id) {
-                log(&format!("Committing selected child message: {}", child_id));
+                log(&format!("[DEBUG] Committing selected child message: {}", child_id));
                 
                 // Create a ChainEntry for this child message and save it
                 let chat_id = self.current_chat_id.clone().unwrap();
@@ -289,8 +302,11 @@ impl State {
                     data: MessageData::ChildMessage(pcm.message.clone()),
                 };
                 
+                log(&format!("[DEBUG] Saving child message with ID: {:?}, parents: {:?}", entry.id, entry.parents));
                 if let Err(e) = self.store.save_specific_message(entry, &chat_id) {
-                    log(&format!("Error saving child message: {}", e));
+                    log(&format!("[ERROR] Error saving child message: {}", e));
+                } else {
+                    log("[DEBUG] Child message saved successfully");
                 }
             }
         }
@@ -300,9 +316,9 @@ impl State {
     }
     
     pub fn generate_llm_response(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        log("Getting anthropic messages");
+        log("[DEBUG] Getting anthropic messages");
         let messages = self.get_anthropic_messages();
-        log(&format!("Anthropic messages: {:?}", messages));
+        log(&format!("[DEBUG] Got {} anthropic messages", messages.len()));
 
         // Get current head as parent
         let mut parents = Vec::new();
@@ -576,6 +592,7 @@ impl State {
     ) {
         // Skip if already processed
         if processed_ids.contains(message_id) {
+            log(&format!("[DEBUG] Message {} already processed, skipping", message_id));
             return;
         }
         
@@ -584,17 +601,30 @@ impl State {
             Ok(entry) => {
                 // Mark as processed
                 processed_ids.insert(message_id.to_string());
+                log(&format!("[DEBUG] Processing message ID: {}, type: {:?}", 
+                    message_id, 
+                    if let MessageData::Chat(_) = &entry.data { "Chat" } else { "ChildMessage" }
+                ));
+                
+                // Log parent information
+                if !entry.parents.is_empty() {
+                    log(&format!("[DEBUG] Message {} has {} parents: {:?}", 
+                        message_id, entry.parents.len(), entry.parents));
+                } else {
+                    log(&format!("[DEBUG] Message {} has no parents", message_id));
+                }
                 
                 // Add to chain
                 chain.push(entry.clone());
                 
                 // Process all parents recursively
                 for parent_id in &entry.parents {
+                    log(&format!("[DEBUG] Processing parent: {} for message: {}", parent_id, message_id));
                     self.process_message_chain(parent_id, chain, processed_ids);
                 }
             }
             Err(e) => {
-                log(&format!("Error loading message {}: {}", message_id, e));
+                log(&format!("[ERROR] Error loading message {}: {}", message_id, e));
             }
         }
     }
@@ -678,6 +708,8 @@ impl State {
         use crate::bindings::ntwk::theater::http_framework::send_websocket_message;
         use crate::bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
 
+        log(&format!("[DEBUG] Broadcasting WebSocket message to {} clients", self.connected_clients.len()));
+
         for client_id in self.connected_clients.keys() {
             if let Ok(connection_id) = client_id.parse::<u64>() {
                 let websocket_message = WebsocketMessage {
@@ -690,8 +722,12 @@ impl State {
                 if let Err(e) =
                     send_websocket_message(self.server_id, connection_id, &websocket_message)
                 {
-                    log(&format!("Failed to send WebSocket message: {}", e));
+                    log(&format!("[ERROR] Failed to send WebSocket message to client {}: {}", connection_id, e));
+                } else {
+                    log(&format!("[DEBUG] WebSocket message sent to client {}", connection_id));
                 }
+            } else {
+                log(&format!("[WARN] Invalid client ID format: {}", client_id));
             }
         }
 
@@ -700,6 +736,7 @@ impl State {
 
     pub fn notify_head_update(&self) -> Result<(), String> {
         // Format head update notification
+        log(&format!("[DEBUG] Notifying clients of head update: Head={:?}, Chat={:?}", self.head, self.current_chat_id));
         let message = serde_json::to_string(&serde_json::json!({
             "type": "messages_updated",
             "head": self.head,
@@ -707,7 +744,16 @@ impl State {
         }))
         .unwrap();
 
-        self.broadcast_websocket_message(&message)
+        match self.broadcast_websocket_message(&message) {
+            Ok(_) => {
+                log("[DEBUG] Head update notification sent successfully");
+                Ok(())
+            },
+            Err(e) => {
+                log(&format!("[ERROR] Failed to broadcast head update: {}", e));
+                Err(e)
+            }
+        }
     }
 
     pub fn notify_chats_update(&self) -> Result<(), String> {
@@ -741,18 +787,23 @@ impl State {
         &mut self,
         manifest_name: &str,
     ) -> Result<String, Box<dyn std::error::Error>> {
+        log(&format!("[DEBUG] Starting child actor: {}", manifest_name));
         // Ensure we have a current chat
         if self.current_chat_id.is_none() {
+            log("[ERROR] No current chat selected when starting child");
             return Err("No current chat selected".into());
         }
 
         let chat_id = self.current_chat_id.clone().unwrap();
+        log(&format!("[DEBUG] Using chat ID: {}", chat_id));
         let manifest_path = format!(
             "/Users/colinrozzi/work/actors/chat/assets/children/{}.toml",
             manifest_name
         );
 
+        log(&format!("[DEBUG] Spawning actor from manifest: {}", manifest_path));
         let actor_id = spawn(&manifest_path, None)?;
+        log(&format!("[DEBUG] Actor spawned with ID: {}", actor_id));
 
         // Create a child actor record
         let child_actor = ChildActor {
@@ -776,7 +827,9 @@ impl State {
 
         // Get current head for the chat
         let current_head = chat_info.head.clone();
+        log(&format!("[DEBUG] Current head for child actor introduction: {:?}", current_head));
 
+        log(&format!("[DEBUG] Sending introduction request to child actor: {}", actor_id));
         if let Ok(response) = request(
             &actor_id,
             &serde_json::to_vec(&json!({
