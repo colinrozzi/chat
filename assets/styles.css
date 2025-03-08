@@ -323,6 +323,35 @@ body {
     z-index: 5;
 }
 
+/* For smaller messages, display actions to the right instead of overlay */
+.message.small .message-actions {
+    position: absolute;
+    top: 50%;
+    right: -220px; /* Position to the right of the message */
+    transform: translateY(-50%);
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.message.small:hover .message-actions {
+    opacity: 1;
+    transform: translateY(-50%) translateX(-10px);
+}
+
+/* Only on very small screens do we revert to overlay */
+@media (max-width: 768px) {
+    .message.small .message-actions {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        transform: none;
+    }
+    
+    .message.small:hover .message-actions {
+        transform: none;
+    }
+}
+
 .message:hover .message-actions {
     display: flex;
 }
@@ -339,6 +368,26 @@ body {
     gap: 0.25rem;
     border-radius: var(--radius-sm);
     transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .message-action-button span {
+        display: none;
+    }
+    
+    .message-action-button svg {
+        margin-right: 0;
+    }
+    
+    .message-actions {
+        padding: 0.15rem;
+    }
+    
+    .message.small .message-actions {
+        right: 0.25rem;
+        top: 0.25rem;
+    }
 }
 
 .message-action-button:hover {

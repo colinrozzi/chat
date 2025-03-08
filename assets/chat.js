@@ -245,8 +245,12 @@ function renderMessage(message) {
         const msg = message.data.Chat;
         // Handle the new Message enum structure
         if (msg.User) {
+            // Determine if this is a short message (less than 80 characters)
+            const isShortMessage = msg.User.content.length < 80;
+            const smallClass = isShortMessage ? 'small' : '';
+            
             return `
-                <div class="message user" data-message-id="${message.id}">
+                <div class="message user ${smallClass}" data-message-id="${message.id}">
                     ${formatMessageContent(msg.User.content)}
                     <div class="message-actions">
                         <button class="message-action-button" onclick="copyMessageText('${message.id}')">
@@ -254,7 +258,7 @@ function renderMessage(message) {
                                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                             </svg>
-                            Copy Text
+                            <span>Copy Text</span>
                         </button>
                         <div class="action-divider"></div>
                         <button class="message-action-button" onclick="copyMessageId('${message.id}')">
@@ -262,15 +266,19 @@ function renderMessage(message) {
                                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
                             </svg>
-                            Copy ID
+                            <span>Copy ID</span>
                         </button>
                     </div>
                 </div>
             `;
         } else if (msg.Assistant) {
             const assistant = msg.Assistant;
+            // Determine if this is a short message (less than 100 characters)
+            const isShortMessage = assistant.content.length < 100;
+            const smallClass = isShortMessage ? 'small' : '';
+            
             return `
-                <div class="message assistant" data-message-id="${message.id}">
+                <div class="message assistant ${smallClass}" data-message-id="${message.id}">
                     ${formatMessageContent(assistant.content)}
                     <div class="message-actions">
                         <button class="message-action-button" onclick="copyMessageText('${message.id}')">
@@ -278,7 +286,7 @@ function renderMessage(message) {
                                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                             </svg>
-                            Copy Text
+                            <span>Copy Text</span>
                         </button>
                         <div class="action-divider"></div>
                         <button class="message-action-button" onclick="copyMessageId('${message.id}')">
@@ -286,7 +294,7 @@ function renderMessage(message) {
                                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
                             </svg>
-                            Copy ID
+                            <span>Copy ID</span>
                         </button>
                     </div>
                     <div class="message-metadata">
@@ -310,10 +318,14 @@ function renderMessage(message) {
         // Handle individual child message
         const childMsg = message.data.ChildMessage;
         
+        // Determine if this is a short text message (less than 100 characters)
+        const isShortMessage = childMsg.text && childMsg.text.length < 100;
+        const smallClass = isShortMessage && !childMsg.html ? 'small' : '';
+        
         // Check if HTML content exists
         if (childMsg.html) {
             return `
-                <div class="child-message" data-message-id="${message.id}">
+                <div class="child-message ${smallClass}" data-message-id="${message.id}">
                     <div class="child-message-header" onclick="toggleChildMessage(this)">
                         <div class="child-header">Actor: ${childMsg.child_id}</div>
                         ${Object.keys(childMsg.data || {}).length > 0 ? `
@@ -332,7 +344,7 @@ function renderMessage(message) {
                                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                                 </svg>
-                                Copy Text
+                                <span>Copy Text</span>
                             </button>
                             <div class="action-divider"></div>
                             <button class="message-action-button" onclick="copyMessageId('${message.id}')">
@@ -340,7 +352,7 @@ function renderMessage(message) {
                                     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                                     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
                                 </svg>
-                                Copy ID
+                                <span>Copy ID</span>
                             </button>
                         </div>
                         <div class="child-html-content">${sanitizeHTML(childMsg.html)}</div>
@@ -356,7 +368,7 @@ function renderMessage(message) {
             `;
         } else if (childMsg.text && childMsg.text.trim() !== '') {
             return `
-                <div class="child-message" data-message-id="${message.id}">
+                <div class="child-message ${smallClass}" data-message-id="${message.id}">
                     <div class="child-message-header" onclick="toggleChildMessage(this)">
                         <div class="child-header">Actor: ${childMsg.child_id}</div>
                         ${Object.keys(childMsg.data || {}).length > 0 ? `
@@ -375,7 +387,7 @@ function renderMessage(message) {
                                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                                 </svg>
-                                Copy Text
+                                <span>Copy Text</span>
                             </button>
                             <div class="action-divider"></div>
                             <button class="message-action-button" onclick="copyMessageId('${message.id}')">
@@ -383,7 +395,7 @@ function renderMessage(message) {
                                     <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                                     <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
                                 </svg>
-                                Copy ID
+                                <span>Copy ID</span>
                             </button>
                         </div>
                         ${formatMessageContent(childMsg.text)}
