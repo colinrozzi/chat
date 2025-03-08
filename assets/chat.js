@@ -246,15 +246,49 @@ function renderMessage(message) {
         // Handle the new Message enum structure
         if (msg.User) {
             return `
-                <div class="message user">
+                <div class="message user" data-message-id="${message.id}">
                     ${formatMessageContent(msg.User.content)}
+                    <div class="message-actions">
+                        <button class="message-action-button" onclick="copyMessageText('${message.id}')">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Copy Text
+                        </button>
+                        <div class="action-divider"></div>
+                        <button class="message-action-button" onclick="copyMessageId('${message.id}')">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                            </svg>
+                            Copy ID
+                        </button>
+                    </div>
                 </div>
             `;
         } else if (msg.Assistant) {
             const assistant = msg.Assistant;
             return `
-                <div class="message assistant">
+                <div class="message assistant" data-message-id="${message.id}">
                     ${formatMessageContent(assistant.content)}
+                    <div class="message-actions">
+                        <button class="message-action-button" onclick="copyMessageText('${message.id}')">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Copy Text
+                        </button>
+                        <div class="action-divider"></div>
+                        <button class="message-action-button" onclick="copyMessageId('${message.id}')">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                            </svg>
+                            Copy ID
+                        </button>
+                    </div>
                     <div class="message-metadata">
                         <div class="metadata-item">
                             <span class="metadata-label">Model:</span> ${assistant.model}
@@ -263,7 +297,7 @@ function renderMessage(message) {
                             <span class="metadata-label">Tokens:</span> ${assistant.usage.input_tokens} in / ${assistant.usage.output_tokens} out
                         </div>
                         <div class="metadata-item">
-                            <span class="metadata-label">Cost:</span> $${calculateMessageCost(assistant.usage, false)}
+                            <span class="metadata-label">Cost:</span> ${calculateMessageCost(assistant.usage, false)}
                         </div>
                         <div class="metadata-item">
                             <span class="metadata-label">Stop Reason:</span> ${assistant.stop_reason}
@@ -279,7 +313,7 @@ function renderMessage(message) {
         // Check if HTML content exists
         if (childMsg.html) {
             return `
-                <div class="child-message">
+                <div class="child-message" data-message-id="${message.id}">
                     <div class="child-message-header" onclick="toggleChildMessage(this)">
                         <div class="child-header">Actor: ${childMsg.child_id}</div>
                         ${Object.keys(childMsg.data || {}).length > 0 ? `
@@ -292,6 +326,23 @@ function renderMessage(message) {
                         ` : ''}
                     </div>
                     <div class="child-message-content">
+                        <div class="message-actions">
+                            <button class="message-action-button" onclick="copyMessageText('${message.id}')">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                Copy Text
+                            </button>
+                            <div class="action-divider"></div>
+                            <button class="message-action-button" onclick="copyMessageId('${message.id}')">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                                </svg>
+                                Copy ID
+                            </button>
+                        </div>
                         <div class="child-html-content">${sanitizeHTML(childMsg.html)}</div>
                         ${Object.keys(childMsg.data || {}).length > 0 ? `
                             <div id="child-${message.id}-${childMsg.child_id}" class="child-data">
@@ -305,7 +356,7 @@ function renderMessage(message) {
             `;
         } else if (childMsg.text && childMsg.text.trim() !== '') {
             return `
-                <div class="child-message">
+                <div class="child-message" data-message-id="${message.id}">
                     <div class="child-message-header" onclick="toggleChildMessage(this)">
                         <div class="child-header">Actor: ${childMsg.child_id}</div>
                         ${Object.keys(childMsg.data || {}).length > 0 ? `
@@ -318,6 +369,23 @@ function renderMessage(message) {
                         ` : ''}
                     </div>
                     <div class="child-message-content">
+                        <div class="message-actions">
+                            <button class="message-action-button" onclick="copyMessageText('${message.id}')">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                Copy Text
+                            </button>
+                            <div class="action-divider"></div>
+                            <button class="message-action-button" onclick="copyMessageId('${message.id}')">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                                </svg>
+                                Copy ID
+                            </button>
+                        </div>
                         ${formatMessageContent(childMsg.text)}
                         ${Object.keys(childMsg.data || {}).length > 0 ? `
                             <div id="child-${message.id}-${childMsg.child_id}" class="child-data">
@@ -868,6 +936,61 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle window resize
     window.addEventListener('resize', checkMobileView);
 });
+
+// Copy message functions
+function copyMessageText(messageId) {
+    // Find the message in the message chain
+    const message = messageChain.find(m => m.id === messageId);
+    if (!message) return;
+    
+    // Extract the content based on the message type
+    let content = '';
+    if (message.data.Chat) {
+        if (message.data.Chat.User) {
+            content = message.data.Chat.User.content;
+        } else if (message.data.Chat.Assistant) {
+            content = message.data.Chat.Assistant.content;
+        }
+    } else if (message.data.ChildMessage) {
+        content = message.data.ChildMessage.text;
+    }
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(content)
+        .then(() => {
+            showCopySuccess('Text copied to clipboard');
+        })
+        .catch(err => {
+            console.error('Failed to copy text: ', err);
+            showError('Failed to copy text');
+        });
+}
+
+function copyMessageId(messageId) {
+    // Copy the message ID to clipboard
+    navigator.clipboard.writeText(messageId)
+        .then(() => {
+            showCopySuccess('ID copied to clipboard');
+        })
+        .catch(err => {
+            console.error('Failed to copy ID: ', err);
+            showError('Failed to copy ID');
+        });
+}
+
+function showCopySuccess(message) {
+    const successDiv = document.createElement('div');
+    successDiv.className = 'success-message';
+    successDiv.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        ${message}
+    `;
+    elements.messagesContainer.prepend(successDiv);
+    setTimeout(() => successDiv.remove(), 2000);
+}
 
 // Cleanup
 window.addEventListener('unload', () => {
