@@ -117,6 +117,9 @@ function handleWebSocketMessage(data) {
                     currentHead = data.head;
                     elements.headId.textContent = `Head: ${data.head.substring(0, 8)}...`;
                     requestMessage(data.head);
+                    
+                    // Enable generate button if we have messages
+                    elements.generateButton.disabled = false;
                 }
             }
             break;
@@ -124,6 +127,7 @@ function handleWebSocketMessage(data) {
         case 'message':
             if (data.message) {
                 handleNewMessage(data.message);
+                // The generate button state is handled in handleNewMessage
             }
             break;
             
@@ -203,6 +207,9 @@ function handleNewMessage(message) {
     isWaitingForResponse = false;
     removeTypingIndicator();
     elements.sendButton.disabled = !elements.messageInput.value.trim();
+    
+    // Enable generate button if we have messages
+    elements.generateButton.disabled = (messageChain.length === 0);
 
     renderMessages();
     scrollToBottom();
@@ -246,6 +253,9 @@ function renderMessages() {
     elements.messagesContainer.innerHTML = sortedMessages.length ? 
         sortedMessages.map(renderMessage).join('') :
         renderEmptyState();
+    
+    // Enable/disable generate button based on whether we have messages
+    elements.generateButton.disabled = (sortedMessages.length === 0);
 }
 
 function renderMessage(message) {
@@ -690,14 +700,17 @@ function branchChat() {
 function switchChat(chatId) {
     if (chatId === currentChatId) return; // Already on this chat
     
+    // Reset message chain - will be reloaded from server
+    messageChain = [];
+    currentHead = null;
+    
     sendWebSocketMessage({
         type: 'switch_chat',
         chat_id: chatId
     });
     
-    // Reset message chain - will be reloaded from server
-    messageChain = [];
-    currentHead = null;
+    // Disable generate button until messages are loaded
+    elements.generateButton.disabled = true;
 }
 
 function showRenameChat(chatId, currentName) {
@@ -927,24 +940,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // Send message handlers
+    // One event handler for all keyboard shortcuts
     elements.messageInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && event.shiftKey) {
-            event.preventDefault();
-            sendMessage();
+        console.log(`Key pressed: ${event.key}, Shift: ${event.shiftKey}, Ctrl: ${event.ctrlKey}, Meta: ${event.metaKey}`);
+        
+        if (event.key === 'Enter') {
+            // Shift+Enter to send message
+            if (event.shiftKey) {
+                event.preventDefault();
+                console.log('Sending message with Shift+Enter');
+                sendMessage();
+            }
+            // Ctrl+Enter or Cmd+Enter to generate response
+            else if (event.ctrlKey || event.metaKey) {
+                event.preventDefault();
+                console.log('Generating response with Ctrl/Cmd+Enter');
+                generateLlmResponse();
+            }
+            // Normal Enter just allows the newline (default behavior)
         }
     });
     
+    // Button click handlers
     elements.sendButton.addEventListener('click', sendMessage);
     elements.generateButton.addEventListener('click', generateLlmResponse);
-    
-    // Add keyboard shortcut for generate (Ctrl+Enter or Cmd+Enter)
-    elements.messageInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-            event.preventDefault();
-            generateLlmResponse();
-        }
-    });
     
     // Chat sidebar toggle handlers
     if (elements.collapseChatSidebarButton) {
