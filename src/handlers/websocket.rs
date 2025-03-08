@@ -108,16 +108,6 @@ pub fn handle_message(
                                 default_response(&current_state)
                             }
                         }
-                        Some("child_message") => {
-                            if let (Some(child_id), Some(text)) =
-                                (command["child_id"].as_str(), command["text"].as_str())
-                            {
-                                let data = command["data"].clone();
-                                handle_child_message(&mut current_state, child_id, text, data)
-                            } else {
-                                default_response(&current_state)
-                            }
-                        }
                         Some("get_head") => handle_get_head(&current_state),
 
                         _ => default_response(&current_state),
@@ -664,12 +654,14 @@ fn handle_child_message(
     child_id: &str,
     text: &str,
     data: Value,
+    html: Option<String>,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     // Create a child message
     let child_message = crate::messages::ChildMessage {
         child_id: child_id.to_string(),
         text: text.to_string(),
         data,
+        html,
     };
 
     // Add it to the chain

@@ -317,6 +317,7 @@ impl State {
             match response {
                 Ok(response) => {
                     let child_response: ChildMessage = serde_json::from_slice(&response).unwrap();
+                // For Claude integration, we always use the text field even if HTML is present
                     if !child_response.text.is_empty() {
                         self.add_to_chain(MessageData::ChildMessage(child_response));
                     }
@@ -368,6 +369,7 @@ impl State {
                 MessageData::ChildMessage(child_msg) => {
                     log(&format!("Adding child message: {:?}", child_msg));
                     if !child_msg.text.is_empty() {
+                        // Always use text field for Claude messages, not HTML
                         let text = child_msg.text.clone();
                         let actor_msg =
                             format!("\n<actor id={}>{}</actor>", child_msg.child_id, text);
@@ -432,12 +434,15 @@ impl State {
     }
 
     pub fn add_child_message(&mut self, child_message: ChildMessage) {
-        // Only add if the message has content
-        if !child_message.text.is_empty() {
+        // Only add if the message has content (either text or HTML)
+        if !child_message.text.is_empty() || child_message.html.is_some() {
             log(&format!(
                 "Adding child message from {}: {}",
                 child_message.child_id, child_message.text
             ));
+            if child_message.html.is_some() {
+                log("Child message contains HTML content");
+            }
             self.add_to_chain(MessageData::ChildMessage(child_message));
 
             // Log that head has been updated (add_to_chain already handles notification)

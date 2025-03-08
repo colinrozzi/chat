@@ -352,6 +352,55 @@ body {
     color: var(--text-primary);
 }
 
+/* Child HTML Content */
+.child-html-content {
+    width: 100%;
+    overflow-x: auto;
+    padding: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Sandbox styles to prevent child HTML from breaking the main UI */
+.child-html-content * {
+    max-width: 100%;
+}
+
+/* Default styling for common HTML elements in child content */
+.child-html-content table {
+    border-collapse: collapse;
+    margin: 0.5rem 0;
+    font-size: 0.75rem;
+}
+
+.child-html-content th,
+.child-html-content td {
+    border: 1px solid var(--border-color);
+    padding: 0.5rem;
+    text-align: left;
+}
+
+.child-html-content th {
+    background: var(--bg-secondary);
+    font-weight: 500;
+}
+
+.child-html-content h1,
+.child-html-content h2,
+.child-html-content h3,
+.child-html-content h4 {
+    margin: 0.5rem 0;
+    color: var(--text-primary);
+}
+
+.child-html-content a {
+    color: var(--accent-primary);
+    text-decoration: none;
+}
+
+.child-html-content a:hover {
+    text-decoration: underline;
+}
+
 /* Child Messages */
 .child-message {
     background: var(--bg-tertiary);

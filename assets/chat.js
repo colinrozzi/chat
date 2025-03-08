@@ -275,7 +275,35 @@ function renderMessage(message) {
     } else if (message.data.ChildMessage) {
         // Handle individual child message
         const childMsg = message.data.ChildMessage;
-        if (childMsg.text && childMsg.text.trim() !== '') {
+        
+        // Check if HTML content exists
+        if (childMsg.html) {
+            return `
+                <div class="child-message">
+                    <div class="child-message-header" onclick="toggleChildMessage(this)">
+                        <div class="child-header">Actor: ${childMsg.child_id}</div>
+                        ${Object.keys(childMsg.data || {}).length > 0 ? `
+                            <button class="child-data-toggle" onclick="toggleChildData('child-${message.id}-${childMsg.child_id}')">
+                                <span>View Data</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 18l6-6-6-6"/>
+                                </svg>
+                            </button>
+                        ` : ''}
+                    </div>
+                    <div class="child-message-content">
+                        <div class="child-html-content">${sanitizeHTML(childMsg.html)}</div>
+                        ${Object.keys(childMsg.data || {}).length > 0 ? `
+                            <div id="child-${message.id}-${childMsg.child_id}" class="child-data">
+                                <div class="child-data-content">
+                                    ${formatJsonData(childMsg.data)}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        } else if (childMsg.text && childMsg.text.trim() !== '') {
             return `
                 <div class="child-message">
                     <div class="child-message-header" onclick="toggleChildMessage(this)">
@@ -401,6 +429,40 @@ function updateTotalCostDisplay() {
 }
 
 // Utility functions
+function sanitizeHTML(html) {
+    // Basic HTML sanitization to prevent XSS
+    // This is a simple implementation - consider using a library like DOMPurify in production
+    if (!html) return '';
+
+    // Create a temporary element
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+
+    // Remove potentially dangerous elements and attributes
+    const dangerous = ['script', 'iframe', 'object', 'embed', 'form'];
+    dangerous.forEach(tag => {
+        const elements = tempDiv.getElementsByTagName(tag);
+        while (elements.length > 0) {
+            elements[0].parentNode.removeChild(elements[0]);
+        }
+    });
+
+    // Remove dangerous attributes from all elements
+    const allElements = tempDiv.getElementsByTagName('*');
+    for (let i = 0; i < allElements.length; i++) {
+        const element = allElements[i];
+        const attrs = element.attributes;
+        for (let j = attrs.length - 1; j >= 0; j--) {
+            const attr = attrs[j];
+            if (attr.name.startsWith('on') || attr.name === 'href' && attr.value.startsWith('javascript:')) {
+                element.removeAttribute(attr.name);
+            }
+        }
+    }
+
+    return tempDiv.innerHTML;
+}
+
 function formatMessageContent(content) {
     if (!content) return '';
     
