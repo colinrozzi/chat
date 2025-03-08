@@ -1,10 +1,119 @@
-// State management
+// Pending Child Messages handling
+function renderPendingChildMessages() {
+    // Create a pending messages container if it doesn't exist
+    let pendingContainer = document.getElementById('pendingMessagesContainer');
+    if (!pendingContainer) {
+        pendingContainer = document.createElement('div');
+        pendingContainer.id = 'pendingMessagesContainer';
+        pendingContainer.className = 'pending-messages-container';
+        // Insert it before the input container
+        const inputContainer = document.querySelector('.input-container');
+        if (inputContainer && inputContainer.parentNode) {
+            inputContainer.parentNode.insertBefore(pendingContainer, inputContainer);
+        } else {
+            // Fallback to append to messages container
+            elements.messagesContainer.appendChild(pendingContainer);
+        }
+    }
+    
+    // Sort pending messages by timestamp (oldest first)
+    const sortedMessages = [...pendingChildMessages].sort((a, b) => a.timestamp - b.timestamp);
+    
+    // Clear container and add the header if we have pending messages
+    if (sortedMessages.length > 0) {
+        pendingContainer.innerHTML = `
+            <div class="pending-messages-header">
+                <h3>Pending Child Messages (${sortedMessages.length})</h3>
+                <div class="pending-action-buttons">
+                    <button id="selectAllPendingBtn" class="select-all-button">Select All</button>
+                    <button id="unselectAllPendingBtn" class="unselect-all-button">Unselect All</button>
+                </div>
+            </div>
+            <div class="pending-messages-list">
+                ${sortedMessages.map(renderPendingChildMessage).join('')}
+            </div>
+        `;
+        pendingContainer.style.display = 'block';
+        
+        // Add event listeners for select/unselect all buttons
+        document.getElementById('selectAllPendingBtn').addEventListener('click', () => toggleAllPendingMessages(true));
+        document.getElementById('unselectAllPendingBtn').addEventListener('click', () => toggleAllPendingMessages(false));
+    } else {
+        pendingContainer.style.display = 'none';
+        pendingContainer.innerHTML = '';
+    }
+}
+
+function renderPendingChildMessage(message) {
+    // Determine if HTML content should be shown
+    const hasHtml = message.html && message.html.trim() !== '';
+    const messageContent = hasHtml ? sanitizeHTML(message.html) : formatMessageContent(message.text);
+    
+    return `
+        <div class="pending-child-message ${message.selected ? 'selected' : ''}" data-message-id="${message.id}">
+            <div class="pending-child-header">
+                <div class="pending-child-info">
+                    <span class="child-actor-id">${message.child_id}</span>
+                    <div class="pending-message-actions">
+                        <label class="toggle-container">
+                            <input type="checkbox" class="toggle-inclusion" 
+                                ${message.selected ? 'checked' : ''}
+                                onchange="togglePendingMessage('${message.id}', this.checked)">
+                            <span class="toggle-label">Include</span>
+                        </label>
+                        <button class="remove-pending-btn" onclick="removePendingMessage('${message.id}')">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 6L6 18M6 6l12 12"></path>
+                            </svg>
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="pending-child-content">
+                ${hasHtml ? 
+                `<div class="child-html-content">${messageContent}</div>` : 
+                `<div class="message-content">${messageContent}</div>`}
+            </div>
+        </div>
+    `;
+}
+
+// Toggle a specific pending message's inclusion state
+function togglePendingMessage(messageId, selected) {
+    console.log(`Toggling message ${messageId} to ${selected}`);
+    sendWebSocketMessage({
+        type: 'toggle_pending_child_message',
+        message_id: messageId,
+        selected: selected
+    });
+}
+
+// Toggle all pending messages' inclusion state
+function toggleAllPendingMessages(selected) {
+    console.log(`Toggling all pending messages to ${selected}`);
+    pendingChildMessages.forEach(message => {
+        if (message.selected !== selected) {
+            togglePendingMessage(message.id, selected);
+        }
+    });
+}
+
+// Remove a pending message
+function removePendingMessage(messageId) {
+    console.log(`Removing pending message ${messageId}`);
+    sendWebSocketMessage({
+        type: 'remove_pending_child_message',
+        message_id: messageId
+    });
+}// State management
 let messageChain = [];
 let currentHead = null;
 let currentChatId = null;
 let chats = [];
 let availableChildren = [];
 let runningChildren = [];
+let pendingChildMessages = [];
 let ws = null;
 let reconnectAttempts = 0;
 let totalCost = 0;
@@ -128,6 +237,13 @@ function handleWebSocketMessage(data) {
             if (data.message) {
                 handleNewMessage(data.message);
                 // The generate button state is handled in handleNewMessage
+            }
+            break;
+            
+        case 'pending_child_messages_update':
+            if (data.pending_messages) {
+                pendingChildMessages = data.pending_messages;
+                renderPendingChildMessages();
             }
             break;
             
