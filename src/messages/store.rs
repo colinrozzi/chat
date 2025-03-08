@@ -77,7 +77,11 @@ impl MessageStore {
         };
 
         // Store the content in the runtime store
-        store::store_with_hash(&self.store_id, &content_ref, &content)?;
+        store::store(&self.store_id, &content)?;
+        
+        // We don't actually need to store with hash since we already have the hash
+        // Just label the content with the provided ID
+        store::label(&self.store_id, &content_ref.hash, &content_ref)?;
         log(&format!("Stored message with specific hash: {}", content_ref.hash));
 
         // Get the current chat info (but don't update head in this case)

@@ -273,8 +273,9 @@ impl State {
         }
 
         // Add user message to chain with all parents
+        let parents_clone = parents.clone();
         self.add_to_chain(MessageData::Chat(msg), parents);
-
+        
         // Add all selected pending child messages to the chain
         for child_id in selected_child_messages {
             if let Some(pcm) = self.pending_child_messages.remove(&child_id) {
@@ -283,7 +284,7 @@ impl State {
                 // Create a ChainEntry for this child message and save it
                 let chat_id = self.current_chat_id.clone().unwrap();
                 let entry = ChainEntry {
-                    parents: parents.clone(), // Same parents as the user message
+                    parents: parents_clone.clone(), // Same parents as the user message
                     id: Some(child_id),
                     data: MessageData::ChildMessage(pcm.message.clone()),
                 };
@@ -329,7 +330,8 @@ impl State {
                 log(&format!("Generated completion: {:?}", assistant_msg));
                 
                 // Add LLM response to chain with all parents
-                self.add_to_chain(MessageData::Chat(assistant_msg), parents.clone());
+                let parents_clone = parents.clone();
+                self.add_to_chain(MessageData::Chat(assistant_msg), parents);
                 
                 // Add all selected pending child messages to the chain
                 for child_id in selected_child_messages {
@@ -339,7 +341,7 @@ impl State {
                         // Create a ChainEntry for this child message and save it
                         let chat_id = self.current_chat_id.clone().unwrap();
                         let entry = ChainEntry {
-                            parents: parents.clone(), // Same parents as the assistant message
+                            parents: parents_clone.clone(), // Same parents as the assistant message
                             id: Some(child_id),
                             data: MessageData::ChildMessage(pcm.message.clone()),
                         };
@@ -412,7 +414,14 @@ impl State {
                     let child_response: ChildMessage = serde_json::from_slice(&response).unwrap();
                 // For Claude integration, we always use the text field even if HTML is present
                     if !child_response.text.is_empty() {
-                        self.add_to_chain(MessageData::ChildMessage(child_response));
+                        if let Ok(head) = self.store.get_head() {
+                            let parents = if let Some(entry) = head {
+                                vec![entry.id.unwrap()]
+                            } else {
+                                vec![]
+                            };
+                            self.add_to_chain(MessageData::ChildMessage(child_response), parents);
+                        }
                     }
                 }
                 Err(e) => {
@@ -781,10 +790,17 @@ impl State {
             }))?,
         ) {
             log(&format!("Child response: {:?}", response));
+            // Get current head for the chat
+            let parents = if let Some(ref head) = chat_info.head {
+                vec![head.clone()]
+            } else {
+                vec![]
+            };
+
             // Add the child message directly to the chain
             let child_response: ChildMessage = serde_json::from_slice(&response)?;
             if !child_response.text.is_empty() {
-                self.add_to_chain(MessageData::ChildMessage(child_response));
+                self.add_to_chain(MessageData::ChildMessage(child_response), parents);
             }
         }
 
