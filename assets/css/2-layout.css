@@ -1,0 +1,183 @@
+/* Layout styles */
+.app {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) 1fr var(--sidebar-width);
+    height: 100vh;
+    background: var(--bg-primary);
+    transition: grid-template-columns 0.3s ease;
+}
+
+/* When chat sidebar is collapsed */
+.app:has(.chat-sidebar.collapsed) {
+    grid-template-columns: 0 1fr var(--sidebar-width);
+}
+
+/* When actor panel is collapsed */
+.app:has(.actor-panel.collapsed) {
+    grid-template-columns: var(--sidebar-width) 1fr 0;
+}
+
+/* When both sidebars are collapsed */
+.app:has(.chat-sidebar.collapsed):has(.actor-panel.collapsed) {
+    grid-template-columns: 0 1fr 0;
+}
+
+/* Chat Container */
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--bg-secondary);
+    position: relative;
+}
+
+/* Custom scrollbars */
+.messages-container::-webkit-scrollbar, 
+.sidebar-content::-webkit-scrollbar, 
+.panel-content::-webkit-scrollbar,
+.section-content::-webkit-scrollbar,
+.child-message-content.expanded::-webkit-scrollbar,
+.pending-messages-list::-webkit-scrollbar,
+.chat-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.messages-container::-webkit-scrollbar-track, 
+.sidebar-content::-webkit-scrollbar-track, 
+.panel-content::-webkit-scrollbar-track,
+.section-content::-webkit-scrollbar-track,
+.child-message-content.expanded::-webkit-scrollbar-track,
+.pending-messages-list::-webkit-scrollbar-track,
+.chat-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.messages-container::-webkit-scrollbar-thumb, 
+.sidebar-content::-webkit-scrollbar-thumb, 
+.panel-content::-webkit-scrollbar-thumb,
+.section-content::-webkit-scrollbar-thumb,
+.child-message-content.expanded::-webkit-scrollbar-thumb,
+.pending-messages-list::-webkit-scrollbar-thumb,
+.chat-list::-webkit-scrollbar-thumb {
+    background-color: var(--text-muted);
+    border-radius: 10px;
+    border: 2px solid transparent;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover, 
+.sidebar-content::-webkit-scrollbar-thumb:hover, 
+.panel-content::-webkit-scrollbar-thumb:hover,
+.section-content::-webkit-scrollbar-thumb:hover,
+.child-message-content.expanded::-webkit-scrollbar-thumb:hover,
+.pending-messages-list::-webkit-scrollbar-thumb:hover,
+.chat-list::-webkit-scrollbar-thumb:hover {
+    background-color: var(--text-secondary);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .app {
+        grid-template-columns: var(--sidebar-width) 1fr 0;
+    }
+    
+    .actor-panel {
+        position: fixed;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        z-index: 30;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+    
+    .expand-button {
+        display: flex;
+    }
+}
+
+@media (max-width: 768px) {
+    :root {
+        --sidebar-width: 85vw;
+    }
+    
+    .app {
+        grid-template-columns: 0 1fr 0;
+    }
+    
+    .chat-sidebar, .actor-panel {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        z-index: 40;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+    
+    .chat-sidebar {
+        left: 0;
+        transform: translateX(-100%);
+    }
+    
+    .actor-panel {
+        right: 0;
+        transform: translateX(100%);
+    }
+    
+    .expand-chat-sidebar-button {
+        display: flex;
+    }
+    
+    .message {
+        max-width: 90%;
+    }
+    
+    .message-action-button span {
+        display: none;
+    }
+    
+    .message-action-button svg {
+        margin-right: 0;
+    }
+    
+    .message-actions {
+        padding: 0.15rem;
+    }
+    
+    .message.small .message-actions {
+        right: 0.25rem;
+        top: 0.25rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .header {
+        padding: 0 1rem 0 3rem; /* Keep left padding for expand button */
+    }
+    
+    .header-content {
+        flex-wrap: wrap;
+    }
+    
+    .connection-status, .head-id {
+        display: none;
+    }
+    
+    .messages-container {
+        padding: 1rem;
+    }
+    
+    .input-container {
+        padding: 1rem;
+    }
+    
+    .message {
+        max-width: 95%;
+        padding: 0.875rem;
+    }
+    
+    .input-wrapper {
+        flex-direction: column;
+    }
+    
+    .send-button, .generate-button {
+        width: 100%;
+    }
+}
