@@ -412,7 +412,7 @@ impl State {
         };
 
         for (actor_id, _) in chat_children.iter() {
-            log(&format!("Notifying child: {}", actor_id));
+            log(&format!("[DEBUG] Notifying child: {}", actor_id));
 
             let response = request(
                 actor_id,
@@ -428,15 +428,30 @@ impl State {
             match response {
                 Ok(response) => {
                     let child_response: ChildMessage = serde_json::from_slice(&response).unwrap();
-                // For Claude integration, we always use the text field even if HTML is present
+                    // For Claude integration, we always use the text field even if HTML is present
                     if !child_response.text.is_empty() {
-                        if let Ok(head) = self.store.get_head() {
-                            let parents = if let Some(entry) = head {
-                                vec![entry.id.unwrap()]
-                            } else {
-                                vec![]
-                            };
+                        // First check if child response has an explicit parent_id field
+                        if let Some(parent_id) = child_response.parent_id.as_ref() {
+                            log(&format!("[DEBUG] Using explicit parent_id from child message: {}", parent_id));
+                            let parents = vec![parent_id.clone()];
                             self.add_to_chain(MessageData::ChildMessage(child_response), parents);
+                        }
+                        // Fallback to checking data.parent_id for backward compatibility
+                        else if let Some(parent_id) = child_response.data.get("parent_id").and_then(|v| v.as_str()) {
+                            log(&format!("[DEBUG] Using parent_id from child message data: {}", parent_id));
+                            let parents = vec![parent_id.to_string()];
+                            self.add_to_chain(MessageData::ChildMessage(child_response), parents);
+                        } else {
+                            // Fallback to using current head as parent
+                            log("[WARN] Child message doesn't contain parent_id, using current head as fallback");
+                            if let Some(head_id) = &current_head {
+                                let parents = vec![head_id.clone()];
+                                self.add_to_chain(MessageData::ChildMessage(child_response), parents);
+                            } else {
+                                log("[ERROR] No head available for parent reference, using empty parents");
+                                // Last resort - use empty parents array, but this may break the DAG structure
+                                self.add_to_chain(MessageData::ChildMessage(child_response), vec![]);
+                            }
                         }
                     }
                 }

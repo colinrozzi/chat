@@ -67,6 +67,7 @@ When responding to messages, child actors should return a `ChildMessage` structu
   "child_id": "your-actor-id",
   "text": "Plain text description or message",
   "html": "<div>Optional HTML content to display</div>",
+  "parent_id": "message-id-this-is-responding-to",  // CRITICAL: Always include this!
   "data": {
     "key1": "value1",
     "key2": "value2"
@@ -80,7 +81,10 @@ When responding to messages, child actors should return a `ChildMessage` structu
 - **child_id**: The unique identifier of your actor (will be provided during initialization)
 - **text**: Plain text content that will be shown if HTML is not available or used for Claude's context
 - **html**: (Optional) HTML content that will be rendered in the chat interface
-- **data**: (Optional) Any structured data that might be relevant or useful for debugging
+- **parent_id**: (REQUIRED) The ID of the message this is responding to (usually the head ID from the most recent head-update message)
+- **data**: (Optional) Any other structured data that might be relevant or useful
+
+> **⚠️ IMPORTANT**: Always include the `parent_id` field! This maintains the message chain structure. Without it, messages may disappear from the chat UI after your actor responds.
 
 ## HTML Content Support
 
@@ -234,6 +238,7 @@ struct ChildMessage {
     child_id: String,
     text: String,
     html: Option<String>,
+    parent_id: Option<String>,  // New field for parent reference
     data: Value,
 }
 
@@ -261,12 +266,18 @@ fn handle_message(message: Value) -> ChildMessage {
                     // Store the actor ID from the introduction
                     let actor_id = intro_msg.child_id.clone();
                     
+                    // Store head ID for later use
+                    let head_id = intro_msg.head.clone();
+                    
                     // Return a welcome message with both text and HTML
                     return ChildMessage {
                         child_id: actor_id,
                         text: "Hello! I'm your helper actor.",
                         html: Some("<div><h3>Hello!</h3><p>I'm your <strong>helper</strong> actor.</p></div>".to_string()),
-                        data: json!({"status": "initialized"}),
+                        parent_id: head_id,  // Include parent_id as top-level field
+                        data: json!({
+                            "status": "initialized"
+                        }),
                     };
                 }
             },
@@ -283,7 +294,10 @@ fn handle_message(message: Value) -> ChildMessage {
                             child_id: "your-actor-id", // Use stored actor ID here
                             text: "I processed your message",
                             html: Some("<div><p>I processed your message</p><table><tr><th>Result</th><td>Success</td></tr></table></div>".to_string()),
-                            data: json!({"message_id": head_id}),
+                            parent_id: Some(head_id),  // CRITICAL: Always include the head ID as parent_id
+                            data: json!({
+                                "message_id": head_id
+                            }),
                         };
                     }
                 }
@@ -299,6 +313,7 @@ fn handle_message(message: Value) -> ChildMessage {
         child_id: "your-actor-id".to_string(),
         text: "".to_string(),
         html: None,
+        parent_id: None,  // No parent reference for default response
         data: json!({}),
     }
 }
@@ -430,7 +445,12 @@ ChildMessage {
 
 ## Best Practices
 
-1. **Always provide both text and HTML**
+1. **Always include the parent_id**
+   - The `parent_id` field in your response data is critical
+   - It should be set to the head ID from the latest head-update message
+   - Without this, the message chain breaks and messages may disappear
+
+2. **Always provide both text and HTML**
    - Text is used for Claude's context and as a fallback
    - HTML provides rich visual representation
 
@@ -484,7 +504,12 @@ To deploy your child actor:
 
 ### Common Issues
 
-1. **Actor doesn't appear in the available list**
+1. **Messages disappear after your actor responds**
+   - This is almost always because you're not including the `parent_id` in your response data
+   - Make sure to store the head ID from head-update messages and include it as the parent_id
+   - Check that your actor correctly handles the parent-child relationship
+
+2. **Actor doesn't appear in the available list**
    - Check that your manifest file is correctly formatted
    - Ensure the component_path in your manifest is correct
 

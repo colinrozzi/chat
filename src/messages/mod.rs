@@ -43,6 +43,7 @@ pub struct ChildMessage {
     pub child_id: String,
     pub text: String,
     pub html: Option<String>,  // New field for HTML content
+    pub parent_id: Option<String>, // New field for parent message reference
     pub data: Value,
 }
 
