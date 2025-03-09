@@ -1,9 +1,0 @@
-/* Main CSS file that imports all modules */
-
-/* Direct HTML imports with full paths for direct file serving */
-@import url('1-variables.css');
-@import url('2-layout.css');
-@import url('3-sidebars.css');
-@import url('4-messages.css');
-@import url('5-header-input.css');
-@import url('6-animations.css');
