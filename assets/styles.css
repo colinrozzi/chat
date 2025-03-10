@@ -3,25 +3,27 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-    /* Updated Core Colors - More modern dark mode palette */
-    --bg-primary: #121218;
-    --bg-secondary: #1E1E2A;
-    --bg-tertiary: #282836;
+
+
+  /* Core Colors */
+    --bg-primary: #1A1C23;
+    --bg-secondary: #242731;
+    --bg-tertiary: #2A2D39;
     
-    /* Updated Accent Colors - More vibrant primary accent */
-    --accent-primary: #7C5DFA;
-    --accent-hover: #9277FF;
-    --accent-muted: rgba(124, 93, 250, 0.1);
+    /* Accent Colors */
+    --accent-primary: #6366F1;
+    --accent-hover: #818CF8;
+    --accent-muted: rgba(99, 102, 241, 0.1);
     
-    /* Updated Status Colors - Slightly more vibrant */
-    --success: #26D07C;
-    --error: #FF5C5C;
-    --warning: #FFB648;
+    /* Status Colors */
+    --success: #10B981;
+    --error: #EF4444;
+    --warning: #F59E0B;
     
-    /* Updated Text Colors - Improved contrast */
-    --text-primary: #F9FAFC;
-    --text-secondary: #B3B9C9;
-    --text-muted: #7E85A1;
+    /* Text Colors */
+    --text-primary: #F3F4F6;
+    --text-secondary: #9CA3AF;
+    --text-muted: #6B7280;
     
     /* Borders */
     --border-color: rgba(255, 255, 255, 0.1);
