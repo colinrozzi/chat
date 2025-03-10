@@ -1,5 +1,5 @@
 {
-    "name": "hello-world",
+    "name": "chat",
     "permissions": ["read", "write"],
     "store_id": "97c64bc1-cae6-45c8-8a59-7c0ceec9a2c4"
 }

@@ -1,0 +1,22 @@
+name = "chat virtual filesytem child"
+version = "0.1.0"
+description = "virtualized filesystem child actor for chat"
+component_path = "/Users/colinrozzi/work/actors/virt-fs-child/target/wasm32-unknown-unknown/release/virt_fs_child.wasm"
+init_state = "/Users/colinrozzi/work/actors/chat/assets/children/chat-virt-fs-child.json"
+
+[interface]
+implements = "ntwk:theater/single-actor"
+requires = []
+
+[[handlers]]
+type = "runtime"
+config = {}
+
+[[handlers]]
+type = "store"
+config = {}
+
+[[handlers]]
+type = "supervisor"
+config = {}
+
