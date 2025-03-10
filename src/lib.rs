@@ -28,6 +28,7 @@ struct InitData {
     head: Option<String>,
     websocket_port: u16,
     store_id: Option<String>,
+    anthropic_api_key: String,
 }
 
 struct Component;
@@ -97,16 +98,6 @@ impl ActorGuest for Component {
         let init_data: InitData = serde_json::from_slice(&data).unwrap();
         log("Init data deserialized");
 
-        // Read API key
-        log("Reading API key");
-        let api_key = match read_file("api-key.txt") {
-            Ok(content) => String::from_utf8(content).unwrap().trim().to_string(),
-            Err(_) => {
-                log("Failed to read API key");
-                return Err("Failed to read API key".to_string());
-            }
-        };
-
         // Create a new runtime store
         log("Creating runtime store");
         let store_id: String;
@@ -128,7 +119,7 @@ impl ActorGuest for Component {
         let initial_state = State::new(
             id,
             store_id,
-            api_key,
+            init_data.anthropic_api_key,
             server_id,
             init_data.websocket_port,
             init_data.head,

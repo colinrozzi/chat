@@ -2,7 +2,7 @@ name = "chat"
 version = "0.1.0"
 description = "chat actor for LLM chat application"
 component_path = "/Users/colinrozzi/work/actors/chat/target/wasm32-unknown-unknown/release/chat.wasm"
-init_state = "/Users/colinrozzi/work/actors/chat/assets/init.json"
+init_state = "/Users/colinrozzi/work/actors/chat/init.json"
 
 [interface]
 implements = "ntwk:theater/single-actor"
