@@ -101,6 +101,7 @@ impl ActorGuest for Component {
         log("Data unwrapped");
         let init_data: InitData = serde_json::from_slice(&data).unwrap();
         log("Init data deserialized");
+        log(&format!("Init data: {:?}", init_data));
 
         // Create a new runtime store
         log("Creating runtime store");
