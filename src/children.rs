@@ -1,4 +1,4 @@
-use crate::fs::FileSystem;
+use crate::fs::ContentFS;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -8,7 +8,7 @@ pub struct ChildInfo {
     pub manifest_name: String,
 }
 
-pub fn scan_available_children(filesystem: &dyn FileSystem) -> Vec<ChildInfo> {
+pub fn scan_available_children(filesystem: &ContentFS) -> Vec<ChildInfo> {
     let mut children = Vec::new();
 
     // List all files in the children directory relative to our assets root

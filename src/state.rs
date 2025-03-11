@@ -2,7 +2,7 @@ use crate::api::claude::ClaudeClient;
 use crate::bindings::ntwk::theater::message_server_host::request;
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::bindings::ntwk::theater::supervisor::spawn;
-use crate::fs::{ContentFS, FileSystem};
+use crate::fs::ContentFS;
 use crate::messages::store::MessageStore;
 use crate::messages::{ChainEntry, ChatInfo, ChildMessage, Message, MessageData};
 use serde::{Deserialize, Serialize};
@@ -38,8 +38,8 @@ pub struct State {
     pub children: HashMap<String, ChildActor>, // Global children (legacy)
     pub actor_messages: HashMap<String, Vec<u8>>,
     pub pending_child_messages: HashMap<String, PendingChildMessage>, // Pending child messages (not committed to chain)
-    #[serde(skip, default = "crate::fs::default_filesystem")]
-    pub filesystem: Arc<dyn FileSystem>, // Content filesystem
+    #[serde(skip)]
+    pub filesystem: Arc<ContentFS>, // Content filesystem
 }
 
 impl State {
@@ -820,13 +820,20 @@ impl State {
 
         let chat_id = self.current_chat_id.clone().unwrap();
         log(&format!("[DEBUG] Using chat ID: {}", chat_id));
-        let manifest_path = format!(
-            "/Users/colinrozzi/work/actors/chat/assets/children/{}.toml",
-            manifest_name
-        );
+        // Read the manifest using content-fs
+        let manifest_path = format!("children/{}.toml", manifest_name);
+        let manifest_content = match self.filesystem.read_file(&manifest_path) {
+            Ok(content) => content,
+            Err(e) => return Err(format!("Failed to read manifest file: {}", e).into()),
+        };
+        
+        // Create a temporary file for spawning
+        use crate::bindings::ntwk::theater::filesystem::write_file;
+        let temp_path = format!("/tmp/spawn-manifest-{}.toml", manifest_name);
+        write_file(&temp_path, &manifest_content)?;
 
-        log(&format!("[DEBUG] Spawning actor from manifest: {}", manifest_path));
-        let actor_id = spawn(&manifest_path, None)?;
+        log(&format!("[DEBUG] Spawning actor from manifest: {}", temp_path));
+        let actor_id = spawn(&temp_path, None)?;
         log(&format!("[DEBUG] Actor spawned with ID: {}", actor_id));
 
         // Create a child actor record

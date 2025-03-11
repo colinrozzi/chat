@@ -1,74 +1,20 @@
-// File system interface for runtime-content-fs
-mod default;
-pub use default::{DefaultFileSystem, default_filesystem};
+// File system client for runtime-content-fs
 use std::sync::Arc;
-use serde_json::Value;
-
-// Common interface for filesystem operations
-pub trait FileSystem: Send + Sync + std::fmt::Debug {
-    fn read_file(&self, path: &str) -> Result<Vec<u8>, String>;
-    fn write_file(&self, path: &str, content: &[u8]) -> Result<(), String>;
-    fn list_directory(&self, path: &str) -> Result<Vec<String>, String>;
-    fn create_directory(&self, path: &str) -> Result<(), String>;
-    fn get_info(&self, path: &str) -> Result<Option<FileInfo>, String>;
-    fn exists(&self, path: &str) -> Result<bool, String>;
-}
-
-// File/directory info structure
-pub struct FileInfo {
-    pub size: usize,
-    pub is_directory: bool,
-}
-
-// Implementation of ContentFS
+use crate::bindings::ntwk::theater::message_server_host::request;
 use crate::bindings::ntwk::theater::runtime::log;
-use serde_json::json;
+use serde_json::{json, Value};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContentFS {
     actor_id: String,
 }
 
 impl ContentFS {
-    pub fn new(actor_id: String) -> Arc<dyn FileSystem> {
+    pub fn new(actor_id: String) -> Arc<ContentFS> {
         Arc::new(Self { actor_id })
     }
     
-    fn send_request(&self, action: &str, params: serde_json::Value) -> Result<serde_json::Value, String> {
-        let request = json!({
-            "action": action,
-            "params": params
-        });
-        
-        let request_bytes = serde_json::to_vec(&request)
-            .map_err(|e| format!("Failed to serialize request: {}", e))?;
-            
-        // Send request to runtime-content-fs actor
-        let response_bytes = crate::bindings::ntwk::theater::message_server_host::request(&self.actor_id, &request_bytes)
-            .map_err(|e| format!("Request to content-fs failed: {}", e))?;
-            
-        // Parse the response
-        let response: serde_json::Value = serde_json::from_slice(&response_bytes)
-            .map_err(|e| format!("Failed to parse response: {}", e))?;
-            
-        // Check for errors
-        if response.get("status").and_then(|s| s.as_str()) == Some("error") {
-            let error_msg = response.get("error")
-                .and_then(|e| e.as_str())
-                .unwrap_or("Unknown error")
-                .to_string();
-            return Err(error_msg);
-        }
-        
-        // Return the data field
-        Ok(response.get("data")
-            .cloned()
-            .unwrap_or(Value::Null))
-    }
-}
-
-impl FileSystem for ContentFS {
-    fn read_file(&self, path: &str) -> Result<Vec<u8>, String> {
+    pub fn read_file(&self, path: &str) -> Result<Vec<u8>, String> {
         let params = json!({
             "path": path
         });
@@ -84,7 +30,7 @@ impl FileSystem for ContentFS {
         Ok(content.as_bytes().to_vec())
     }
     
-    fn write_file(&self, path: &str, content: &[u8]) -> Result<(), String> {
+    pub fn write_file(&self, path: &str, content: &[u8]) -> Result<(), String> {
         let content_str = String::from_utf8_lossy(content).to_string();
         
         let params = json!({
@@ -98,7 +44,7 @@ impl FileSystem for ContentFS {
         Ok(())
     }
     
-    fn list_directory(&self, path: &str) -> Result<Vec<String>, String> {
+    pub fn list_directory(&self, path: &str) -> Result<Vec<String>, String> {
         let params = json!({
             "path": path
         });
@@ -121,7 +67,7 @@ impl FileSystem for ContentFS {
         Ok(result)
     }
     
-    fn create_directory(&self, path: &str) -> Result<(), String> {
+    pub fn create_directory(&self, path: &str) -> Result<(), String> {
         let params = json!({
             "path": path
         });
@@ -132,7 +78,7 @@ impl FileSystem for ContentFS {
         Ok(())
     }
     
-    fn get_info(&self, path: &str) -> Result<Option<FileInfo>, String> {
+    pub fn get_info(&self, path: &str) -> Result<Option<FileInfo>, String> {
         // First try to see if this exists at all
         if !self.exists(path)? {
             return Ok(None);
@@ -163,7 +109,7 @@ impl FileSystem for ContentFS {
         }
     }
     
-    fn exists(&self, path: &str) -> Result<bool, String> {
+    pub fn exists(&self, path: &str) -> Result<bool, String> {
         // Try listing as directory first
         match self.list_directory(path) {
             Ok(_) => return Ok(true),
@@ -176,4 +122,43 @@ impl FileSystem for ContentFS {
             }
         }
     }
+    
+    fn send_request(&self, action: &str, params: Value) -> Result<Value, String> {
+        let request = json!({
+            "action": action,
+            "params": params
+        });
+        
+        let request_bytes = serde_json::to_vec(&request)
+            .map_err(|e| format!("Failed to serialize request: {}", e))?;
+            
+        // Send request to runtime-content-fs actor
+        let response_bytes = request(&self.actor_id, &request_bytes)
+            .map_err(|e| format!("Request to content-fs failed: {}", e))?;
+            
+        // Parse the response
+        let response: Value = serde_json::from_slice(&response_bytes)
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
+            
+        // Check for errors
+        if response.get("status").and_then(|s| s.as_str()) == Some("error") {
+            let error_msg = response.get("error")
+                .and_then(|e| e.as_str())
+                .unwrap_or("Unknown error")
+                .to_string();
+            return Err(error_msg);
+        }
+        
+        // Return the data field
+        Ok(response.get("data")
+            .cloned()
+            .unwrap_or(Value::Null))
+    }
+}
+
+/// File/directory info structure
+#[derive(Debug, Clone)]
+pub struct FileInfo {
+    pub size: usize,
+    pub is_directory: bool,
 }
