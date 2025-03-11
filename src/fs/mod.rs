@@ -1,6 +1,8 @@
 // File system interface for runtime-content-fs
 mod default;
+pub use default::{DefaultFileSystem, default_filesystem};
 use std::sync::Arc;
+use serde_json::Value;
 
 // Common interface for filesystem operations
 pub trait FileSystem: Send + Sync + std::fmt::Debug {

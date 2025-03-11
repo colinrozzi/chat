@@ -7,10 +7,10 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct DefaultFileSystem;
 
-impl Default for Arc<dyn FileSystem> {
-    fn default() -> Self {
-        Arc::new(DefaultFileSystem)
-    }
+// Note: We cannot implement Default for Arc<dyn FileSystem> directly
+// Instead, this function will be used by users of this module
+pub fn default_filesystem() -> Arc<dyn FileSystem> {
+    Arc::new(DefaultFileSystem)
 }
 
 impl fmt::Debug for DefaultFileSystem {
