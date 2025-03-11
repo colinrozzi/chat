@@ -1,12 +1,19 @@
 // File system client for runtime-content-fs
 use std::sync::Arc;
-use crate::bindings::ntwk::theater::message_server_host::request;
-use crate::bindings::ntwk::theater::runtime::log;
 use serde_json::{json, Value};
+use crate::bindings::ntwk::theater::runtime::log;
 
 #[derive(Debug, Clone)]
 pub struct ContentFS {
     actor_id: String,
+}
+
+impl Default for ContentFS {
+    fn default() -> Self {
+        Self {
+            actor_id: "default".to_string()
+        }
+    }
 }
 
 impl ContentFS {
@@ -133,7 +140,7 @@ impl ContentFS {
             .map_err(|e| format!("Failed to serialize request: {}", e))?;
             
         // Send request to runtime-content-fs actor
-        let response_bytes = request(&self.actor_id, &request_bytes)
+        let response_bytes = crate::bindings::ntwk::theater::message_server_host::request(&self.actor_id, &request_bytes)
             .map_err(|e| format!("Request to content-fs failed: {}", e))?;
             
         // Parse the response

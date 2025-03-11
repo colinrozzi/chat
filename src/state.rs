@@ -38,7 +38,7 @@ pub struct State {
     pub children: HashMap<String, ChildActor>, // Global children (legacy)
     pub actor_messages: HashMap<String, Vec<u8>>,
     pub pending_child_messages: HashMap<String, PendingChildMessage>, // Pending child messages (not committed to chain)
-    #[serde(skip)]
+    #[serde(skip, default)]
     pub filesystem: Arc<ContentFS>, // Content filesystem
 }
 
@@ -830,7 +830,8 @@ impl State {
         // Create a temporary file for spawning
         use crate::bindings::ntwk::theater::filesystem::write_file;
         let temp_path = format!("/tmp/spawn-manifest-{}.toml", manifest_name);
-        write_file(&temp_path, &manifest_content)?;
+        let manifest_content_str = String::from_utf8_lossy(&manifest_content).to_string();
+        write_file(&temp_path, &manifest_content_str)?;
 
         log(&format!("[DEBUG] Spawning actor from manifest: {}", temp_path));
         let actor_id = spawn(&temp_path, None)?;

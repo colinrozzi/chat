@@ -13,9 +13,9 @@ type = "runtime"
 config = {}
 
 # We no longer need the filesystem handler since we're using runtime-content-fs!
-# [[handlers]]
-# type = "filesystem"
-# config = { path = "/Users/colinrozzi/work/actors/chat/assets"}
+[[handlers]]
+type = "filesystem"
+config = { path = "/Users/colinrozzi/work/actors/chat/assets"}
 
 [[handlers]]
 type = "store"
