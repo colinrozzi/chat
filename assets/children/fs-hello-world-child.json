@@ -1,5 +1,0 @@
-{
-    "name": "fs-http-child",
-    "base_path": ".",
-    "permissions": ["read", "write"] 
-}

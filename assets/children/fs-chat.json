@@ -1,5 +1,0 @@
-{
-    "name": "chat",
-    "base_path": ".",
-    "permissions": ["read", "write"] 
-}

@@ -119,7 +119,11 @@ pub fn handle_message(
                                 command["message_id"].as_str(),
                                 command["selected"].as_bool(),
                             ) {
-                                handle_toggle_pending_child_message(&mut current_state, message_id, selected)
+                                handle_toggle_pending_child_message(
+                                    &mut current_state,
+                                    message_id,
+                                    selected,
+                                )
                             } else {
                                 default_response(&current_state)
                             }
@@ -453,7 +457,7 @@ fn handle_delete_chat(
 fn handle_get_available_children(
     state: &State,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    let available_children = scan_available_children(&*state.filesystem)
+    let available_children = scan_available_children(&state.filesystem)
         .into_iter()
         .map(|child| {
             json!({
@@ -731,7 +735,7 @@ fn handle_get_pending_child_messages(
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     // The notification is already done by state.notify_pending_child_messages_update()
     let _ = state.notify_pending_child_messages_update();
-    
+
     Ok((
         Some(serde_json::to_vec(state).unwrap()),
         (WebsocketResponse {
@@ -750,9 +754,7 @@ fn handle_toggle_pending_child_message(
             // Return empty messages as the notification is already sent
             Ok((
                 Some(serde_json::to_vec(state).unwrap()),
-                (WebsocketResponse {
-                    messages: vec![],
-                },),
+                (WebsocketResponse { messages: vec![] },),
             ))
         }
         Err(e) => {
@@ -786,9 +788,7 @@ fn handle_remove_pending_child_message(
             // Return empty messages as the notification is already sent
             Ok((
                 Some(serde_json::to_vec(state).unwrap()),
-                (WebsocketResponse {
-                    messages: vec![],
-                },),
+                (WebsocketResponse { messages: vec![] },),
             ))
         }
         Err(e) => {
