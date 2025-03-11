@@ -35,9 +35,8 @@ fn serve_file(
     content_type: &str,
     state: &mut State,
 ) -> Result<(Option<Vec<u8>>, (ClientHttpResponse,)), String> {
-    use crate::bindings::ntwk::theater::filesystem::read_file;
-
-    match read_file(filename) {
+    // Use the ContentFS interface instead of direct filesystem access
+    match state.filesystem.read_file(filename) {
         Ok(content) => {
             let response = ClientHttpResponse {
                 status: 200,
@@ -57,9 +56,8 @@ fn serve_file(
 }
 
 fn serve_chat_js(state: &mut State) -> Result<(Option<Vec<u8>>, (ClientHttpResponse,)), String> {
-    use crate::bindings::ntwk::theater::filesystem::read_file;
-
-    match read_file("chat.js") {
+    // Use the ContentFS interface instead of direct filesystem access
+    match state.filesystem.read_file("chat.js") {
         Ok(content) => {
             // Convert content to string
             let content_str = String::from_utf8(content).unwrap_or_else(|_| "".to_string());

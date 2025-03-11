@@ -1,4 +1,4 @@
-use crate::bindings::ntwk::theater::filesystem::{list_files, read_file};
+use crate::fs::FileSystem;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -8,15 +8,15 @@ pub struct ChildInfo {
     pub manifest_name: String,
 }
 
-pub fn scan_available_children() -> Vec<ChildInfo> {
+pub fn scan_available_children(filesystem: &dyn FileSystem) -> Vec<ChildInfo> {
     let mut children = Vec::new();
 
     // List all files in the children directory relative to our assets root
-    if let Ok(files) = list_files("children") {
+    if let Ok(files) = filesystem.list_directory("children") {
         for file in files {
             // Only process .toml files
             if file.ends_with(".toml") {
-                if let Ok(content) = read_file(&format!("children/{}", file)) {
+                if let Ok(content) = filesystem.read_file(&format!("children/{}", file)) {
                     if let Ok(content_str) = String::from_utf8(content) {
                         if let Ok(manifest) = toml::from_str::<toml::Value>(&content_str) {
                             // Get base name without .toml extension for manifest_name
@@ -50,4 +50,3 @@ pub fn scan_available_children() -> Vec<ChildInfo> {
 
     children
 }
-

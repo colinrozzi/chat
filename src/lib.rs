@@ -1,6 +1,7 @@
 mod api;
 mod bindings;
 mod children;
+mod fs;
 mod handlers;
 mod messages;
 mod state;
@@ -29,6 +30,7 @@ struct InitData {
     websocket_port: u16,
     store_id: Option<String>,
     anthropic_api_key: String,
+    content_fs_actor_id: String,
 }
 
 struct Component;
@@ -115,7 +117,7 @@ impl ActorGuest for Component {
         let server_id = setup_http_server(init_data.websocket_port)?;
         log("HTTP server set up successfully");
 
-        // Initialize state
+        // Initialize state with content filesystem
         let initial_state = State::new(
             id,
             store_id,
@@ -123,6 +125,7 @@ impl ActorGuest for Component {
             server_id,
             init_data.websocket_port,
             init_data.head,
+            init_data.content_fs_actor_id,
         );
 
         log("State initialized");

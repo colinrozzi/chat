@@ -1,8 +1,8 @@
 name = "chat"
 version = "0.1.0"
-description = "chat actor for LLM chat application"
+description = "chat actor for LLM chat application using content-fs for storage"
 component_path = "/Users/colinrozzi/work/actors/chat/target/wasm32-unknown-unknown/release/chat.wasm"
-init_state = "/Users/colinrozzi/work/actors/chat/init.json"
+init_state = "/Users/colinrozzi/work/actors/chat/content-fs-init.json"
 
 [interface]
 implements = "ntwk:theater/single-actor"
@@ -12,9 +12,10 @@ requires = []
 type = "runtime"
 config = {}
 
-[[handlers]]
-type = "filesystem"
-config = { path = "/Users/colinrozzi/work/actors/chat/assets"}
+# We no longer need the filesystem handler since we're using runtime-content-fs!
+# [[handlers]]
+# type = "filesystem"
+# config = { path = "/Users/colinrozzi/work/actors/chat/assets"}
 
 [[handlers]]
 type = "store"

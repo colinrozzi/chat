@@ -2,12 +2,14 @@ use crate::api::claude::ClaudeClient;
 use crate::bindings::ntwk::theater::message_server_host::request;
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::bindings::ntwk::theater::supervisor::spawn;
+use crate::fs::{ContentFS, FileSystem};
 use crate::messages::store::MessageStore;
 use crate::messages::{ChainEntry, ChatInfo, ChildMessage, Message, MessageData};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::error::Error;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -36,6 +38,8 @@ pub struct State {
     pub children: HashMap<String, ChildActor>, // Global children (legacy)
     pub actor_messages: HashMap<String, Vec<u8>>,
     pub pending_child_messages: HashMap<String, PendingChildMessage>, // Pending child messages (not committed to chain)
+    #[serde(skip)]
+    pub filesystem: Arc<dyn FileSystem>, // Content filesystem
 }
 
 impl State {
@@ -46,7 +50,11 @@ impl State {
         server_id: u64,
         websocket_port: u16,
         head: Option<String>,
+        content_fs_actor_id: String,
     ) -> Self {
+        // Create content filesystem
+        let filesystem = ContentFS::new(content_fs_actor_id);
+        
         let mut state = Self {
             id,
             head,
@@ -59,6 +67,7 @@ impl State {
             children: HashMap::new(),
             actor_messages: HashMap::new(),
             pending_child_messages: HashMap::new(),
+            filesystem,
         };
 
         // Get the list of chats
@@ -895,7 +904,7 @@ impl State {
     }
 
     pub fn list_available_children(&self) -> Vec<crate::children::ChildInfo> {
-        crate::children::scan_available_children()
+        crate::children::scan_available_children(&*self.filesystem)
     }
 
     pub fn list_running_children(&self) -> Vec<serde_json::Value> {
