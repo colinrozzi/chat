@@ -1,9 +1,9 @@
 // File system interface for runtime-content-fs
+mod default;
 use std::sync::Arc;
-use serde_json::Value;
 
 // Common interface for filesystem operations
-pub trait FileSystem: Send + Sync {
+pub trait FileSystem: Send + Sync + std::fmt::Debug {
     fn read_file(&self, path: &str) -> Result<Vec<u8>, String>;
     fn write_file(&self, path: &str, content: &[u8]) -> Result<(), String>;
     fn list_directory(&self, path: &str) -> Result<Vec<String>, String>;
@@ -19,9 +19,8 @@ pub struct FileInfo {
 }
 
 // Implementation of ContentFS
-use crate::bindings::ntwk::theater::message_server_host::request;
 use crate::bindings::ntwk::theater::runtime::log;
-use serde_json::{json, Value};
+use serde_json::json;
 
 #[derive(Debug)]
 pub struct ContentFS {
@@ -33,7 +32,7 @@ impl ContentFS {
         Arc::new(Self { actor_id })
     }
     
-    fn send_request(&self, action: &str, params: Value) -> Result<Value, String> {
+    fn send_request(&self, action: &str, params: serde_json::Value) -> Result<serde_json::Value, String> {
         let request = json!({
             "action": action,
             "params": params
@@ -43,11 +42,11 @@ impl ContentFS {
             .map_err(|e| format!("Failed to serialize request: {}", e))?;
             
         // Send request to runtime-content-fs actor
-        let response_bytes = request(&self.actor_id, &request_bytes)
+        let response_bytes = crate::bindings::ntwk::theater::message_server_host::request(&self.actor_id, &request_bytes)
             .map_err(|e| format!("Request to content-fs failed: {}", e))?;
             
         // Parse the response
-        let response: Value = serde_json::from_slice(&response_bytes)
+        let response: serde_json::Value = serde_json::from_slice(&response_bytes)
             .map_err(|e| format!("Failed to parse response: {}", e))?;
             
         // Check for errors

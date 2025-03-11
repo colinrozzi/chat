@@ -39,6 +39,7 @@ pub struct State {
     pub actor_messages: HashMap<String, Vec<u8>>,
     pub pending_child_messages: HashMap<String, PendingChildMessage>, // Pending child messages (not committed to chain)
     #[serde(skip)]
+    #[serde(default)]
     pub filesystem: Arc<dyn FileSystem>, // Content filesystem
 }
 

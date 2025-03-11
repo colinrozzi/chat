@@ -453,7 +453,7 @@ fn handle_delete_chat(
 fn handle_get_available_children(
     state: &State,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    let available_children = scan_available_children()
+    let available_children = scan_available_children(&*state.filesystem)
         .into_iter()
         .map(|child| {
             json!({

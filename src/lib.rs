@@ -9,7 +9,6 @@ mod state;
 use bindings::exports::ntwk::theater::actor::Guest as ActorGuest;
 use bindings::exports::ntwk::theater::http_handlers::Guest as HttpHandlersGuest;
 use bindings::exports::ntwk::theater::message_server_client::Guest as MessageServerClientGuest;
-use bindings::ntwk::theater::filesystem::read_file;
 use bindings::ntwk::theater::http_client::HttpRequest as ClientHttpRequest;
 use bindings::ntwk::theater::http_framework::{
     add_route, create_server, enable_websocket, register_handler, start_server, ServerConfig,
