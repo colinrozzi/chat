@@ -1,5 +1,5 @@
 {
     "name": "chat-assets",
     "permissions": ["read", "write"],
-    "store_id": "68ce162e-b033-4953-bb10-f283b60cb0dc"
+    "runtime_content_fs": "d836da9d-18d3-4a18-a5c7-fed6b1fe4398"
 }

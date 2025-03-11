@@ -18,10 +18,12 @@ use bindings::ntwk::theater::http_types::{
 };
 use bindings::ntwk::theater::runtime::log;
 use bindings::ntwk::theater::store;
+use bindings::ntwk::theater::supervisor::spawn;
 use bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
 use state::State;
 
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct InitData {
@@ -29,7 +31,8 @@ struct InitData {
     websocket_port: u16,
     store_id: Option<String>,
     anthropic_api_key: String,
-    content_fs_actor_id: String,
+    assets_store_id: Option<String>,
+    assets_runtime_content_fs: Option<String>,
 }
 
 struct Component;
@@ -111,6 +114,23 @@ impl ActorGuest for Component {
             log(&format!("Created runtime store with ID: {}", store_id));
         }
 
+        let content_fs_actor_id;
+        if init_data.assets_runtime_content_fs.is_none() {
+            // Start runtime content fs actor
+            log("Starting runtime content fs actor");
+            let content_fs_init_data = json!({
+                "store_id": init_data.assets_store_id.unwrap(),
+                "name": "chat-assets"
+            });
+
+            content_fs_actor_id = spawn(
+                "/Users/colinrozzi/work/actors/runtime-content-fs/actor.toml",
+                Some(&serde_json::to_vec(&content_fs_init_data).unwrap()),
+            )?;
+        } else {
+            content_fs_actor_id = init_data.assets_runtime_content_fs.unwrap()
+        }
+
         // Set up the HTTP server
         log("Setting up HTTP server...");
         let server_id = setup_http_server(init_data.websocket_port)?;
@@ -124,7 +144,7 @@ impl ActorGuest for Component {
             server_id,
             init_data.websocket_port,
             init_data.head,
-            init_data.content_fs_actor_id,
+            content_fs_actor_id,
         );
 
         log("State initialized");
