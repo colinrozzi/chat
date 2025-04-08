@@ -5,6 +5,54 @@
 #[allow(dead_code, clippy::all)]
 pub mod ntwk {
     pub mod theater {
+        /// # Common Type Definitions
+        ///
+        /// Defines shared types used across multiple interfaces in the Theater system.
+        /// This interface serves as a central location for type definitions to ensure
+        /// consistency and avoid duplication.
+        ///
+        /// ## Purpose
+        ///
+        /// The types interface provides common data structures and type aliases used
+        /// throughout the Theater system. These types represent core concepts such as:
+        ///
+        /// - Actor state
+        /// - Message formats
+        /// - Event chain structures
+        /// - Identifiers
+        ///
+        /// By centralizing these definitions, the system maintains type consistency
+        /// across different interfaces and components.
+        ///
+        /// ## Example
+        ///
+        /// These types are typically imported and used in actor implementations:
+        ///
+        /// ```rust
+        /// use ntwk::theater::types::{state, json, actor_id};
+        ///
+        /// // Using the state type for actor state
+        /// fn process_state(current_state: state) -> Result<state, String> {
+        /// // Process the state
+        /// Ok(current_state)
+        /// }
+        ///
+        /// // Using the json type for serialized data
+        /// fn create_message() -> json {
+        /// serde_json::to_vec(&MyMessage { value: 42 }).unwrap()
+        /// }
+        ///
+        /// // Using actor-id for referring to actors
+        /// fn get_actor_info(id: actor_id) -> String {
+        /// format!("Info for actor {}", id)
+        /// }
+        /// ```
+        ///
+        /// ## Implementation Notes
+        ///
+        /// - Most types are designed to be serialization-format agnostic
+        /// - The `list<u8>` (byte array) representation allows for flexible serialization
+        /// - Actors typically use serde-compatible formats for serialization/deserialization
         /// Define a shared type for messages
         #[allow(dead_code, clippy::all)]
         pub mod types {
@@ -13,13 +61,36 @@ pub mod ntwk {
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             use super::super::super::_rt;
             /// Generic message type as bytes that can be serialized/deserialized
+            ///
+            /// Represents JSON-encoded data as a byte array. This type is used for
+            /// passing structured data between components that may need to be serialized
+            /// and deserialized.
             pub type Json = _rt::Vec<u8>;
+            /// Actor state represented as an optional byte array
+            ///
+            /// This type represents the current state of an actor. The state is:
+            /// - None when an actor is first initialized and has no state yet
+            /// - Some(bytes) containing serialized state data when the actor has state
             pub type State = Option<_rt::Vec<u8>>;
+            /// Unique identifier for an actor
+            ///
+            /// Actors are identified by string identifiers throughout the system. These
+            /// identifiers are typically UUIDs or other unique strings.
             pub type ActorId = _rt::String;
+            /// Unique identifier for a channel
+            ///
+            /// Channels are communication pathways between actors or between actors and
+            /// external systems. They are identified by string identifiers.
             pub type ChannelId = _rt::String;
+            /// Response to a channel connection request
+            ///
+            /// When an actor is asked to accept a channel connection, it responds with
+            /// this structure to indicate acceptance and provide an optional initial message.
             #[derive(Clone)]
             pub struct ChannelAccept {
+                /// Whether the channel connection was accepted
                 pub accepted: bool,
+                /// Optional initial message to send on the channel
                 pub message: Option<Json>,
             }
             impl ::core::fmt::Debug for ChannelAccept {
@@ -33,10 +104,17 @@ pub mod ntwk {
                         .finish()
                 }
             }
+            /// Core event structure
+            ///
+            /// Represents a single event in an actor's history, including its type,
+            /// parent reference, and associated data.
             #[derive(Clone)]
             pub struct Event {
+                /// Type of event (e.g., "http", "message", "wasm")
                 pub event_type: _rt::String,
+                /// Optional reference to parent event (previous in chain)
                 pub parent: Option<u64>,
+                /// Serialized event data
                 pub data: Json,
             }
             impl ::core::fmt::Debug for Event {
@@ -51,9 +129,15 @@ pub mod ntwk {
                         .finish()
                 }
             }
+            /// Event with associated metadata
+            ///
+            /// Represents a single event in the chain with its metadata (hash),
+            /// allowing for verification and referencing.
             #[derive(Clone)]
             pub struct MetaEvent {
+                /// Hash of the event, used for verification and referencing
                 pub hash: u64,
+                /// The actual event data
                 pub event: Event,
             }
             impl ::core::fmt::Debug for MetaEvent {
@@ -67,8 +151,13 @@ pub mod ntwk {
                         .finish()
                 }
             }
+            /// Complete event chain for an actor
+            ///
+            /// Represents the full history of events that have occurred in an actor,
+            /// providing traceability and auditability.
             #[derive(Clone)]
             pub struct Chain {
+                /// List of events in the chain, each with metadata
                 pub events: _rt::Vec<MetaEvent>,
             }
             impl ::core::fmt::Debug for Chain {
@@ -80,6 +169,39 @@ pub mod ntwk {
                 }
             }
         }
+        /// # Runtime Interface
+        ///
+        /// The `runtime` interface provides core runtime capabilities to actors in the Theater system.
+        /// It allows actors to access their environment, log messages, and retrieve their event chain.
+        ///
+        /// ## Purpose
+        ///
+        /// This interface serves as a bridge between the actor and its execution environment,
+        /// providing essential services for operation, debugging, and state management. It enables
+        /// actors to log information to the system and access their immutable event history.
+        ///
+        /// ## Example
+        ///
+        /// ```wit
+        /// // Using the runtime interface in a WIT definition
+        /// use ntwk:theater/runtime;
+        ///
+        /// // Using the runtime interface in a Rust implementation
+        /// runtime::log("Actor initialized successfully");
+        /// let my_chain = runtime::get_chain();
+        /// ```
+        ///
+        /// ## Security
+        ///
+        /// The runtime interface is designed to be safe to expose to all actors, as it provides
+        /// only read access to state and controlled logging functionality. It doesn't allow actors
+        /// to modify runtime state or access system resources outside their sandbox.
+        ///
+        /// ## Implementation Notes
+        ///
+        /// This interface is typically implemented by the Theater runtime and automatically
+        /// provided to all actors. No special configuration is required to use it, though
+        /// logging behavior can be controlled through manifest settings.
         #[allow(dead_code, clippy::all)]
         pub mod runtime {
             #[used]
@@ -88,6 +210,29 @@ pub mod ntwk {
             use super::super::super::_rt;
             pub type Chain = super::super::super::ntwk::theater::types::Chain;
             #[allow(unused_unsafe, clippy::all)]
+            /// Logs a message to the actor's log stream.
+            ///
+            /// ## Purpose
+            ///
+            /// This function allows actors to send log messages to the Theater logging system.
+            /// Messages are tagged with the actor's ID and can be viewed through the Theater CLI
+            /// or event subscription system.
+            ///
+            /// ## Parameters
+            ///
+            /// * `msg` - The message to log
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// // In Rust actor code
+            /// runtime::log("Processing request with ID: 12345");
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// Log messages are subject to the logging level configuration specified in the actor's
+            /// manifest. The Theater runtime may filter or redirect logs based on this configuration.
             pub fn log(msg: &str) {
                 unsafe {
                     let vec0 = msg;
@@ -107,6 +252,36 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
+            /// Retrieves the actor's event chain.
+            ///
+            /// ## Purpose
+            ///
+            /// This function provides access to the actor's complete event history as a chain of
+            /// cryptographically linked events. This allows actors to inspect their state evolution
+            /// and verify the integrity of their history.
+            ///
+            /// ## Returns
+            ///
+            /// * `chain` - The actor's event chain containing all recorded events
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// // In Rust actor code
+            /// let chain = runtime::get_chain();
+            ///
+            /// // Count events by type
+            /// let mut event_counts = std::collections::HashMap::new();
+            /// for event in chain.events {
+            /// *event_counts.entry(event.event_type.clone()).or_insert(0) += 1;
+            /// }
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// The event chain is immutable and cryptographically verifiable, ensuring that actors
+            /// cannot tamper with their event history. This provides a secure audit trail of all
+            /// actor actions.
             pub fn get_chain() -> Chain {
                 unsafe {
                     #[repr(align(4))]
@@ -169,15 +344,95 @@ pub mod ntwk {
                 }
             }
         }
+        /// # Content Store
+        ///
+        /// Provides a content-addressable storage system for actors to store and retrieve data.
+        ///
+        /// ## Purpose
+        ///
+        /// The store interface allows actors to save and retrieve content using content-addressed
+        /// storage, where each piece of content is referenced by a hash of its data. This provides
+        /// immutability, deduplication, and integrity verification for all stored content.
+        ///
+        /// Additionally, the store supports a labeling system that allows human-readable names
+        /// to be attached to content references, making it easier to locate and manage content.
+        ///
+        /// ## Example
+        ///
+        /// ```rust
+        /// use ntwk::theater::store;
+        ///
+        /// // Create a new store
+        /// let store_id = store::new()?;
+        ///
+        /// // Store some content
+        /// let content = "Hello, Theater!".as_bytes().to_vec();
+        /// let content_ref = store::store(store_id, content)?;
+        ///
+        /// // Retrieve it by its content reference
+        /// let retrieved = store::get(store_id, content_ref.clone())?;
+        /// assert_eq!(retrieved, "Hello, Theater!".as_bytes());
+        ///
+        /// // Label the content for easier access
+        /// store::label(store_id, "greeting", content_ref.clone())?;
+        ///
+        /// // Later, retrieve by label
+        /// let label_ref = store::get_by_label(store_id, "greeting")?.unwrap();
+        /// let greeting = store::get(store_id, label_ref)?;
+        /// ```
+        ///
+        /// ## Security
+        ///
+        /// The content store is isolated per actor, preventing direct access to other actors' data.
+        /// All store operations are tracked in the actor's event chain, providing a complete
+        /// audit trail of data operations.
+        ///
+        /// ## Implementation Notes
+        ///
+        /// The store uses content-based addressing where the reference to content is derived from
+        /// a cryptographic hash of the content itself. This ensures:
+        ///
+        /// - Content cannot be modified without changing its reference
+        /// - Identical content is stored only once (automatic deduplication)
+        /// - Content integrity can be verified
         #[allow(dead_code, clippy::all)]
         pub mod store {
             #[used]
             #[doc(hidden)]
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             use super::super::super::_rt;
-            /// Reference to content in the store
+            /// # Content Reference
+            ///
+            /// A reference to content stored in the content-addressable store.
+            ///
+            /// ## Purpose
+            ///
+            /// ContentRef provides a stable, immutable reference to content based on its hash,
+            /// enabling content-addressable storage where data is referenced by its cryptographic hash
+            /// rather than by location or name.
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store::{content_ref, store};
+            ///
+            /// // Store content and get its reference
+            /// let store_id = store::new()?;
+            /// let data = b"Some important data".to_vec();
+            /// let ref = store::store(store_id, data)?;
+            ///
+            /// // The hash in the content ref is a SHA-256 digest
+            /// println!("Stored content with hash: {}", ref.hash);
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// Content references use cryptographic hashes that are collision-resistant,
+            /// ensuring that distinct content will have distinct references. This provides
+            /// integrity verification for all stored content.
             #[derive(Clone)]
             pub struct ContentRef {
+                /// Cryptographic hash of the content (SHA-256 in hexadecimal format)
                 pub hash: _rt::String,
             }
             impl ::core::fmt::Debug for ContentRef {
@@ -189,6 +444,28 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
+            /// # Create a new store
+            ///
+            /// Creates a new content-addressable store instance.
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(string)` - The ID of the newly created store
+            /// * `Err(string)` - Error message if store creation fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Create a new store
+            /// let store_id = store::new()?;
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// Each actor has access to its own isolated store instances. Store IDs are only
+            /// valid within the context of the actor that created them.
             pub fn new() -> Result<_rt::String, _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -241,7 +518,34 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Store content and return its ContentRef
+            /// # Store content
+            ///
+            /// Stores content in the content-addressable store and returns a reference to it.
+            ///
+            /// ## Parameters
+            ///
+            /// * `store-id` - ID of the store to use
+            /// * `content` - The content bytes to store
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(content-ref)` - Reference to the stored content
+            /// * `Err(string)` - Error message if storage fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Store some content
+            /// let data = serde_json::to_vec(&my_data)?;
+            /// let content_ref = store::store(store_id, data)?;
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// If identical content already exists in the store, the existing content reference
+            /// will be returned without storing a duplicate copy.
             pub fn store(
                 store_id: &str,
                 content: &[u8],
@@ -317,7 +621,29 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Retrieve content by its reference
+            /// # Retrieve content
+            ///
+            /// Retrieves content from the store using its content reference.
+            ///
+            /// ## Parameters
+            ///
+            /// * `store-id` - ID of the store to use
+            /// * `content-ref` - Reference to the content to retrieve
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(list<u8>)` - The retrieved content bytes
+            /// * `Err(string)` - Error message if retrieval fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Retrieve content
+            /// let content = store::get(store_id, content_ref)?;
+            /// let my_data: MyData = serde_json::from_slice(&content)?;
+            /// ```
             pub fn get(
                 store_id: &str,
                 content_ref: &ContentRef,
@@ -387,7 +713,33 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Check if content exists
+            /// # Check if content exists
+            ///
+            /// Checks if a particular content reference exists in the store.
+            ///
+            /// ## Parameters
+            ///
+            /// * `store-id` - ID of the store to check
+            /// * `content-ref` - Reference to check for
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(bool)` - True if the content exists, false otherwise
+            /// * `Err(string)` - Error message if the check fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Check if content exists before attempting to retrieve it
+            /// if store::exists(store_id, content_ref)? {
+            /// let content = store::get(store_id, content_ref)?;
+            /// // Process content...
+            /// } else {
+            /// // Handle missing content case
+            /// }
+            /// ```
             pub fn exists(
                 store_id: &str,
                 content_ref: &ContentRef,
@@ -455,7 +807,37 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Attach a label to content
+            /// # Attach a label to content
+            ///
+            /// Associates a human-readable label with a content reference.
+            ///
+            /// ## Parameters
+            ///
+            /// * `store-id` - ID of the store to use
+            /// * `label` - The human-readable label to attach
+            /// * `content-ref` - Reference to the content to label
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Label was successfully attached
+            /// * `Err(string)` - Error message if labeling fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Store and label config data
+            /// let config_data = serde_json::to_vec(&my_config)?;
+            /// let ref = store::store(store_id, config_data)?;
+            /// store::label(store_id, "current-config", ref)?;
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// A label can point to multiple content references, effectively acting as a collection.
+            /// Each call to this function adds the content reference to the label without removing
+            /// previous references.
             pub fn label(
                 store_id: &str,
                 label: &str,
@@ -536,7 +918,39 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Get content reference by label
+            /// # Get content reference by label
+            ///
+            /// Retrieves a content reference associated with a label.
+            ///
+            /// ## Parameters
+            ///
+            /// * `store-id` - ID of the store to use
+            /// * `label` - The label to look up
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(option<content-ref>)` - The content reference if found, None if the label doesn't exist
+            /// * `Err(string)` - Error message if the lookup fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Retrieve the current configuration
+            /// if let Some(ref) = store::get_by_label(store_id, "current-config")? {
+            /// let config_data = store::get(store_id, ref)?;
+            /// let config: MyConfig = serde_json::from_slice(&config_data)?;
+            /// // Use configuration...
+            /// } else {
+            /// // No configuration found
+            /// }
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// If a label points to multiple content references, this function returns the most
+            /// recently added reference.
             pub fn get_by_label(
                 store_id: &str,
                 label: &str,
@@ -622,7 +1036,33 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Remove a label
+            /// # Remove a label
+            ///
+            /// Deletes a label and its associations with content references.
+            ///
+            /// ## Parameters
+            ///
+            /// * `store-id` - ID of the store to use
+            /// * `label` - The label to remove
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Label was successfully removed
+            /// * `Err(string)` - Error message if removal fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Remove an obsolete label
+            /// store::remove_label(store_id, "old-config")?;
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// Removing a label does not delete the content it points to, only the association
+            /// between the label and the content references.
             pub fn remove_label(store_id: &str, label: &str) -> Result<(), _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -683,7 +1123,34 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Remove a specific content reference from a label
+            /// # Remove a specific content reference from a label
+            ///
+            /// Removes the association between a label and a specific content reference.
+            ///
+            /// ## Parameters
+            ///
+            /// * `store-id` - ID of the store to use
+            /// * `label` - The label to modify
+            /// * `content-ref` - The content reference to remove from the label
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Reference was successfully removed from the label
+            /// * `Err(string)` - Error message if removal fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Remove a specific version from the "historical-configs" label
+            /// store::remove_from_label(store_id, "historical-configs", outdated_ref)?;
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// This operation only removes the association between the label and the content reference.
+            /// It does not delete the content itself.
             pub fn remove_from_label(
                 store_id: &str,
                 label: &str,
@@ -764,7 +1231,36 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Store content and immediately label it
+            /// # Store content and immediately label it
+            ///
+            /// Stores content and associates it with a label in a single operation.
+            ///
+            /// ## Parameters
+            ///
+            /// * `store-id` - ID of the store to use
+            /// * `label` - The label to attach to the content
+            /// * `content` - The content bytes to store
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(content-ref)` - Reference to the stored content
+            /// * `Err(string)` - Error message if the operation fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Store and label user data in one operation
+            /// let user_data = serde_json::to_vec(&user)?;
+            /// let ref = store::store_at_label(store_id, "user-profile", user_data)?;
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// This is a convenience function that combines `store` and `label` operations.
+            /// The label will point to the new content reference in addition to any existing
+            /// content references it may already point to.
             pub fn store_at_label(
                 store_id: &str,
                 label: &str,
@@ -856,7 +1352,36 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Put content at a label, replacing any existing content
+            /// # Replace content at a label
+            ///
+            /// Stores new content and makes the label point exclusively to it, removing any
+            /// previous associations.
+            ///
+            /// ## Parameters
+            ///
+            /// * `store-id` - ID of the store to use
+            /// * `label` - The label to update
+            /// * `content` - The new content bytes to store
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(content-ref)` - Reference to the stored content
+            /// * `Err(string)` - Error message if the operation fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Update configuration with new values
+            /// let new_config = serde_json::to_vec(&updated_config)?;
+            /// let ref = store::replace_content_at_label(store_id, "current-config", new_config)?;
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// This operation is atomic - the label will either point to the new content reference
+            /// or remain unchanged if the operation fails.
             pub fn replace_content_at_label(
                 store_id: &str,
                 label: &str,
@@ -948,7 +1473,35 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Replace content at a label with a specific content reference
+            /// # Replace label with specific content reference
+            ///
+            /// Updates a label to point exclusively to an existing content reference.
+            ///
+            /// ## Parameters
+            ///
+            /// * `store-id` - ID of the store to use
+            /// * `label` - The label to update
+            /// * `content-ref` - The content reference the label should point to
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Label was successfully updated
+            /// * `Err(string)` - Error message if the update fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Revert to a previous version
+            /// store::replace_at_label(store_id, "current-config", previous_version_ref)?;
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// This operation removes any existing associations between the label and other
+            /// content references. After this operation, the label will point only to the
+            /// specified content reference.
             pub fn replace_at_label(
                 store_id: &str,
                 label: &str,
@@ -1029,7 +1582,30 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// List all labels
+            /// # List all labels
+            ///
+            /// Retrieves a list of all labels in the store.
+            ///
+            /// ## Parameters
+            ///
+            /// * `store-id` - ID of the store to query
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(list<string>)` - List of all labels in the store
+            /// * `Err(string)` - Error message if the operation fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Get all available labels
+            /// let labels = store::list_labels(store_id)?;
+            /// for label in labels {
+            /// println!("Found label: {}", label);
+            /// }
+            /// ```
             pub fn list_labels(
                 store_id: &str,
             ) -> Result<_rt::Vec<_rt::String>, _rt::String> {
@@ -1100,7 +1676,33 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// List all content references
+            /// # List all content references
+            ///
+            /// Retrieves a list of all content references in the store.
+            ///
+            /// ## Parameters
+            ///
+            /// * `store-id` - ID of the store to query
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(list<content-ref>)` - List of all content references in the store
+            /// * `Err(string)` - Error message if the operation fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Get all content references
+            /// let refs = store::list_all_content(store_id)?;
+            /// println!("Store contains {} content items", refs.len());
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// This operation may be expensive for stores with a large amount of content.
+            /// Consider using labels to organize and access content more efficiently.
             pub fn list_all_content(
                 store_id: &str,
             ) -> Result<_rt::Vec<ContentRef>, _rt::String> {
@@ -1173,7 +1775,37 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Calculate total size of all content
+            /// # Calculate total size
+            ///
+            /// Calculates the total size of all content in the store.
+            ///
+            /// ## Parameters
+            ///
+            /// * `store-id` - ID of the store to query
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(u64)` - Total size in bytes
+            /// * `Err(string)` - Error message if the calculation fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::store;
+            ///
+            /// // Check store size
+            /// let total_bytes = store::calculate_total_size(store_id)?;
+            /// println!("Store contains {} bytes of data", total_bytes);
+            ///
+            /// // Format as human-readable size
+            /// let size_mb = total_bytes as f64 / (1024.0 * 1024.0);
+            /// println!("Store size: {:.2} MB", size_mb);
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// This operation calculates the actual storage space used, accounting for
+            /// deduplication of identical content.
             pub fn calculate_total_size(store_id: &str) -> Result<u64, _rt::String> {
                 unsafe {
                     #[repr(align(8))]
@@ -1222,6 +1854,69 @@ pub mod ntwk {
                 }
             }
         }
+        /// # Message Server Host Interface
+        ///
+        /// Provides functions for actors to send messages to other actors and manage communication channels.
+        ///
+        /// ## Purpose
+        ///
+        /// This interface enables actors to initiate various types of communication:
+        /// - Send one-way messages to other actors
+        /// - Make request-response interactions with other actors
+        /// - Establish and use bidirectional communication channels
+        ///
+        /// These functions allow actors to collaborate, share data, and coordinate their activities
+        /// within the Theater system.
+        ///
+        /// ## Example
+        ///
+        /// ```rust
+        /// use ntwk::theater::message_server_host;
+        /// use ntwk::theater::types::actor_id;
+        /// use serde_json::json;
+        ///
+        /// async fn example() -> Result<(), String> {
+        /// // Get the target actor ID (in a real scenario)
+        /// let target_actor = actor_id { id: "actor-123".to_string() };
+        ///
+        /// // Send a one-way message
+        /// let message = json!({"action": "update", "value": 42});
+        /// message_server_host::send(target_actor.clone(), message)?;
+        ///
+        /// // Make a request and get a response
+        /// let request = json!({"action": "query", "key": "user-profile"});
+        /// let response = message_server_host::request(target_actor.clone(), request)?;
+        /// println!("Received response: {}", response);
+        ///
+        /// // Open a channel for ongoing communication
+        /// let initial_msg = json!({"action": "subscribe", "topic": "updates"});
+        /// let channel_id = message_server_host::open_channel(target_actor, initial_msg)?;
+        ///
+        /// // Send messages on the channel
+        /// message_server_host::send_on_channel(channel_id.clone(), json!({"update": 1}))?;
+        /// message_server_host::send_on_channel(channel_id.clone(), json!({"update": 2}))?;
+        ///
+        /// // Close the channel when done
+        /// message_server_host::close_channel(channel_id)?;
+        ///
+        /// Ok(())
+        /// }
+        /// ```
+        ///
+        /// ## Security
+        ///
+        /// The message server enforces security boundaries to ensure that:
+        /// - Actors can only communicate with actors they have permission to access
+        /// - Messages are delivered reliably and in order
+        /// - Channel operations are authenticated
+        ///
+        /// All message operations are tracked in the actor's event chain for complete auditability.
+        ///
+        /// ## Implementation Notes
+        ///
+        /// The message server operations are asynchronous but appear synchronous to the WebAssembly
+        /// component. The runtime suspends the actor's execution as needed without blocking the
+        /// entire system.
         #[allow(dead_code, clippy::all)]
         pub mod message_server_host {
             #[used]
@@ -1232,7 +1927,41 @@ pub mod ntwk {
             pub type ActorId = super::super::super::ntwk::theater::types::ActorId;
             pub type ChannelId = super::super::super::ntwk::theater::types::ChannelId;
             #[allow(unused_unsafe, clippy::all)]
-            /// send and forget message
+            /// # Send one-way message
+            ///
+            /// Sends a message to another actor without waiting for a response.
+            ///
+            /// ## Parameters
+            ///
+            /// * `actor-id` - ID of the target actor
+            /// * `msg` - JSON message payload to send
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Message was successfully sent
+            /// * `Err(string)` - Error message if send fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::message_server_host;
+            /// use ntwk::theater::types::actor_id;
+            /// use serde_json::json;
+            ///
+            /// // Send a notification
+            /// let target = actor_id { id: "logging-service".to_string() };
+            /// let log_msg = json!({
+            /// "level": "info",
+            /// "message": "User logged in",
+            /// "timestamp": 1625097600000
+            /// });
+            /// message_server_host::send(target, log_msg)?;
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// The runtime verifies that the sender has permission to send messages to the
+            /// target actor before delivery.
             pub fn send(actor_id: &ActorId, msg: &Json) -> Result<(), _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -1293,7 +2022,41 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// send message and wait for response
+            /// # Send request and await response
+            ///
+            /// Sends a message to another actor and waits for a response.
+            ///
+            /// ## Parameters
+            ///
+            /// * `actor-id` - ID of the target actor
+            /// * `msg` - JSON request payload to send
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(json)` - The response from the target actor
+            /// * `Err(string)` - Error message if the request fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::message_server_host;
+            /// use ntwk::theater::types::actor_id;
+            /// use serde_json::json;
+            ///
+            /// // Query a data service
+            /// let data_service = actor_id { id: "data-service".to_string() };
+            /// let query = json!({
+            /// "query": "SELECT * FROM users WHERE id = ?",
+            /// "parameters": [42]
+            /// });
+            /// let result = message_server_host::request(data_service, query)?;
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// This function suspends the calling actor's execution until a response is received
+            /// or a timeout occurs. The runtime handles the suspension efficiently without
+            /// blocking other actors.
             pub fn request(actor_id: &ActorId, msg: &Json) -> Result<Json, _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -1359,7 +2122,44 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// channel operations
+            /// # Open communication channel
+            ///
+            /// Establishes a bidirectional communication channel with another actor.
+            ///
+            /// ## Parameters
+            ///
+            /// * `actor-id` - ID of the target actor
+            /// * `initial-msg` - JSON message sent as part of channel establishment
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(channel-id)` - ID of the established channel
+            /// * `Err(string)` - Error message if channel establishment fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::message_server_host;
+            /// use ntwk::theater::types::actor_id;
+            /// use serde_json::json;
+            ///
+            /// // Open a channel to a streaming service
+            /// let streaming_service = actor_id { id: "data-stream".to_string() };
+            /// let subscription = json!({
+            /// "action": "subscribe",
+            /// "topics": ["market-data", "news-feed"],
+            /// "options": {"buffer_size": 100}
+            /// });
+            /// let channel = message_server_host::open_channel(streaming_service, subscription)?;
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// Channel establishment requires mutual consent:
+            /// 1. The initiator requests the channel by calling this function
+            /// 2. The target actor explicitly accepts or rejects the channel
+            ///
+            /// This provides a security checkpoint to prevent unwanted channels.
             pub fn open_channel(
                 actor_id: &ActorId,
                 initial_msg: &Json,
@@ -1433,6 +2233,40 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
+            /// # Send message on channel
+            ///
+            /// Sends a message through an established channel.
+            ///
+            /// ## Parameters
+            ///
+            /// * `channel-id` - ID of the channel to send on
+            /// * `msg` - JSON message payload to send
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Message was successfully sent
+            /// * `Err(string)` - Error message if send fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::message_server_host;
+            /// use serde_json::json;
+            ///
+            /// // Send a message on an established channel
+            /// let update = json!({
+            /// "type": "position-update",
+            /// "x": 10.5,
+            /// "y": 20.3,
+            /// "timestamp": 1625097600000
+            /// });
+            /// message_server_host::send_on_channel(channel_id, update)?;
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// Messages sent on a channel are delivered in order. If the channel is closed
+            /// or invalid, this function will return an error.
             pub fn send_on_channel(
                 channel_id: &ChannelId,
                 msg: &Json,
@@ -1496,6 +2330,32 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
+            /// # Close channel
+            ///
+            /// Closes an open communication channel.
+            ///
+            /// ## Parameters
+            ///
+            /// * `channel-id` - ID of the channel to close
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Channel was successfully closed
+            /// * `Err(string)` - Error message if close fails
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::message_server_host;
+            ///
+            /// // Close a channel when done with it
+            /// message_server_host::close_channel(channel_id)?;
+            /// ```
+            ///
+            /// ## Implementation Notes
+            ///
+            /// Closing a channel is a final operation - once closed, a channel cannot be reopened.
+            /// Both participants receive a notification when a channel is closed.
             pub fn close_channel(channel_id: &ChannelId) -> Result<(), _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -1541,13 +2401,93 @@ pub mod ntwk {
                 }
             }
         }
+        /// # Filesystem Interface
+        ///
+        /// Provides access to the host filesystem from within WebAssembly components.
+        /// This interface allows Theater actors to perform file operations in a controlled
+        /// and sandboxed manner.
+        ///
+        /// ## Purpose
+        ///
+        /// The filesystem interface serves as a bridge between WebAssembly components and
+        /// the host filesystem. It provides essential file operations while maintaining
+        /// security through proper sandboxing and access controls. This enables actors to:
+        ///
+        /// - Read and write files for persistent storage
+        /// - Manage directory structures
+        /// - Execute system commands in a controlled environment
+        /// - Interact with the local filesystem within defined boundaries
+        ///
+        /// ## Security
+        ///
+        /// This interface represents a potential security boundary between the WebAssembly
+        /// sandbox and the host system. Important security considerations include:
+        ///
+        /// - All paths should be validated and normalized before use
+        /// - Access should be restricted to specific directories (jail/chroot pattern)
+        /// - Command execution must be carefully controlled to prevent injection attacks
+        /// - Error messages should not leak sensitive system information
+        ///
+        /// ## Example
+        ///
+        /// In a Rust actor implementation:
+        ///
+        /// ```rust
+        /// use ntwk::theater::filesystem;
+        ///
+        /// fn read_config_file() -> Result<String, String> {
+        /// // Read a configuration file
+        /// let bytes = filesystem::read_file("config.json")?;
+        ///
+        /// // Convert to string
+        /// let content = String::from_utf8(bytes)
+        /// .map_err(|e| format!("Invalid UTF-8 in config file: {}", e))?;
+        ///
+        /// Ok(content)
+        /// }
+        ///
+        /// fn save_results(data: &str) -> Result<(), String> {
+        /// // Ensure the directory exists
+        /// filesystem::create_dir("results")?;
+        ///
+        /// // Write data to a file
+        /// filesystem::write_file("results/output.txt", data)?;
+        ///
+        /// Ok(())
+        /// }
+        /// ```
         #[allow(dead_code, clippy::all)]
         pub mod filesystem {
             #[used]
             #[doc(hidden)]
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             use super::super::super::_rt;
-            /// Command Types
+            /// # Command Result Data Structure
+            ///
+            /// Represents the successful result of a command execution.
+            ///
+            /// ## Fields
+            ///
+            /// * `stdout` - Standard output from the command
+            /// * `stderr` - Standard error output from the command
+            /// * `exit-code` - Exit code returned by the command
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// match result {
+            /// CommandResult::Success(cmd) => {
+            /// println!("Command output: {}", cmd.stdout);
+            /// println!("Exit code: {}", cmd.exit_code);
+            /// }
+            /// // ...
+            /// }
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// Command output may contain sensitive system information.
+            /// The implementation should sanitize or filter this output as appropriate.
             #[derive(Clone)]
             pub struct CommandSuccess {
                 pub stdout: _rt::String,
@@ -1566,6 +2506,29 @@ pub mod ntwk {
                         .finish()
                 }
             }
+            /// # Command Error Data Structure
+            ///
+            /// Represents an error that occurred during command execution.
+            ///
+            /// ## Fields
+            ///
+            /// * `message` - Description of the error
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// match result {
+            /// CommandResult::Error(err) => {
+            /// println!("Command failed: {}", err.message);
+            /// }
+            /// // ...
+            /// }
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// Error messages should be informative but not reveal sensitive
+            /// system details or implementation specifics.
             #[derive(Clone)]
             pub struct CommandError {
                 pub message: _rt::String,
@@ -1580,6 +2543,27 @@ pub mod ntwk {
                         .finish()
                 }
             }
+            /// # Command Result Variant
+            ///
+            /// Represents the possible outcomes of a command execution.
+            ///
+            /// ## Variants
+            ///
+            /// * `success` - Command executed successfully
+            /// * `error` - An error occurred during execution
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// match execute_command(".", "ls", vec!["-la"])? {
+            /// CommandResult::Success(result) => {
+            /// println!("Files: {}", result.stdout);
+            /// }
+            /// CommandResult::Error(err) => {
+            /// println!("Failed to list files: {}", err.message);
+            /// }
+            /// }
+            /// ```
             #[derive(Clone)]
             pub enum CommandResult {
                 Success(CommandSuccess),
@@ -1601,7 +2585,34 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Basic file operations
+            /// # Read File
+            ///
+            /// Reads the entire contents of a file into memory.
+            ///
+            /// ## Parameters
+            ///
+            /// * `path` - Path to the file to read
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(list<u8>)` - The file contents as a byte array
+            /// * `Err(string)` - An error message if the file cannot be read
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// let bytes = filesystem::read_file("data.json")?;
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// Paths are relative to the actor's working directory and should be
+            /// sanitized to prevent path traversal attacks.
+            ///
+            /// ## Implementation Notes
+            ///
+            /// This function reads the entire file into memory, so it should be used
+            /// with caution for large files. The Theater runtime may impose size limits.
             pub fn read_file(path: &str) -> Result<_rt::Vec<u8>, _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -1652,6 +2663,37 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
+            /// # Write File
+            ///
+            /// Writes content to a file, creating it if it doesn't exist or
+            /// overwriting it if it does.
+            ///
+            /// ## Parameters
+            ///
+            /// * `path` - Path to the file to write
+            /// * `content` - String content to write to the file
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Success (unit type)
+            /// * `Err(string)` - An error message if the file cannot be written
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// filesystem::write_file("config.json", json_string)?;
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// This operation should be restricted to specific directories to
+            /// prevent actors from writing to sensitive system areas.
+            ///
+            /// ## Implementation Notes
+            ///
+            /// The content is provided as a string, which means it's best suited for
+            /// text files. For binary files, consider implementing a separate function
+            /// that accepts a byte array.
             pub fn write_file(path: &str, content: &str) -> Result<(), _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -1712,6 +2754,37 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
+            /// # List Files
+            ///
+            /// Lists all files and directories in the specified directory.
+            ///
+            /// ## Parameters
+            ///
+            /// * `path` - Path to the directory to list
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(list<string>)` - List of filenames in the directory
+            /// * `Err(string)` - An error message if the directory cannot be read
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// let files = filesystem::list_files("./data")?;
+            /// for file in files {
+            /// println!("Found file: {}", file);
+            /// }
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// This operation may expose sensitive information about the filesystem.
+            /// The implementation should ensure it only lists files within allowed directories.
+            ///
+            /// ## Implementation Notes
+            ///
+            /// The returned filenames are just the names, not full paths. The caller is
+            /// responsible for constructing full paths if needed.
             pub fn list_files(path: &str) -> Result<_rt::Vec<_rt::String>, _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -1780,6 +2853,34 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
+            /// # Delete File
+            ///
+            /// Deletes a file from the filesystem.
+            ///
+            /// ## Parameters
+            ///
+            /// * `path` - Path to the file to delete
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Success (unit type)
+            /// * `Err(string)` - An error message if the file cannot be deleted
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// filesystem::delete_file("temp.txt")?;
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// This is a destructive operation that should be carefully controlled.
+            /// The implementation should validate paths to prevent deletion of system files.
+            ///
+            /// ## Implementation Notes
+            ///
+            /// If the file doesn't exist, implementations may either return an error
+            /// or succeed silently (idempotent behavior).
             pub fn delete_file(path: &str) -> Result<(), _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -1825,6 +2926,35 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
+            /// # Create Directory
+            ///
+            /// Creates a new directory at the specified path.
+            ///
+            /// ## Parameters
+            ///
+            /// * `path` - Path where the directory should be created
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Success (unit type)
+            /// * `Err(string)` - An error message if the directory cannot be created
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// filesystem::create_dir("results/2025/q1")?;
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// The implementation should ensure actors can only create directories
+            /// within their allowed workspace.
+            ///
+            /// ## Implementation Notes
+            ///
+            /// This function might not create parent directories automatically.
+            /// For nested directory creation, the actor may need to create each level
+            /// explicitly or use a recursive directory creation pattern.
             pub fn create_dir(path: &str) -> Result<(), _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -1870,6 +3000,36 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
+            /// # Delete Directory
+            ///
+            /// Deletes a directory and all its contents.
+            ///
+            /// ## Parameters
+            ///
+            /// * `path` - Path to the directory to delete
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Success (unit type)
+            /// * `Err(string)` - An error message if the directory cannot be deleted
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// filesystem::delete_dir("temp")?;
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// This is a highly destructive operation that recursively removes content.
+            /// The implementation must carefully validate paths to prevent deletion of
+            /// critical system directories.
+            ///
+            /// ## Implementation Notes
+            ///
+            /// This operation typically performs a recursive delete, removing all
+            /// files and subdirectories. The behavior should be clearly documented
+            /// whether it's recursive or requires the directory to be empty.
             pub fn delete_dir(path: &str) -> Result<(), _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -1915,6 +3075,39 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
+            /// # Check Path Exists
+            ///
+            /// Checks if a file or directory exists at the specified path.
+            ///
+            /// ## Parameters
+            ///
+            /// * `path` - Path to check
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(bool)` - True if the path exists, false otherwise
+            /// * `Err(string)` - An error message if the check cannot be performed
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// if filesystem::path_exists("config.json")? {
+            /// // File exists, proceed with reading it
+            /// } else {
+            /// // Create a default configuration
+            /// }
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// This function allows probing the filesystem structure, which could be
+            /// used for information gathering. The implementation should restrict
+            /// which paths can be checked.
+            ///
+            /// ## Implementation Notes
+            ///
+            /// This function typically doesn't distinguish between files and directories.
+            /// If that distinction is important, additional functions could be added.
             pub fn path_exists(path: &str) -> Result<bool, _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -1963,7 +3156,47 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Command execution functions
+            /// # Execute Command
+            ///
+            /// Executes a system command with the specified arguments.
+            ///
+            /// ## Parameters
+            ///
+            /// * `dir` - Working directory for the command
+            /// * `command` - Name of the command to execute
+            /// * `args` - List of arguments to pass to the command
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(command-result)` - The result of the command execution
+            /// * `Err(string)` - An error message if the command could not be executed
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// let result = filesystem::execute_command(".", "grep", vec!["pattern", "file.txt"])?;
+            /// match result {
+            /// CommandResult::Success(cmd) => {
+            /// println!("Matching lines: {}", cmd.stdout);
+            /// }
+            /// CommandResult::Error(err) => {
+            /// println!("Search failed: {}", err.message);
+            /// }
+            /// }
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// Command execution is a significant security risk. The implementation should:
+            /// - Validate and sanitize all command and argument inputs
+            /// - Restrict which commands can be executed
+            /// - Consider using an allowlist approach for permitted commands
+            /// - Set appropriate resource limits
+            ///
+            /// ## Implementation Notes
+            ///
+            /// The command execution is typically synchronous and blocks until completion.
+            /// For long-running commands, consider implementing asynchronous alternatives.
             pub fn execute_command(
                 dir: &str,
                 command: &str,
@@ -2117,6 +3350,47 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
+            /// # Execute Nix Command
+            ///
+            /// Executes a command through the Nix package manager.
+            ///
+            /// ## Parameters
+            ///
+            /// * `dir` - Working directory for the command
+            /// * `command` - The Nix command string to execute
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(command-result)` - The result of the command execution
+            /// * `Err(string)` - An error message if the command could not be executed
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// let result = filesystem::execute_nix_command(".", "nix-shell -p python3 --run 'python -c \"print(1+1)\"'")?;
+            /// match result {
+            /// CommandResult::Success(cmd) => {
+            /// println!("Python output: {}", cmd.stdout.trim());
+            /// }
+            /// CommandResult::Error(err) => {
+            /// println!("Failed to run Python: {}", err.message);
+            /// }
+            /// }
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// Nix command execution inherits all the security concerns of regular
+            /// command execution, with additional considerations:
+            /// - Nix commands can download and execute code from the internet
+            /// - They can potentially modify the system's Nix store
+            /// - They may have different permission models than regular commands
+            ///
+            /// ## Implementation Notes
+            ///
+            /// This function is specifically for environments where Nix is available.
+            /// It allows leveraging Nix's package and environment management features
+            /// from within Theater actors.
             pub fn execute_nix_command(
                 dir: &str,
                 command: &str,
@@ -2229,12 +3503,68 @@ pub mod ntwk {
                 }
             }
         }
+        /// # Supervisor Interface
+        ///
+        /// Defines the interface for actor supervision in the Theater system. This allows parent actors
+        /// to manage the lifecycle and monitor the state of their child actors.
+        ///
+        /// ## Purpose
+        ///
+        /// The supervisor interface enables an important part of the Theater architecture: the supervision
+        /// tree. Similar to Erlang's supervision system, this allows actors to monitor and manage other
+        /// actors, creating a hierarchical structure that enhances fault tolerance and system management.
+        ///
+        /// Through this interface, parent actors can:
+        /// - Spawn new child actors
+        /// - Monitor child actor status and state
+        /// - Restart failed child actors
+        /// - Access child actor event history
+        ///
+        /// ## Example
+        ///
+        /// In a typical Theater actor, supervision capabilities would be used like this:
+        ///
+        /// ```rust
+        /// use ntwk::theater::supervisor;
+        ///
+        /// // Spawn a new child actor from a manifest
+        /// let child_id = supervisor::spawn("child_manifest.toml", None)?;
+        ///
+        /// // Later, restart the child if needed
+        /// supervisor::restart_child(child_id)?;
+        ///
+        /// // Get the current state of the child
+        /// let state = supervisor::get_child_state(child_id)?;
+        /// ```
+        ///
+        /// ## Security
+        ///
+        /// The supervisor interface has significant privileges, as it can control other actors and
+        /// access their state. The Theater runtime ensures that an actor can only supervise its
+        /// direct children, enforcing proper hierarchy boundaries.
+        ///
+        /// ## Implementation Notes
+        ///
+        /// The interface uses string-based actor identifiers and returns results that can contain
+        /// errors as strings. This allows for human-readable error messages and flexible actor
+        /// identification across the system.
         #[allow(dead_code, clippy::all)]
         pub mod supervisor {
             #[used]
             #[doc(hidden)]
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             use super::super::super::_rt;
+            /// # Event in a chain
+            ///
+            /// Represents a single event in an actor's chain (audit log).
+            ///
+            /// ## Fields
+            ///
+            /// * `hash` - Unique identifier/hash for this event
+            /// * `parent-hash` - Hash of the previous event in the chain (None for first event)
+            /// * `event-type` - Type of event (e.g., "wasm", "http", "message")
+            /// * `data` - Serialized event data
+            /// * `timestamp` - Timestamp when the event occurred (milliseconds since epoch)
             #[derive(Clone)]
             pub struct ChainEvent {
                 pub hash: _rt::Vec<u8>,
@@ -2258,7 +3588,19 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Spawn a new child actor
+            /// # Spawn a new child actor
+            ///
+            /// Creates and starts a new actor from the specified manifest file.
+            ///
+            /// ## Parameters
+            ///
+            /// * `manifest` - Path or content of the manifest file describing the actor
+            /// * `init-bytes` - Optional initial state for the actor (serialized bytes)
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(string)` - ID of the newly created actor
+            /// * `Err(string)` - Error message if spawning fails
             pub fn spawn(
                 manifest: &str,
                 init_bytes: Option<&[u8]>,
@@ -2347,7 +3689,20 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Resume a previously stopped child actor
+            /// # Resume a previously stopped child actor
+            ///
+            /// Restarts a previously created actor using an existing manifest but with a potentially
+            /// new initial state.
+            ///
+            /// ## Parameters
+            ///
+            /// * `manifest` - Path or content of the manifest file describing the actor
+            /// * `init-state` - Optional new initial state for the actor (serialized bytes)
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(string)` - ID of the resumed actor
+            /// * `Err(string)` - Error message if resuming fails
             pub fn resume(
                 manifest: &str,
                 init_state: Option<&[u8]>,
@@ -2436,7 +3791,13 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Get list of child IDs
+            /// # List all child actors
+            ///
+            /// Retrieves a list of all children directly managed by this actor.
+            ///
+            /// ## Returns
+            ///
+            /// * `list<string>` - IDs of all child actors
             pub fn list_children() -> _rt::Vec<_rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -2475,7 +3836,18 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Stop a specific child
+            /// # Stop a specific child actor
+            ///
+            /// Gracefully stops a child actor identified by its ID.
+            ///
+            /// ## Parameters
+            ///
+            /// * `child-id` - ID of the child actor to stop
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Child was successfully stopped
+            /// * `Err(string)` - Error message if stopping fails
             pub fn stop_child(child_id: &str) -> Result<(), _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -2521,7 +3893,18 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Restart a specific child
+            /// # Restart a specific child actor
+            ///
+            /// Stops and then starts a child actor, maintaining its ID but resetting its state.
+            ///
+            /// ## Parameters
+            ///
+            /// * `child-id` - ID of the child actor to restart
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Child was successfully restarted
+            /// * `Err(string)` - Error message if restarting fails
             pub fn restart_child(child_id: &str) -> Result<(), _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -2567,7 +3950,18 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Get latest state of a child
+            /// # Get the latest state of a child actor
+            ///
+            /// Retrieves the current serialized state of a specified child actor.
+            ///
+            /// ## Parameters
+            ///
+            /// * `child-id` - ID of the child actor
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(option<list<u8>>)` - Current state of the child (None if no state)
+            /// * `Err(string)` - Error message if retrieving state fails
             pub fn get_child_state(
                 child_id: &str,
             ) -> Result<Option<_rt::Vec<u8>>, _rt::String> {
@@ -2630,7 +4024,19 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Get event history of a child
+            /// # Get event history of a child actor
+            ///
+            /// Retrieves the chain of events that have occurred in a child actor,
+            /// providing visibility into its execution history.
+            ///
+            /// ## Parameters
+            ///
+            /// * `child-id` - ID of the child actor
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(list<chain-event>)` - List of events in the child's chain
+            /// * `Err(string)` - Error message if retrieving events fails
             pub fn get_child_events(
                 child_id: &str,
             ) -> Result<_rt::Vec<ChainEvent>, _rt::String> {
@@ -2727,19 +4133,58 @@ pub mod ntwk {
                 }
             }
         }
-        /// Types used by the HTTP framework
+        /// # HTTP Types
+        ///
+        /// Types used by the HTTP framework for requests, responses, and configuration.
+        ///
+        /// ## Purpose
+        ///
+        /// This interface defines the data structures used throughout the HTTP subsystem,
+        /// providing a consistent type system for HTTP operations. These types are used
+        /// by both the framework and handlers interfaces.
+        ///
+        /// ## Example
+        ///
+        /// ```rust
+        /// use ntwk::theater::http_types::{http_request, http_response, server_config};
+        ///
+        /// // Create a server configuration
+        /// let config = server_config {
+        /// port: Some(8080),
+        /// host: Some("127.0.0.1".to_string()),
+        /// tls_config: None,
+        /// };
+        ///
+        /// // Create an HTTP response
+        /// let response = http_response {
+        /// status: 200,
+        /// headers: vec![
+        /// ("content-type".to_string(), "application/json".to_string()),
+        /// ("x-powered-by".to_string(), "Theater".to_string()),
+        /// ],
+        /// body: Some(b"{\"message\":\"Hello, World!\"}".to_vec()),
+        /// };
+        /// ```
         #[allow(dead_code, clippy::all)]
         pub mod http_types {
             #[used]
             #[doc(hidden)]
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             use super::super::super::_rt;
+            /// Raw binary data type
             pub type Bytes = _rt::Vec<u8>;
+            /// # HTTP Request
+            ///
+            /// Represents an incoming HTTP request.
             #[derive(Clone)]
             pub struct HttpRequest {
+                /// HTTP method (GET, POST, PUT, DELETE, etc.)
                 pub method: _rt::String,
+                /// Full request URI including query parameters
                 pub uri: _rt::String,
+                /// List of request headers as key-value pairs
                 pub headers: _rt::Vec<(_rt::String, _rt::String)>,
+                /// Optional request body as binary data
                 pub body: Option<Bytes>,
             }
             impl ::core::fmt::Debug for HttpRequest {
@@ -2755,10 +4200,16 @@ pub mod ntwk {
                         .finish()
                 }
             }
+            /// # HTTP Response
+            ///
+            /// Represents an outgoing HTTP response.
             #[derive(Clone)]
             pub struct HttpResponse {
+                /// HTTP status code (e.g., 200, 404, 500)
                 pub status: u16,
+                /// List of response headers as key-value pairs
                 pub headers: _rt::Vec<(_rt::String, _rt::String)>,
+                /// Optional response body as binary data
                 pub body: Option<Bytes>,
             }
             impl ::core::fmt::Debug for HttpResponse {
@@ -2773,7 +4224,9 @@ pub mod ntwk {
                         .finish()
                 }
             }
-            /// TLS configuration
+            /// # TLS Configuration
+            ///
+            /// Configuration for HTTPS (TLS/SSL) support.
             #[derive(Clone)]
             pub struct TlsConfig {
                 /// Path to the certificate file
@@ -2792,14 +4245,16 @@ pub mod ntwk {
                         .finish()
                 }
             }
-            /// Configuration for an HTTP server
+            /// # Server Configuration
+            ///
+            /// Configuration for an HTTP server instance.
             #[derive(Clone)]
             pub struct ServerConfig {
                 /// Port to listen on, 0 means system-assigned
                 pub port: Option<u16>,
                 /// Host address to bind to
                 pub host: Option<_rt::String>,
-                /// TLS configuration
+                /// TLS configuration for HTTPS
                 pub tls_config: Option<TlsConfig>,
             }
             impl ::core::fmt::Debug for ServerConfig {
@@ -2814,7 +4269,9 @@ pub mod ntwk {
                         .finish()
                 }
             }
-            /// Information about a server
+            /// # Server Information
+            ///
+            /// Information about a running HTTP server.
             #[derive(Clone)]
             pub struct ServerInfo {
                 /// Server ID
@@ -2848,12 +4305,14 @@ pub mod ntwk {
                         .finish()
                 }
             }
-            /// Result from middleware processing
+            /// # Middleware Processing Result
+            ///
+            /// Result from middleware processing a request.
             #[derive(Clone)]
             pub struct MiddlewareResult {
                 /// Whether to continue processing the request
                 pub proceed: bool,
-                /// The modified request
+                /// The potentially modified request
                 pub request: HttpRequest,
             }
             impl ::core::fmt::Debug for MiddlewareResult {
@@ -2868,6 +4327,56 @@ pub mod ntwk {
                 }
             }
         }
+        /// # HTTP Client Interface
+        ///
+        /// Provides functionality for actors to make outbound HTTP requests.
+        ///
+        /// ## Purpose
+        ///
+        /// This interface allows actors to communicate with external HTTP services,
+        /// enabling integration with external APIs and services while maintaining
+        /// the security guarantees of the Theater system.
+        ///
+        /// ## Example
+        ///
+        /// ```rust
+        /// use ntwk::theater::http_client;
+        /// use ntwk::theater::http_types::{http_request, http_response};
+        ///
+        /// async fn fetch_data() -> Result<String, String> {
+        /// // Create a request
+        /// let request = http_request {
+        /// method: "GET".to_string(),
+        /// uri: "https://api.example.com/data".to_string(),
+        /// headers: vec![],
+        /// body: None,
+        /// };
+        ///
+        /// // Send the request
+        /// let response = http_client::send_http(request)?;
+        ///
+        /// // Process the response
+        /// if response.status == 200 {
+        /// if let Some(body) = response.body {
+        /// let text = String::from_utf8(body)
+        /// .map_err(|e| format!("Invalid UTF-8: {}", e))?;
+        /// Ok(text)
+        /// } else {
+        /// Ok("".to_string())
+        /// }
+        /// } else {
+        /// Err(format!("HTTP error: {}", response.status))
+        /// }
+        /// }
+        /// ```
+        ///
+        /// ## Security
+        ///
+        /// The HTTP client enforces the Theater security model:
+        /// - All outbound requests are logged in the event chain
+        /// - The runtime may enforce rate limiting, URL restrictions, etc.
+        /// - TLS certificates are validated by the runtime
+        /// - Response sizes may be limited to prevent memory exhaustion
         #[allow(dead_code, clippy::all)]
         pub mod http_client {
             #[used]
@@ -2877,6 +4386,23 @@ pub mod ntwk {
             pub type HttpRequest = super::super::super::ntwk::theater::http_types::HttpRequest;
             pub type HttpResponse = super::super::super::ntwk::theater::http_types::HttpResponse;
             #[allow(unused_unsafe, clippy::all)]
+            /// # Send an HTTP request
+            ///
+            /// Sends an outbound HTTP request and returns the response.
+            ///
+            /// ## Parameters
+            ///
+            /// * `req` - The HTTP request to send
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(http-response)` - The response received from the server
+            /// * `Err(string)` - Error message if the request fails
+            ///
+            /// ## Security
+            ///
+            /// The runtime may restrict which domains can be accessed based on
+            /// the actor's permissions. All requests are recorded in the event chain.
             pub fn send_http(req: &HttpRequest) -> Result<HttpResponse, _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -3056,17 +4582,46 @@ pub mod ntwk {
                 }
             }
         }
-        /// Types used for WebSocket communication
+        /// # WebSocket Types
+        ///
+        /// Types used for WebSocket communication.
+        ///
+        /// ## Purpose
+        ///
+        /// This interface defines the data structures used for WebSocket connections
+        /// and messages, providing a type-safe way to handle real-time communication.
+        ///
+        /// ## Example
+        ///
+        /// ```rust
+        /// use ntwk::theater::websocket_types::{websocket_message, message_type};
+        ///
+        /// // Create a text message to send
+        /// let message = websocket_message {
+        /// ty: message_type::text,
+        /// data: None,
+        /// text: Some("Hello, WebSocket!".to_string()),
+        /// };
+        ///
+        /// // Create a binary message to send
+        /// let binary_message = websocket_message {
+        /// ty: message_type::binary,
+        /// data: Some(vec![0x01, 0x02, 0x03, 0x04]),
+        /// text: None,
+        /// };
+        /// ```
         #[allow(dead_code, clippy::all)]
         pub mod websocket_types {
             #[used]
             #[doc(hidden)]
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
             use super::super::super::_rt;
-            /// The type of WebSocket message/event
+            /// # WebSocket Message Type
+            ///
+            /// The type of WebSocket message or event.
             #[derive(Clone)]
             pub enum MessageType {
-                /// A text message
+                /// A text message (UTF-8 encoded)
                 Text,
                 /// A binary message
                 Binary,
@@ -3078,7 +4633,7 @@ pub mod ntwk {
                 Ping,
                 /// A pong message (response to ping)
                 Pong,
-                /// Any other message type
+                /// Any other message type with string identifier
                 Other(_rt::String),
             }
             impl ::core::fmt::Debug for MessageType {
@@ -3105,7 +4660,9 @@ pub mod ntwk {
                     }
                 }
             }
-            /// Represents a message sent or received over a WebSocket connection
+            /// # WebSocket Message
+            ///
+            /// Represents a message sent or received over a WebSocket connection.
             #[derive(Clone)]
             pub struct WebsocketMessage {
                 /// The type of the message
@@ -3128,8 +4685,68 @@ pub mod ntwk {
                 }
             }
         }
+        /// # HTTP Framework
+        ///
         /// The HTTP framework interface provides a comprehensive API for creating,
         /// configuring, and managing HTTP and WebSocket servers from within WebAssembly actors.
+        ///
+        /// ## Purpose
+        ///
+        /// This interface allows actors to act as HTTP servers, handling web requests directly
+        /// from within the WebAssembly sandbox. It provides a complete set of functionality for
+        /// creating servers, defining routes, processing requests, and managing WebSockets,
+        /// enabling actors to serve web content and APIs while maintaining the security
+        /// guarantees of the Theater system.
+        ///
+        /// ## Example
+        ///
+        /// ```rust
+        /// use ntwk::theater::http_framework;
+        /// use ntwk::theater::http_types::{server_config, http_response};
+        ///
+        /// // Create and start an HTTP server
+        /// fn start_http_server() -> Result<u64, String> {
+        /// // Configure a server on port 8080
+        /// let config = server_config {
+        /// port: Some(8080),
+        /// host: Some("127.0.0.1".to_string()),
+        /// tls_config: None,
+        /// };
+        ///
+        /// // Create the server
+        /// let server_id = http_framework::create_server(config)?;
+        ///
+        /// // Register a handler function
+        /// let handler_id = http_framework::register_handler("handle_request")?;
+        ///
+        /// // Add a route
+        /// http_framework::add_route(server_id, "/api/v1/hello", "GET", handler_id)?;
+        ///
+        /// // Start the server
+        /// http_framework::start_server(server_id)?;
+        ///
+        /// Ok(server_id)
+        /// }
+        /// ```
+        ///
+        /// ## Security
+        ///
+        /// The HTTP framework enforces the Theater sandboxing model while allowing controlled
+        /// access to network resources. All HTTP traffic is mediated by the Theater runtime,
+        /// which can enforce rate limiting, connection limits, and other security policies.
+        ///
+        /// Actors using this interface cannot directly access the network stack and are limited
+        /// to the specific HTTP/WebSocket functionality provided here. The runtime tracks all
+        /// HTTP activity in the event chain for complete auditability.
+        ///
+        /// ## Implementation Notes
+        ///
+        /// - The HTTP server implementation is backed by the runtime's event loop and does not
+        /// spawn additional threads within the actor.
+        /// - Server IDs, handler IDs, and other identifiers are managed by the runtime and
+        /// are valid only within the context of the specific actor instance.
+        /// - WebSocket support is implemented via callbacks to handler functions within the
+        /// WebAssembly component.
         #[allow(dead_code, clippy::all)]
         pub mod http_framework {
             #[used]
@@ -3140,13 +4757,34 @@ pub mod ntwk {
             pub type ServerInfo = super::super::super::ntwk::theater::http_types::ServerInfo;
             pub type WebsocketMessage = super::super::super::ntwk::theater::websocket_types::WebsocketMessage;
             /// Core types
+            /// Unique identifier for an HTTP server instance
             pub type ServerId = u64;
+            /// Unique identifier for a registered handler function
             pub type HandlerId = u64;
+            /// Unique identifier for a registered route
             pub type RouteId = u64;
+            /// Unique identifier for registered middleware
             pub type MiddlewareId = u64;
             #[allow(unused_unsafe, clippy::all)]
             /// Server lifecycle
-            /// Create a new HTTP server with the given configuration
+            /// # Create a new HTTP server
+            ///
+            /// Creates a new HTTP server with the given configuration but does not start it.
+            /// The server will be ready to have routes and handlers added to it.
+            ///
+            /// ## Parameters
+            ///
+            /// * `config` - Configuration for the server including port, host and TLS settings
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(server-id)` - Unique identifier for the created server
+            /// * `Err(string)` - Error message if server creation fails
+            ///
+            /// ## Security
+            ///
+            /// The runtime will validate that the requested port is allowed by the actor's
+            /// permissions before creating the server.
             pub fn create_server(
                 config: &ServerConfig,
             ) -> Result<ServerId, _rt::String> {
@@ -3272,7 +4910,18 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Get information about a server
+            /// # Get information about a server
+            ///
+            /// Retrieves the current status and configuration of an HTTP server.
+            ///
+            /// ## Parameters
+            ///
+            /// * `server-id` - The ID of the server to get information for
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(server-info)` - Information about the server
+            /// * `Err(string)` - Error message if retrieval fails
             pub fn get_server_info(
                 server_id: ServerId,
             ) -> Result<ServerInfo, _rt::String> {
@@ -3341,7 +4990,19 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Start a server
+            /// # Start a server
+            ///
+            /// Starts a previously created HTTP server, making it begin listening for connections.
+            ///
+            /// ## Parameters
+            ///
+            /// * `server-id` - The ID of the server to start
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(u16)` - The port number the server is listening on (may be different from
+            /// requested port if port 0 was specified in config)
+            /// * `Err(string)` - Error message if server start fails
             pub fn start_server(server_id: ServerId) -> Result<u16, _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -3387,7 +5048,19 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Stop a server
+            /// # Stop a server
+            ///
+            /// Stops a running HTTP server, closing all active connections and stopping it from
+            /// accepting new connections. The server can be restarted later.
+            ///
+            /// ## Parameters
+            ///
+            /// * `server-id` - The ID of the server to stop
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Server was successfully stopped
+            /// * `Err(string)` - Error message if stop operation fails
             pub fn stop_server(server_id: ServerId) -> Result<(), _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -3430,7 +5103,19 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Remove a server completely
+            /// # Remove a server completely
+            ///
+            /// Destroys an HTTP server, releasing all resources associated with it. The server
+            /// must be stopped before it can be destroyed.
+            ///
+            /// ## Parameters
+            ///
+            /// * `server-id` - The ID of the server to destroy
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Server was successfully destroyed
+            /// * `Err(string)` - Error message if destroy operation fails
             pub fn destroy_server(server_id: ServerId) -> Result<(), _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -3474,7 +5159,19 @@ pub mod ntwk {
             }
             #[allow(unused_unsafe, clippy::all)]
             /// Handler registration
-            /// Register a handler by name (the name is used to identify the handler function in the component)
+            /// # Register a handler by name
+            ///
+            /// Registers a function within the WebAssembly component to be used as an HTTP handler.
+            /// The handler name must correspond to an exported function with the correct signature.
+            ///
+            /// ## Parameters
+            ///
+            /// * `handler-name` - The name of the handler function in the component
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(handler-id)` - ID that can be used to reference this handler in other functions
+            /// * `Err(string)` - Error message if registration fails
             pub fn register_handler(
                 handler_name: &str,
             ) -> Result<HandlerId, _rt::String> {
@@ -3526,7 +5223,21 @@ pub mod ntwk {
             }
             #[allow(unused_unsafe, clippy::all)]
             /// Route management
-            /// Add a route to a server
+            /// # Add a route to a server
+            ///
+            /// Adds a new route to an HTTP server, mapping a URL path and method to a handler function.
+            ///
+            /// ## Parameters
+            ///
+            /// * `server-id` - The ID of the server to add the route to
+            /// * `path` - The URL path to handle (e.g., "/api/users")
+            /// * `method` - The HTTP method to handle (e.g., "GET", "POST")
+            /// * `handler-id` - The ID of the handler function to call for this route
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(route-id)` - ID that can be used to reference or remove this route
+            /// * `Err(string)` - Error message if route addition fails
             pub fn add_route(
                 server_id: ServerId,
                 path: &str,
@@ -3607,7 +5318,18 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Remove a route
+            /// # Remove a route
+            ///
+            /// Removes a previously added route from a server.
+            ///
+            /// ## Parameters
+            ///
+            /// * `route-id` - The ID of the route to remove
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Route was successfully removed
+            /// * `Err(string)` - Error message if removal fails
             pub fn remove_route(route_id: RouteId) -> Result<(), _rt::String> {
                 unsafe {
                     #[repr(align(4))]
@@ -3651,7 +5373,21 @@ pub mod ntwk {
             }
             #[allow(unused_unsafe, clippy::all)]
             /// Middleware
-            /// Add middleware to a server path
+            /// # Add middleware to a server path
+            ///
+            /// Adds middleware to process requests before they reach the route handler.
+            /// Middleware can modify requests or short-circuit the request handling.
+            ///
+            /// ## Parameters
+            ///
+            /// * `server-id` - The ID of the server to add middleware to
+            /// * `path` - The URL path pattern to apply middleware to
+            /// * `handler-id` - The ID of the handler function to use as middleware
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(middleware-id)` - ID that can be used to reference or remove this middleware
+            /// * `Err(string)` - Error message if middleware addition fails
             pub fn add_middleware(
                 server_id: ServerId,
                 path: &str,
@@ -3710,7 +5446,18 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Remove middleware
+            /// # Remove middleware
+            ///
+            /// Removes previously added middleware from a server.
+            ///
+            /// ## Parameters
+            ///
+            /// * `middleware-id` - The ID of the middleware to remove
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Middleware was successfully removed
+            /// * `Err(string)` - Error message if removal fails
             pub fn remove_middleware(
                 middleware_id: MiddlewareId,
             ) -> Result<(), _rt::String> {
@@ -3756,7 +5503,23 @@ pub mod ntwk {
             }
             #[allow(unused_unsafe, clippy::all)]
             /// WebSocket support
-            /// Enable WebSocket support on a path
+            /// # Enable WebSocket support on a path
+            ///
+            /// Configures a path on the server to accept WebSocket connections and
+            /// registers handlers for WebSocket events.
+            ///
+            /// ## Parameters
+            ///
+            /// * `server-id` - The ID of the server to enable WebSockets on
+            /// * `path` - The URL path to accept WebSocket connections on
+            /// * `connect-handler-id` - Optional handler for connection events
+            /// * `message-handler-id` - Required handler for message events
+            /// * `disconnect-handler-id` - Optional handler for disconnection events
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - WebSocket support was successfully enabled
+            /// * `Err(string)` - Error message if operation fails
             pub fn enable_websocket(
                 server_id: ServerId,
                 path: &str,
@@ -3846,7 +5609,19 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Disable WebSocket support on a path
+            /// # Disable WebSocket support on a path
+            ///
+            /// Removes WebSocket support from a path, closing any active connections.
+            ///
+            /// ## Parameters
+            ///
+            /// * `server-id` - The ID of the server to modify
+            /// * `path` - The URL path to disable WebSocket support on
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - WebSocket support was successfully disabled
+            /// * `Err(string)` - Error message if operation fails
             pub fn disable_websocket(
                 server_id: ServerId,
                 path: &str,
@@ -3895,7 +5670,20 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Send a message to a specific WebSocket connection
+            /// # Send a message to a specific WebSocket connection
+            ///
+            /// Sends a message to a client connected via WebSocket.
+            ///
+            /// ## Parameters
+            ///
+            /// * `server-id` - The ID of the server with the connection
+            /// * `connection-id` - The ID of the specific WebSocket connection
+            /// * `message` - The message to send to the client
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Message was successfully sent
+            /// * `Err(string)` - Error message if send fails
             pub fn send_websocket_message(
                 server_id: ServerId,
                 connection_id: u64,
@@ -4019,7 +5807,19 @@ pub mod ntwk {
                 }
             }
             #[allow(unused_unsafe, clippy::all)]
-            /// Close a specific WebSocket connection
+            /// # Close a specific WebSocket connection
+            ///
+            /// Closes a single WebSocket connection.
+            ///
+            /// ## Parameters
+            ///
+            /// * `server-id` - The ID of the server with the connection
+            /// * `connection-id` - The ID of the specific WebSocket connection to close
+            ///
+            /// ## Returns
+            ///
+            /// * `Ok(_)` - Connection was successfully closed
+            /// * `Err(string)` - Error message if close operation fails
             pub fn close_websocket(
                 server_id: ServerId,
                 connection_id: u64,
@@ -4076,6 +5876,63 @@ pub mod ntwk {
 pub mod exports {
     pub mod ntwk {
         pub mod theater {
+            /// # Message Server Client Interface
+            ///
+            /// Defines the callback handlers that actors must implement to receive messages through
+            /// the message server system.
+            ///
+            /// ## Purpose
+            ///
+            /// This interface enables actors to receive and process various types of messages:
+            /// - One-way messages (send)
+            /// - Request-response interactions (request)
+            /// - Bidirectional channel-based communication (channel operations)
+            ///
+            /// By implementing these handler functions, an actor can participate in different
+            /// communication patterns with other actors and external systems.
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::message_server_client::Guest;
+            /// use ntwk::theater::types::{json, channel_accept, channel_id};
+            /// use serde_json::{json, Value};
+            ///
+            /// struct MyMessageHandler;
+            ///
+            /// impl Guest for MyMessageHandler {
+            /// fn handle_send(state: Option<Value>, params: (Value,))
+            /// -> Result<(Option<Value>,), String> {
+            /// let (message,) = params;
+            /// println!("Received message: {}", message);
+            ///
+            /// // Update state if needed
+            /// let new_state = if let Some(mut state) = state {
+            /// state["message_count"] = json!(state["message_count"].as_u64().unwrap_or(0) + 1);
+            /// Some(state)
+            /// } else {
+            /// Some(json!({"message_count": 1}))
+            /// };
+            ///
+            /// Ok((new_state,))
+            /// }
+            ///
+            /// // Implement other handlers...
+            /// }
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// The message handlers receive input from potentially untrusted sources, so they should:
+            /// - Validate all incoming message data
+            /// - Handle malformed messages gracefully
+            /// - Protect against common attack vectors like JSON injection
+            ///
+            /// ## Implementation Notes
+            ///
+            /// - All handlers receive and can update the actor's state
+            /// - Errors returned from handlers are logged and may trigger supervision
+            /// - Handler execution is tracked in the actor's event chain
             #[allow(dead_code, clippy::all)]
             pub mod message_server_client {
                 #[used]
@@ -4556,23 +6413,183 @@ pub mod exports {
                     }
                 }
                 pub trait Guest {
+                    /// # Handle one-way message
+                    ///
+                    /// Processes a one-way message that doesn't require a response.
+                    ///
+                    /// ## Parameters
+                    ///
+                    /// * `state` - The current actor state or None if not initialized
+                    /// * `params` - Tuple containing:
+                    /// * `json` - The message payload
+                    ///
+                    /// ## Returns
+                    ///
+                    /// * `Ok((option<json>,))` - Updated actor state (or None to retain current state)
+                    /// * `Err(string)` - Error message if message handling fails
+                    ///
+                    /// ## Example
+                    ///
+                    /// ```rust
+                    /// fn handle_send(state: Option<Value>, params: (Value,)) -> Result<(Option<Value>,), String> {
+                    /// let (message,) = params;
+                    ///
+                    /// // Process the message...
+                    ///
+                    /// // Return updated state (or None to keep current state)
+                    /// Ok((Some(updated_state),))
+                    /// }
+                    /// ```
                     fn handle_send(
                         state: Option<Json>,
                         params: (Json,),
                     ) -> Result<(Option<Json>,), _rt::String>;
+                    /// # Handle request-response message
+                    ///
+                    /// Processes a request that requires a response.
+                    ///
+                    /// ## Parameters
+                    ///
+                    /// * `state` - The current actor state or None if not initialized
+                    /// * `params` - Tuple containing:
+                    /// * `json` - The request payload
+                    ///
+                    /// ## Returns
+                    ///
+                    /// * `Ok((option<json>, (json,)))` - Tuple containing:
+                    /// * Updated actor state (or None to retain current state)
+                    /// * Response message to send back
+                    /// * `Err(string)` - Error message if request handling fails
+                    ///
+                    /// ## Example
+                    ///
+                    /// ```rust
+                    /// fn handle_request(state: Option<Value>, params: (Value,))
+                    /// -> Result<(Option<Value>, (Value,)), String> {
+                    /// let (request,) = params;
+                    ///
+                    /// // Process the request...
+                    /// let response = json!({"status": "success", "data": "result"});
+                    ///
+                    /// // Return updated state and response
+                    /// Ok((Some(updated_state), (response,)))
+                    /// }
+                    /// ```
                     fn handle_request(
                         state: Option<Json>,
                         params: (Json,),
                     ) -> Result<(Option<Json>, (Json,)), _rt::String>;
-                    /// Channel operations
+                    /// # Handle channel open request
+                    ///
+                    /// Called when another actor requests to open a communication channel.
+                    ///
+                    /// ## Parameters
+                    ///
+                    /// * `state` - The current actor state or None if not initialized
+                    /// * `params` - Tuple containing:
+                    /// * `json` - The initial message payload
+                    ///
+                    /// ## Returns
+                    ///
+                    /// * `Ok((option<json>, (channel-accept,)))` - Tuple containing:
+                    /// * Updated actor state (or None to retain current state)
+                    /// * Channel acceptance decision
+                    /// * `Err(string)` - Error message if open handling fails
+                    ///
+                    /// ## Example
+                    ///
+                    /// ```rust
+                    /// fn handle_channel_open(state: Option<Value>, params: (Value,))
+                    /// -> Result<(Option<Value>, (channel_accept,)), String> {
+                    /// let (initial_message,) = params;
+                    ///
+                    /// // Decide whether to accept the channel
+                    /// let accept = channel_accept {
+                    /// accept: true,
+                    /// error_message: None,
+                    /// };
+                    ///
+                    /// // Return updated state and acceptance decision
+                    /// Ok((Some(updated_state), (accept,)))
+                    /// }
+                    /// ```
+                    ///
+                    /// ## Security
+                    ///
+                    /// The actor should validate the channel request and only accept channels from
+                    /// trusted sources. The acceptance mechanism provides a security checkpoint.
                     fn handle_channel_open(
                         state: Option<Json>,
                         params: (Json,),
                     ) -> Result<(Option<Json>, (ChannelAccept,)), _rt::String>;
+                    /// # Handle channel message
+                    ///
+                    /// Processes a message received on an established channel.
+                    ///
+                    /// ## Parameters
+                    ///
+                    /// * `state` - The current actor state or None if not initialized
+                    /// * `params` - Tuple containing:
+                    /// * `channel-id` - ID of the channel the message was received on
+                    /// * `json` - The message payload
+                    ///
+                    /// ## Returns
+                    ///
+                    /// * `Ok((option<json>,))` - Updated actor state (or None to retain current state)
+                    /// * `Err(string)` - Error message if message handling fails
+                    ///
+                    /// ## Example
+                    ///
+                    /// ```rust
+                    /// fn handle_channel_message(state: Option<Value>, params: (channel_id, Value))
+                    /// -> Result<(Option<Value>,), String> {
+                    /// let (channel_id, message) = params;
+                    ///
+                    /// // Process the channel message...
+                    /// println!("Received message on channel {}: {}", channel_id, message);
+                    ///
+                    /// // Return updated state (or None to keep current state)
+                    /// Ok((Some(updated_state),))
+                    /// }
+                    /// ```
                     fn handle_channel_message(
                         state: Option<Json>,
                         params: (ChannelId, Json),
                     ) -> Result<(Option<Json>,), _rt::String>;
+                    /// # Handle channel close
+                    ///
+                    /// Called when a communication channel is closed.
+                    ///
+                    /// ## Parameters
+                    ///
+                    /// * `state` - The current actor state or None if not initialized
+                    /// * `params` - Tuple containing:
+                    /// * `channel-id` - ID of the channel that was closed
+                    ///
+                    /// ## Returns
+                    ///
+                    /// * `Ok((option<json>,))` - Updated actor state (or None to retain current state)
+                    /// * `Err(string)` - Error message if close handling fails
+                    ///
+                    /// ## Example
+                    ///
+                    /// ```rust
+                    /// fn handle_channel_close(state: Option<Value>, params: (channel_id,))
+                    /// -> Result<(Option<Value>,), String> {
+                    /// let (channel_id,) = params;
+                    ///
+                    /// // Clean up any resources associated with the channel
+                    /// println!("Channel {} closed", channel_id);
+                    ///
+                    /// // Return updated state (or None to keep current state)
+                    /// Ok((Some(updated_state),))
+                    /// }
+                    /// ```
+                    ///
+                    /// ## Implementation Notes
+                    ///
+                    /// This function should perform any necessary cleanup for the closed channel,
+                    /// such as releasing resources or updating internal state to reflect the channel closure.
                     fn handle_channel_close(
                         state: Option<Json>,
                         params: (ChannelId,),
@@ -4639,6 +6656,77 @@ pub mod exports {
                     [::core::mem::MaybeUninit::uninit(); 32],
                 );
             }
+            /// # Actor Interface
+            ///
+            /// Defines the core interface that all Theater actors must implement. This is the
+            /// fundamental contract between the Theater runtime and WebAssembly actor components.
+            ///
+            /// ## Purpose
+            ///
+            /// The actor interface establishes the minimal required functionality for a component
+            /// to be recognized and managed as a Theater actor. By implementing this interface,
+            /// a WebAssembly component can be:
+            ///
+            /// - Loaded by the Theater runtime
+            /// - Initialized with state and parameters
+            /// - Managed within the supervision hierarchy
+            /// - Integrated with the event chain system
+            ///
+            /// This interface is deliberately minimal to make it as easy as possible to create
+            /// compatible actors, while still providing the core functionality needed for the
+            /// Theater system to manage them.
+            ///
+            /// ## Example
+            ///
+            /// Here's how a typical actor would implement this interface in Rust:
+            ///
+            /// ```rust
+            /// use ntwk::theater::actor::Guest;
+            /// use ntwk::theater::types::State;
+            ///
+            /// struct MyActor;
+            ///
+            /// impl Guest for MyActor {
+            /// fn init(state: State, params: (String,)) -> Result<(State,), String> {
+            /// // Parse the initial parameters
+            /// let (actor_id,) = params;
+            /// println!("Initializing actor with ID: {}", actor_id);
+            ///
+            /// // Create initial state if none exists
+            /// let new_state = match state {
+            /// Some(existing) => {
+            /// // Use existing state
+            /// existing
+            /// }
+            /// None => {
+            /// // Create new initial state
+            /// let initial_data = MyActorState {
+            /// counter: 0,
+            /// last_updated: chrono::Utc::now(),
+            /// };
+            /// serde_json::to_vec(&initial_data).map_err(|e| e.to_string())?
+            /// }
+            /// };
+            ///
+            /// // Return the new state
+            /// Ok((new_state,))
+            /// }
+            /// }
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// This interface is the primary entry point for actor execution. The Theater runtime
+            /// ensures that actors can only access resources they have been explicitly granted
+            /// through handler configurations.
+            ///
+            /// ## Implementation Notes
+            ///
+            /// - The state parameter is passed as a blob of bytes, typically serialized/deserialized
+            /// using formats like JSON, MessagePack, or bincode.
+            /// - Actors are responsible for managing their own state format and serialization.
+            /// - The parameters tuple allows for flexible initialization with a variety of data types.
+            /// - Returning an error string from the init function will cause the actor to fail to start.
             #[allow(dead_code, clippy::all)]
             pub mod actor {
                 #[used]
@@ -4730,6 +6818,27 @@ pub mod exports {
                     }
                 }
                 pub trait Guest {
+                    /// # Initialize the actor
+                    ///
+                    /// Called when the actor is first started or restarted. This function is responsible
+                    /// for setting up the actor's initial state and responding to initialization parameters.
+                    ///
+                    /// ## Parameters
+                    ///
+                    /// * `state` - Current state of the actor, or None if first initialization
+                    /// * `params` - Tuple of initialization parameters, typically including actor ID
+                    ///
+                    /// ## Returns
+                    ///
+                    /// * `Ok((state,))` - The updated state to store
+                    /// * `Err(string)` - An error message if initialization fails
+                    ///
+                    /// ## Implementation Notes
+                    ///
+                    /// - If state is None, the actor should create a new initial state
+                    /// - If state contains data, the actor should validate and use that state
+                    /// - The first parameter in the tuple is typically the actor's ID
+                    /// - Any error returned will cause the actor to fail to start
                     fn init(
                         state: State,
                         params: (_rt::String,),
@@ -4756,8 +6865,57 @@ pub mod exports {
                     [::core::mem::MaybeUninit::uninit(); 16],
                 );
             }
+            /// # HTTP Handlers Interface
+            ///
             /// The HTTP handlers interface defines the callback functions that are used
             /// to handle HTTP requests and WebSocket events.
+            ///
+            /// ## Purpose
+            ///
+            /// This interface establishes the contract for handler functions that process HTTP requests
+            /// and WebSocket events. These functions are implemented by the WebAssembly component and
+            /// called by the Theater runtime in response to incoming requests and events.
+            ///
+            /// ## Example
+            ///
+            /// ```rust
+            /// use ntwk::theater::http_handlers::Guest;
+            /// use ntwk::theater::http_types::{http_request, http_response};
+            /// use ntwk::theater::websocket_types::websocket_message;
+            ///
+            /// struct MyHttpHandlers;
+            ///
+            /// impl Guest for MyHttpHandlers {
+            /// fn handle_request(state: Vec<u8>, params: (u64, http_request))
+            /// -> Result<(Vec<u8>, (http_response,)), String> {
+            /// // Process the HTTP request and return a response
+            /// let (handler_id, request) = params;
+            ///
+            /// // Create a simple response
+            /// let response = http_response {
+            /// status: 200,
+            /// headers: vec![("content-type".to_string(), "text/plain".to_string())],
+            /// body: Some("Hello, World!".as_bytes().to_vec()),
+            /// };
+            ///
+            /// Ok((state, (response,)))
+            /// }
+            ///
+            /// // Implement other required functions...
+            /// }
+            /// ```
+            ///
+            /// ## Security
+            ///
+            /// Handler functions receive data from untrusted external sources and must carefully
+            /// validate all input. The Theater runtime monitors handler execution for timeouts
+            /// and resource usage to prevent denial-of-service attacks.
+            ///
+            /// ## Implementation Notes
+            ///
+            /// - All handler functions receive and return the actor's state to allow stateful processing
+            /// - Handlers should be efficient as they may be called frequently
+            /// - Errors returned from handlers are logged and may trigger actor supervision responses
             #[allow(dead_code, clippy::all)]
             pub mod http_handlers {
                 #[used]
@@ -5694,27 +7852,100 @@ pub mod exports {
                     }
                 }
                 pub trait Guest {
-                    /// Called to handle an HTTP request
+                    /// # Handle an HTTP request
+                    ///
+                    /// Called to process an incoming HTTP request and generate a response.
+                    ///
+                    /// ## Parameters
+                    ///
+                    /// * `state` - The current actor state
+                    /// * `params` - Tuple containing:
+                    /// * `handler-id` - ID of the registered handler being called
+                    /// * `http-request` - The incoming HTTP request to handle
+                    ///
+                    /// ## Returns
+                    ///
+                    /// * `Ok((state, (http-response,)))` - Updated state and the HTTP response to send
+                    /// * `Err(string)` - Error message if request handling fails
                     fn handle_request(
                         state: State,
                         params: (HandlerId, HttpRequest),
                     ) -> Result<(State, (HttpResponse,)), _rt::String>;
-                    /// Called to process a request through middleware
+                    /// # Process a request through middleware
+                    ///
+                    /// Called to process an HTTP request through middleware before it reaches a route handler.
+                    ///
+                    /// ## Parameters
+                    ///
+                    /// * `state` - The current actor state
+                    /// * `params` - Tuple containing:
+                    /// * `handler-id` - ID of the registered middleware handler being called
+                    /// * `http-request` - The incoming HTTP request to process
+                    ///
+                    /// ## Returns
+                    ///
+                    /// * `Ok((state, (middleware-result,)))` - Updated state and middleware processing result
+                    /// * `Err(string)` - Error message if middleware processing fails
                     fn handle_middleware(
                         state: State,
                         params: (HandlerId, HttpRequest),
                     ) -> Result<(State, (MiddlewareResult,)), _rt::String>;
-                    /// Called when a WebSocket connection is established
+                    /// # Handle WebSocket connection event
+                    ///
+                    /// Called when a new WebSocket connection is established.
+                    ///
+                    /// ## Parameters
+                    ///
+                    /// * `state` - The current actor state
+                    /// * `params` - Tuple containing:
+                    /// * `handler-id` - ID of the registered connect handler being called
+                    /// * `u64` - Unique connection ID for this WebSocket connection
+                    /// * `string` - The URL path that was connected to
+                    /// * `option<string>` - Optional protocol specified by the client
+                    ///
+                    /// ## Returns
+                    ///
+                    /// * `Ok((state,))` - Updated actor state
+                    /// * `Err(string)` - Error message if connection handling fails
                     fn handle_websocket_connect(
                         state: State,
                         params: (HandlerId, u64, _rt::String, Option<_rt::String>),
                     ) -> Result<(State,), _rt::String>;
-                    /// Called when a WebSocket message is received
+                    /// # Handle WebSocket message event
+                    ///
+                    /// Called when a message is received on a WebSocket connection.
+                    ///
+                    /// ## Parameters
+                    ///
+                    /// * `state` - The current actor state
+                    /// * `params` - Tuple containing:
+                    /// * `handler-id` - ID of the registered message handler being called
+                    /// * `u64` - Connection ID that received the message
+                    /// * `websocket-message` - The message that was received
+                    ///
+                    /// ## Returns
+                    ///
+                    /// * `Ok((state, (list<websocket-message>,)))` - Updated state and optional response messages
+                    /// * `Err(string)` - Error message if message handling fails
                     fn handle_websocket_message(
                         state: State,
                         params: (HandlerId, u64, WebsocketMessage),
                     ) -> Result<(State, (_rt::Vec<WebsocketMessage>,)), _rt::String>;
-                    /// Called when a WebSocket connection is closed
+                    /// # Handle WebSocket disconnection event
+                    ///
+                    /// Called when a WebSocket connection is closed.
+                    ///
+                    /// ## Parameters
+                    ///
+                    /// * `state` - The current actor state
+                    /// * `params` - Tuple containing:
+                    /// * `handler-id` - ID of the registered disconnect handler being called
+                    /// * `u64` - Connection ID that was closed
+                    ///
+                    /// ## Returns
+                    ///
+                    /// * `Ok((state,))` - Updated actor state
+                    /// * `Err(string)` - Error message if disconnect handling fails
                     fn handle_websocket_disconnect(
                         state: State,
                         params: (HandlerId, u64),

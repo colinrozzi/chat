@@ -16,6 +16,7 @@ use bindings::ntwk::theater::http_framework::{
 use bindings::ntwk::theater::http_types::{
     HttpRequest as FrameworkHttpRequest, HttpResponse as FrameworkHttpResponse, MiddlewareResult,
 };
+use bindings::ntwk::theater::message_server_host::send_on_channel;
 use bindings::ntwk::theater::runtime::log;
 use bindings::ntwk::theater::store;
 use bindings::ntwk::theater::supervisor::spawn;
@@ -423,6 +424,54 @@ impl MessageServerClientGuest for Component {
     ) -> Result<(Option<Vec<u8>>, (Vec<u8>,)), String> {
         log("Handling message server client request");
         Ok((state, (vec![],)))
+    }
+
+    fn handle_channel_open(
+        state: Option<bindings::exports::ntwk::theater::message_server_client::Json>,
+        params: (bindings::exports::ntwk::theater::message_server_client::Json,),
+    ) -> Result<
+        (
+            Option<bindings::exports::ntwk::theater::message_server_client::Json>,
+            (bindings::exports::ntwk::theater::message_server_client::ChannelAccept,),
+        ),
+        String,
+    > {
+        Ok((
+            state,
+            (
+                bindings::exports::ntwk::theater::message_server_client::ChannelAccept {
+                    accepted: true,
+                    message: None,
+                },
+            ),
+        ))
+    }
+
+    fn handle_channel_close(
+        state: Option<bindings::exports::ntwk::theater::message_server_client::Json>,
+        params: (String,),
+    ) -> Result<(Option<bindings::exports::ntwk::theater::message_server_client::Json>,), String>
+    {
+        Ok((state,))
+    }
+
+    fn handle_channel_message(
+        state: Option<bindings::exports::ntwk::theater::message_server_client::Json>,
+        params: (
+            String,
+            bindings::exports::ntwk::theater::message_server_client::Json,
+        ),
+    ) -> Result<(Option<bindings::exports::ntwk::theater::message_server_client::Json>,), String>
+    {
+        let (channel_id, message) = params;
+        log(&format!(
+            "Received message on channel {}: {:?}",
+            channel_id, message
+        ));
+        let response = "Hello from the server!";
+        let r = send_on_channel(&channel_id, &response.as_bytes().to_vec());
+        log(&format!("runtime-content-fs: Sent response: {:?}", r));
+        Ok((state,))
     }
 }
 
