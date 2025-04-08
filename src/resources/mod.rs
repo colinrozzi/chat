@@ -13,9 +13,9 @@ pub const CHAT_JS: &str = include_str!("../../assets/chat.js");
 pub fn get_resource(path: &str) -> Option<(&'static str, &'static str)> {
     log(format!("Request for resource: {}", path).as_str());
     match path {
-        "/" | "/index.html" => Some((INDEX_HTML, "text/html")),
-        "/styles.css" => Some((STYLES_CSS, "text/css")),
-        "/chat.js" => Some((CHAT_JS, "application/javascript")),
+        "index.html" => Some((INDEX_HTML, "text/html")),
+        "styles.css" => Some((STYLES_CSS, "text/css")),
+        "chat.js" => Some((CHAT_JS, "application/javascript")),
         _ => None,
     }
 }
