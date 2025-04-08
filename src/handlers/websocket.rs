@@ -1,7 +1,6 @@
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::bindings::ntwk::theater::types::Json;
 use crate::bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
-use crate::children::scan_available_children;
 use crate::state::State;
 use serde_json::{json, Value};
 
@@ -73,26 +72,6 @@ pub fn handle_message(
                             }
                         }
 
-                        // Child actor commands
-                        Some("get_available_children") => {
-                            handle_get_available_children(&current_state)
-                        }
-                        Some("get_running_children") => handle_get_running_children(&current_state),
-                        Some("start_child") => {
-                            if let Some(manifest_name) = command["manifest_name"].as_str() {
-                                handle_start_child(&mut current_state, manifest_name)
-                            } else {
-                                default_response(&current_state)
-                            }
-                        }
-                        Some("stop_child") => {
-                            if let Some(actor_id) = command["actor_id"].as_str() {
-                                handle_stop_child(&mut current_state, actor_id)
-                            } else {
-                                default_response(&current_state)
-                            }
-                        }
-
                         // Message commands
                         Some("send_message") => {
                             if let Some(content) = command["content"].as_str() {
@@ -107,30 +86,6 @@ pub fn handle_message(
                         Some("get_message") => {
                             if let Some(message_id) = command["message_id"].as_str() {
                                 handle_get_message(&mut current_state, message_id)
-                            } else {
-                                default_response(&current_state)
-                            }
-                        }
-                        Some("get_pending_child_messages") => {
-                            handle_get_pending_child_messages(&current_state)
-                        }
-                        Some("toggle_pending_child_message") => {
-                            if let (Some(message_id), Some(selected)) = (
-                                command["message_id"].as_str(),
-                                command["selected"].as_bool(),
-                            ) {
-                                handle_toggle_pending_child_message(
-                                    &mut current_state,
-                                    message_id,
-                                    selected,
-                                )
-                            } else {
-                                default_response(&current_state)
-                            }
-                        }
-                        Some("remove_pending_child_message") => {
-                            if let Some(message_id) = command["message_id"].as_str() {
-                                handle_remove_pending_child_message(&mut current_state, message_id)
                             } else {
                                 default_response(&current_state)
                             }
@@ -453,172 +408,6 @@ fn handle_delete_chat(
     }
 }
 
-// Child actor handlers
-fn handle_get_available_children(
-    state: &State,
-) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    let available_children = scan_available_children(&state.filesystem)
-        .into_iter()
-        .map(|child| {
-            json!({
-                "name": child.name,
-                "description": child.description,
-                "manifest_name": child.manifest_name
-            })
-        })
-        .collect::<Vec<Value>>();
-
-    Ok((
-        Some(serde_json::to_vec(state).unwrap()),
-        (WebsocketResponse {
-            messages: vec![WebsocketMessage {
-                ty: MessageType::Text,
-                text: Some(
-                    json!({
-                        "type": "children_update",
-                        "available_children": available_children
-                    })
-                    .to_string(),
-                ),
-                data: None,
-            }],
-        },),
-    ))
-}
-
-fn handle_get_running_children(
-    state: &State,
-) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    let running_children = state.list_running_children();
-
-    Ok((
-        Some(serde_json::to_vec(state).unwrap()),
-        (WebsocketResponse {
-            messages: vec![WebsocketMessage {
-                ty: MessageType::Text,
-                text: Some(
-                    json!({
-                        "type": "children_update",
-                        "running_children": running_children
-                    })
-                    .to_string(),
-                ),
-                data: None,
-            }],
-        },),
-    ))
-}
-
-fn handle_start_child(
-    state: &mut State,
-    manifest_name: &str,
-) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    match state.start_child(manifest_name) {
-        Ok(_actor_id) => {
-            // Get the updated running children
-            let running_children = state.list_running_children();
-
-            Ok((
-                Some(serde_json::to_vec(state).unwrap()),
-                (WebsocketResponse {
-                    messages: vec![
-                        WebsocketMessage {
-                            ty: MessageType::Text,
-                            text: Some(
-                                json!({
-                                    "type": "children_update",
-                                    "running_children": running_children
-                                })
-                                .to_string(),
-                            ),
-                            data: None,
-                        },
-                        WebsocketMessage {
-                            ty: MessageType::Text,
-                            text: Some(
-                                json!({
-                                    "type": "messages_updated",
-                                    "head": state.head,
-                                    "current_chat_id": state.current_chat_id
-                                })
-                                .to_string(),
-                            ),
-                            data: None,
-                        },
-                    ],
-                },),
-            ))
-        }
-        Err(e) => {
-            log(&format!("Failed to start child: {}", e));
-            Ok((
-                Some(serde_json::to_vec(state).unwrap()),
-                (WebsocketResponse {
-                    messages: vec![WebsocketMessage {
-                        ty: MessageType::Text,
-                        text: Some(
-                            json!({
-                                "type": "error",
-                                "message": format!("Failed to start child: {}", e)
-                            })
-                            .to_string(),
-                        ),
-                        data: None,
-                    }],
-                },),
-            ))
-        }
-    }
-}
-
-fn handle_stop_child(
-    state: &mut State,
-    actor_id: &str,
-) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    match state.stop_child(actor_id) {
-        Ok(_) => {
-            // Get the updated running children
-            let running_children = state.list_running_children();
-
-            Ok((
-                Some(serde_json::to_vec(state).unwrap()),
-                (WebsocketResponse {
-                    messages: vec![WebsocketMessage {
-                        ty: MessageType::Text,
-                        text: Some(
-                            json!({
-                                "type": "children_update",
-                                "running_children": running_children
-                            })
-                            .to_string(),
-                        ),
-                        data: None,
-                    }],
-                },),
-            ))
-        }
-        Err(e) => {
-            log(&format!("Failed to stop child: {}", e));
-            Ok((
-                Some(serde_json::to_vec(state).unwrap()),
-                (WebsocketResponse {
-                    messages: vec![WebsocketMessage {
-                        ty: MessageType::Text,
-                        text: Some(
-                            json!({
-                                "type": "error",
-                                "message": format!("Failed to stop child: {}", e)
-                            })
-                            .to_string(),
-                        ),
-                        data: None,
-                    }],
-                },),
-            ))
-        }
-    }
-}
-
 // Message handlers
 fn handle_send_message(
     state: &mut State,
@@ -728,89 +517,6 @@ fn handle_get_head(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse
             }],
         },),
     ))
-}
-
-fn handle_get_pending_child_messages(
-    state: &State,
-) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    // The notification is already done by state.notify_pending_child_messages_update()
-    let _ = state.notify_pending_child_messages_update();
-
-    Ok((
-        Some(serde_json::to_vec(state).unwrap()),
-        (WebsocketResponse {
-            messages: vec![], // Empty messages as we've already sent the notification
-        },),
-    ))
-}
-
-fn handle_toggle_pending_child_message(
-    state: &mut State,
-    message_id: &str,
-    selected: bool,
-) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    match state.toggle_pending_child_message(message_id, selected) {
-        Ok(_) => {
-            // Return empty messages as the notification is already sent
-            Ok((
-                Some(serde_json::to_vec(state).unwrap()),
-                (WebsocketResponse { messages: vec![] },),
-            ))
-        }
-        Err(e) => {
-            log(&format!("Failed to toggle pending child message: {}", e));
-            Ok((
-                Some(serde_json::to_vec(state).unwrap()),
-                (WebsocketResponse {
-                    messages: vec![WebsocketMessage {
-                        ty: MessageType::Text,
-                        text: Some(
-                            json!({
-                                "type": "error",
-                                "message": format!("Failed to toggle pending child message: {}", e)
-                            })
-                            .to_string(),
-                        ),
-                        data: None,
-                    }],
-                },),
-            ))
-        }
-    }
-}
-
-fn handle_remove_pending_child_message(
-    state: &mut State,
-    message_id: &str,
-) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    match state.remove_pending_child_message(message_id) {
-        Ok(_) => {
-            // Return empty messages as the notification is already sent
-            Ok((
-                Some(serde_json::to_vec(state).unwrap()),
-                (WebsocketResponse { messages: vec![] },),
-            ))
-        }
-        Err(e) => {
-            log(&format!("Failed to remove pending child message: {}", e));
-            Ok((
-                Some(serde_json::to_vec(state).unwrap()),
-                (WebsocketResponse {
-                    messages: vec![WebsocketMessage {
-                        ty: MessageType::Text,
-                        text: Some(
-                            json!({
-                                "type": "error",
-                                "message": format!("Failed to remove pending child message: {}", e)
-                            })
-                            .to_string(),
-                        ),
-                        data: None,
-                    }],
-                },),
-            ))
-        }
-    }
 }
 
 fn default_response(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {

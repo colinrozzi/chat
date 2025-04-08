@@ -1,6 +1,5 @@
 mod api;
 mod bindings;
-mod children;
 mod fs;
 mod handlers;
 mod messages;
@@ -117,23 +116,6 @@ impl ActorGuest for Component {
             log(&format!("Created runtime store with ID: {}", store_id));
         }
 
-        let content_fs_actor_id;
-        if init_data.assets_runtime_content_fs.is_none() {
-            // Start runtime content fs actor
-            log("Starting runtime content fs actor");
-            let content_fs_init_data = json!({
-                "store_id": init_data.assets_store_id.unwrap(),
-                "name": "chat-assets"
-            });
-
-            content_fs_actor_id = spawn(
-                "/Users/colinrozzi/work/actors/runtime-content-fs/actor.toml",
-                Some(&serde_json::to_vec(&content_fs_init_data).unwrap()),
-            )?;
-        } else {
-            content_fs_actor_id = init_data.assets_runtime_content_fs.unwrap()
-        }
-
         // Set up the HTTP server
         log("Setting up HTTP server...");
         let server_id = setup_http_server(init_data.websocket_port)?;
@@ -147,7 +129,6 @@ impl ActorGuest for Component {
             server_id,
             init_data.websocket_port,
             init_data.head,
-            content_fs_actor_id,
         );
 
         log("State initialized");
@@ -379,44 +360,11 @@ impl HttpHandlersGuest for Component {
 impl MessageServerClientGuest for Component {
     fn handle_send(
         state: Option<Vec<u8>>,
-        params: (Vec<u8>,),
+        _params: (Vec<u8>,),
     ) -> Result<(Option<Vec<u8>>,), String> {
         log("Handling message server client send");
-        let mut current_state: State = serde_json::from_slice(&state.unwrap()).unwrap();
 
-        // Attempt to parse the incoming message
-        match serde_json::from_slice::<serde_json::Value>(&params.0) {
-            Ok(message) => {
-                log(&format!(
-                    "Received message: {}",
-                    serde_json::to_string(&message).unwrap()
-                ));
-
-                // Check if this is a child message
-                if let Some(msg_type) = message.get("msg_type").and_then(|v| v.as_str()) {
-                    if msg_type == "child_message" {
-                        if let Some(data) = message.get("data") {
-                            // Try to parse as ChildMessage
-                            match serde_json::from_value::<messages::ChildMessage>(data.clone()) {
-                                Ok(child_message) => {
-                                    log(&format!("Processing child message: {:?}", child_message));
-                                    // Add to pending child messages instead of directly to the chain
-                                    current_state.add_pending_child_message(child_message);
-                                }
-                                Err(e) => {
-                                    log(&format!("Failed to parse child message: {}", e));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                log(&format!("Failed to parse message: {}", e));
-            }
-        }
-
-        Ok((Some(serde_json::to_vec(&current_state).unwrap()),))
+        Ok((state,))
     }
 
     fn handle_request(
@@ -429,7 +377,7 @@ impl MessageServerClientGuest for Component {
 
     fn handle_channel_open(
         state: Option<bindings::exports::ntwk::theater::message_server_client::Json>,
-        params: (bindings::exports::ntwk::theater::message_server_client::Json,),
+        _params: (bindings::exports::ntwk::theater::message_server_client::Json,),
     ) -> Result<
         (
             Option<bindings::exports::ntwk::theater::message_server_client::Json>,
@@ -450,7 +398,7 @@ impl MessageServerClientGuest for Component {
 
     fn handle_channel_close(
         state: Option<bindings::exports::ntwk::theater::message_server_client::Json>,
-        params: (String,),
+        _params: (String,),
     ) -> Result<(Option<bindings::exports::ntwk::theater::message_server_client::Json>,), String>
     {
         Ok((state,))

@@ -26,14 +26,20 @@ impl MessageStore {
         mut entry: ChainEntry,
         chat_id: &str,
     ) -> Result<ChainEntry, Box<dyn std::error::Error>> {
-        log(&format!("[DEBUG] Saving message to runtime store for chat {}", chat_id));
+        log(&format!(
+            "[DEBUG] Saving message to runtime store for chat {}",
+            chat_id
+        ));
 
         // Serialize the entry to bytes
         let content = serde_json::to_vec(&entry)?;
 
         // Store the content in the runtime store
         let content_ref = store::store(&self.store_id, &content)?;
-        log(&format!("[DEBUG] Stored message with hash: {}", content_ref.hash));
+        log(&format!(
+            "[DEBUG] Stored message with hash: {}",
+            content_ref.hash
+        ));
 
         // Set the ID based on the content reference hash
         entry.id = Some(content_ref.hash.clone());
@@ -44,7 +50,10 @@ impl MessageStore {
             .ok_or_else(|| format!("Chat {} not found", chat_id))?;
 
         // Update the chat head
-        log(&format!("[DEBUG] Updating chat head from {:?} to {}", chat_info.head, content_ref.hash));
+        log(&format!(
+            "[DEBUG] Updating chat head from {:?} to {}",
+            chat_info.head, content_ref.hash
+        ));
         chat_info.head = Some(content_ref.hash.clone());
 
         // Save the updated chat info
@@ -62,7 +71,10 @@ impl MessageStore {
         entry: ChainEntry,
         chat_id: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        log(&format!("[DEBUG] Saving message with specific ID to runtime store: {:?}", entry.id));
+        log(&format!(
+            "[DEBUG] Saving message with specific ID to runtime store: {:?}",
+            entry.id
+        ));
 
         // Make sure the entry has an ID
         if entry.id.is_none() {
@@ -70,11 +82,15 @@ impl MessageStore {
         }
 
         let id = entry.id.as_ref().unwrap();
-        
+
         // Log parent information
         if !entry.parents.is_empty() {
-            log(&format!("[DEBUG] Message {} has {} parents: {:?}", 
-                id, entry.parents.len(), entry.parents));
+            log(&format!(
+                "[DEBUG] Message {} has {} parents: {:?}",
+                id,
+                entry.parents.len(),
+                entry.parents
+            ));
         } else {
             log(&format!("[DEBUG] Message {} has no parents", id));
         }
@@ -83,23 +99,27 @@ impl MessageStore {
         let content = serde_json::to_vec(&entry)?;
 
         // Create a content reference with the specified ID
-        let content_ref = ContentRef {
-            hash: id.clone(),
-        };
+        let content_ref = ContentRef { hash: id.clone() };
 
         // Store the content in the runtime store
         store::store(&self.store_id, &content)?;
-        
+
         // We don't actually need to store with hash since we already have the hash
         // Just label the content with the provided ID
         store::label(&self.store_id, &content_ref.hash, &content_ref)?;
-        log(&format!("[DEBUG] Stored message with specific hash: {}", content_ref.hash));
+        log(&format!(
+            "[DEBUG] Stored message with specific hash: {}",
+            content_ref.hash
+        ));
 
         // Get the current chat info (but don't update head in this case)
         let chat_info = self
             .get_chat_info(chat_id)?
             .ok_or_else(|| format!("Chat {} not found", chat_id))?;
-        log(&format!("[DEBUG] Current chat head remains: {:?}", chat_info.head));
+        log(&format!(
+            "[DEBUG] Current chat head remains: {:?}",
+            chat_info.head
+        ));
 
         // Update cache
         self.cache.insert(content_ref.hash.clone(), entry);
@@ -115,7 +135,10 @@ impl MessageStore {
             return Ok(msg.clone());
         }
 
-        log(&format!("[DEBUG] Loading message from runtime store: {}", id));
+        log(&format!(
+            "[DEBUG] Loading message from runtime store: {}",
+            id
+        ));
 
         // Create content reference
         let content_ref = ContentRef {
@@ -135,7 +158,10 @@ impl MessageStore {
         let mut msg: ChainEntry = match serde_json::from_slice(&content) {
             Ok(msg) => msg,
             Err(e) => {
-                log(&format!("[ERROR] Failed to deserialize message {}: {}", id, e));
+                log(&format!(
+                    "[ERROR] Failed to deserialize message {}: {}",
+                    id, e
+                ));
                 return Err(e.into());
             }
         };
@@ -143,8 +169,12 @@ impl MessageStore {
 
         // Log parent information
         if !msg.parents.is_empty() {
-            log(&format!("[DEBUG] Loaded message {} has {} parents: {:?}", 
-                id, msg.parents.len(), msg.parents));
+            log(&format!(
+                "[DEBUG] Loaded message {} has {} parents: {:?}",
+                id,
+                msg.parents.len(),
+                msg.parents
+            ));
         } else {
             log(&format!("[DEBUG] Loaded message {} has no parents", id));
         }
@@ -254,7 +284,6 @@ impl MessageStore {
             name,
             head: starting_head,
             icon: None,
-            children: HashMap::new(),
         };
 
         // Try to store the chat info with enhanced error handling
