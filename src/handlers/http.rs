@@ -1,6 +1,7 @@
 use crate::bindings::ntwk::theater::http_client::HttpRequest as ClientHttpRequest;
 use crate::bindings::ntwk::theater::http_client::HttpResponse as ClientHttpResponse;
 use crate::bindings::ntwk::theater::runtime::log;
+use crate::resources::get_resource;
 use crate::state::State;
 use serde_json::{json, Value};
 
@@ -35,35 +36,26 @@ fn serve_file(
     content_type: &str,
     state: &mut State,
 ) -> Result<(Option<Vec<u8>>, (ClientHttpResponse,)), String> {
-    // Use the ContentFS interface instead of direct filesystem access
-    match state.filesystem.read_file(filename) {
-        Ok(content) => {
+    get_resource(filename)
+        .map(|(content, _)| {
             let response = ClientHttpResponse {
                 status: 200,
                 headers: vec![
                     ("Content-Type".to_string(), content_type.to_string()),
                     ("Cache-Control".to_string(), "no-cache".to_string()),
                 ],
-                body: Some(content),
+                body: Some(content.as_bytes().to_vec()),
             };
             Ok((Some(serde_json::to_vec(state).unwrap()), (response,)))
-        }
-        Err(e) => {
-            log(&format!("Error reading file {}: {}", filename, e));
-            not_found()
-        }
-    }
+        })
+        .unwrap_or_else(|| not_found())
 }
 
 fn serve_chat_js(state: &mut State) -> Result<(Option<Vec<u8>>, (ClientHttpResponse,)), String> {
-    // Use the ContentFS interface instead of direct filesystem access
-    match state.filesystem.read_file("chat.js") {
-        Ok(content) => {
-            // Convert content to string
-            let content_str = String::from_utf8(content).unwrap_or_else(|_| "".to_string());
-
+    get_resource("chat.js")
+        .map(|(content, _)| {
             // Replace the placeholder with the actual WebSocket port
-            let modified_content = content_str.replace("{{WEBSOCKET_PORT}}", "8084");
+            let modified_content = content.replace("{{WEBSOCKET_PORT}}", "8084");
 
             let response = ClientHttpResponse {
                 status: 200,
@@ -74,15 +66,11 @@ fn serve_chat_js(state: &mut State) -> Result<(Option<Vec<u8>>, (ClientHttpRespo
                     ),
                     ("Cache-Control".to_string(), "no-cache".to_string()),
                 ],
-                body: Some(modified_content.into_bytes()),
+                body: Some(modified_content.as_bytes().to_vec()),
             };
             Ok((Some(serde_json::to_vec(state).unwrap()), (response,)))
-        }
-        Err(e) => {
-            log(&format!("Error reading chat.js file: {}", e));
-            not_found()
-        }
-    }
+        })
+        .unwrap_or_else(|| not_found())
 }
 
 fn handle_messages_api(

@@ -4,6 +4,7 @@ mod children;
 mod fs;
 mod handlers;
 mod messages;
+mod resources;
 mod state;
 
 use bindings::exports::ntwk::theater::actor::Guest as ActorGuest;
