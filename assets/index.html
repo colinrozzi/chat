@@ -112,60 +112,6 @@
                 <div class="loading-spinner"></div>
             </div>
         </main>
-
-        <!-- Toggle Button for Actor Panel -->
-        <button id="expandButton" class="expand-button">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="15 18 9 12 15 6"></polyline>
-            </svg>
-            Actors
-        </button>
-
-        <!-- Actor Panel (Right Sidebar) -->
-        <aside id="actorPanel" class="actor-panel">
-            <div class="panel-header">
-                <div class="panel-title">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                    Actor Management
-                </div>
-                <button id="collapseButton" class="collapse-button">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M18 6L6 18M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            <div class="panel-content">
-                <div class="section">
-                    <button class="section-header" onclick="toggleSection('availableActors')">
-                        <h3 class="section-title">Available Actors</h3>
-                        <svg class="section-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2">
-                            <path d="M6 9l6 6 6-6" />
-                        </svg>
-                    </button>
-                    <div id="availableActors" class="section-content">
-                        <!-- Available actors will be rendered here -->
-                    </div>
-                </div>
-                <div class="section">
-                    <button class="section-header" onclick="toggleSection('runningActors')">
-                        <h3 class="section-title">Running Actors</h3>
-                        <svg class="section-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2">
-                            <path d="M6 9l6 6 6-6" />
-                        </svg>
-                    </button>
-                    <div id="runningActors" class="section-content">
-                        <!-- Running actors will be rendered here -->
-                    </div>
-                </div>
-            </div>
-        </aside>
     </div>
     <script src="chat.js"></script>
 </body>

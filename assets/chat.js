@@ -3,9 +3,6 @@ let messageChain = [];
 let currentHead = null;
 let currentChatId = null;
 let chats = [];
-let availableChildren = [];
-let runningChildren = [];
-let pendingChildMessages = [];
 let ws = null;
 let reconnectAttempts = 0;
 let totalCost = 0;
@@ -58,15 +55,11 @@ function connectWebSocket() {
             currentHead: currentHead,
             currentChatId: currentChatId,
             chats: chats.length,
-            pendingChildMessages: pendingChildMessages.length
         });
         
         // Request initial state
         sendWebSocketMessage({ type: 'list_chats' });  // Get available chats
         sendWebSocketMessage({ type: 'get_head' });  // Initial head query
-        sendWebSocketMessage({ type: 'get_available_children' });
-        sendWebSocketMessage({ type: 'get_running_children' });
-        sendWebSocketMessage({ type: 'get_pending_child_messages' });
     };
     
     ws.onclose = () => {
@@ -102,19 +95,6 @@ function connectWebSocket() {
                     messageType: data.message?.data ? Object.keys(data.message.data)[0] : 'unknown',
                     currentChainLength: messageChain.length
                 });
-            } else if (data.type === 'children_update') {
-                console.log('CHILDREN UPDATE:', {
-                    availableCount: data.available_children?.length || 0,
-                    runningCount: data.running_children?.length || 0,
-                    currentChainLength: messageChain.length,
-                    currentHead: currentHead
-                });
-            } else if (data.type === 'pending_child_messages_update') {
-                console.log('PENDING CHILD MESSAGES:', {
-                    count: data.pending_messages?.length || 0,
-                    messageIds: data.pending_messages?.map(m => m.id) || [],
-                    childIds: data.pending_messages?.map(m => m.child_id) || []
-                });
             }
             
             handleWebSocketMessage(data);
@@ -145,16 +125,6 @@ function handleWebSocketMessage(data) {
     console.log('Received message:', data);
 
     switch (data.type) {
-        case 'children_update':
-            if (data.available_children) {
-                availableChildren = data.available_children;
-            }
-            if (data.running_children) {
-                runningChildren = data.running_children;
-            }
-            renderActorPanels();
-            break;
-
         case 'messages_updated':
         case 'head':
             if (data.current_chat_id && data.current_chat_id !== currentChatId) {
@@ -180,13 +150,6 @@ function handleWebSocketMessage(data) {
             if (data.message) {
                 handleNewMessage(data.message);
                 // The generate button state is handled in handleNewMessage
-            }
-            break;
-            
-        case 'pending_child_messages_update':
-            if (data.pending_messages) {
-                pendingChildMessages = data.pending_messages;
-                renderPendingChildMessages();
             }
             break;
             
@@ -412,215 +375,10 @@ function renderMessage(message) {
                 </div>
             `;
         }
-    } else if (message.data.ChildMessage) {
-        // Handle individual child message
-        const childMsg = message.data.ChildMessage;
-        
-        // Determine if this is a short text message (less than 100 characters)
-        const isShortMessage = childMsg.text && childMsg.text.length < 100;
-        const smallClass = isShortMessage && !childMsg.html ? 'small' : '';
-        
-        // Check if HTML content exists
-        if (childMsg.html) {
-            return `
-                <div class="child-message ${smallClass}" data-message-id="${message.id}">
-                    <div class="child-message-header" onclick="toggleChildMessage(this)">
-                        <div class="child-header">Actor: ${childMsg.child_id}</div>
-                        ${Object.keys(childMsg.data || {}).length > 0 ? `
-                            <button class="child-data-toggle" onclick="toggleChildData('child-${message.id}-${childMsg.child_id}')">
-                                <span>View Data</span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M9 18l6-6-6-6"/>
-                                </svg>
-                            </button>
-                        ` : ''}
-                    </div>
-                    <div class="child-message-content">
-                        <div class="message-actions">
-                            <button class="message-action-button" onclick="copyMessageText('${message.id}')">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                </svg>
-                                <span>Copy Text</span>
-                            </button>
-                            <div class="action-divider"></div>
-                            <button class="message-action-button" onclick="copyMessageId('${message.id}')">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                                </svg>
-                                <span>Copy ID</span>
-                            </button>
-                        </div>
-                        <div class="child-html-content">${sanitizeHTML(childMsg.html)}</div>
-                        ${Object.keys(childMsg.data || {}).length > 0 ? `
-                            <div id="child-${message.id}-${childMsg.child_id}" class="child-data">
-                                <div class="child-data-content">
-                                    ${formatJsonData(childMsg.data)}
-                                </div>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-        } else if (childMsg.text && childMsg.text.trim() !== '') {
-            return `
-                <div class="child-message ${smallClass}" data-message-id="${message.id}">
-                    <div class="child-message-header" onclick="toggleChildMessage(this)">
-                        <div class="child-header">Actor: ${childMsg.child_id}</div>
-                        ${Object.keys(childMsg.data || {}).length > 0 ? `
-                            <button class="child-data-toggle" onclick="toggleChildData('child-${message.id}-${childMsg.child_id}')">
-                                <span>View Data</span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M9 18l6-6-6-6"/>
-                                </svg>
-                            </button>
-                        ` : ''}
-                    </div>
-                    <div class="child-message-content">
-                        <div class="message-actions">
-                            <button class="message-action-button" onclick="copyMessageText('${message.id}')">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                                </svg>
-                                <span>Copy Text</span>
-                            </button>
-                            <div class="action-divider"></div>
-                            <button class="message-action-button" onclick="copyMessageId('${message.id}')">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-                                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-                                </svg>
-                                <span>Copy ID</span>
-                            </button>
-                        </div>
-                        ${formatMessageContent(childMsg.text)}
-                        ${Object.keys(childMsg.data || {}).length > 0 ? `
-                            <div id="child-${message.id}-${childMsg.child_id}" class="child-data">
-                                <div class="child-data-content">
-                                    ${formatJsonData(childMsg.data)}
-                                </div>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-        }
-    }
+    } 
     return '';
 }
 
-// Pending Child Messages handling
-function renderPendingChildMessages() {
-    // Create a pending messages container if it doesn't exist
-    let pendingContainer = document.getElementById('pendingMessagesContainer');
-    if (!pendingContainer) {
-        pendingContainer = document.createElement('div');
-        pendingContainer.id = 'pendingMessagesContainer';
-        pendingContainer.className = 'pending-messages-container';
-        // Insert it before the input container
-        const inputContainer = document.querySelector('.input-container');
-        if (inputContainer && inputContainer.parentNode) {
-            inputContainer.parentNode.insertBefore(pendingContainer, inputContainer);
-        } else {
-            // Fallback to append to messages container
-            elements.messagesContainer.appendChild(pendingContainer);
-        }
-    }
-    
-    // Sort pending messages by timestamp (oldest first)
-    const sortedMessages = [...pendingChildMessages].sort((a, b) => a.timestamp - b.timestamp);
-    
-    // Clear container and add the header if we have pending messages
-    if (sortedMessages.length > 0) {
-        pendingContainer.innerHTML = `
-            <div class="pending-messages-header">
-                <h3>Pending Child Messages (${sortedMessages.length})</h3>
-                <div class="pending-action-buttons">
-                    <button id="selectAllPendingBtn" class="select-all-button">Select All</button>
-                    <button id="unselectAllPendingBtn" class="unselect-all-button">Unselect All</button>
-                </div>
-            </div>
-            <div class="pending-messages-list">
-                ${sortedMessages.map(renderPendingChildMessage).join('')}
-            </div>
-        `;
-        pendingContainer.style.display = 'block';
-        
-        // Add event listeners for select/unselect all buttons
-        document.getElementById('selectAllPendingBtn').addEventListener('click', () => toggleAllPendingMessages(true));
-        document.getElementById('unselectAllPendingBtn').addEventListener('click', () => toggleAllPendingMessages(false));
-    } else {
-        pendingContainer.style.display = 'none';
-        pendingContainer.innerHTML = '';
-    }
-}
-
-function renderPendingChildMessage(message) {
-    // Determine if HTML content should be shown
-    const hasHtml = message.html && message.html.trim() !== '';
-    const messageContent = hasHtml ? sanitizeHTML(message.html) : formatMessageContent(message.text);
-    
-    return `
-        <div class="pending-child-message ${message.selected ? 'selected' : ''}" data-message-id="${message.id}">
-            <div class="pending-child-header">
-                <div class="pending-child-info">
-                    <span class="child-actor-id">${message.child_id}</span>
-                    <div class="pending-message-actions">
-                        <label class="toggle-container">
-                            <input type="checkbox" class="toggle-inclusion" 
-                                ${message.selected ? 'checked' : ''}
-                                onchange="togglePendingMessage('${message.id}', this.checked)">
-                            <span class="toggle-label">Include</span>
-                        </label>
-                        <button class="remove-pending-btn" onclick="removePendingMessage('${message.id}')">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M18 6L6 18M6 6l12 12"></path>
-                            </svg>
-                            Remove
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="pending-child-content">
-                ${hasHtml ? 
-                `<div class="child-html-content">${messageContent}</div>` : 
-                `<div class="message-content">${messageContent}</div>`}
-            </div>
-        </div>
-    `;
-}
-
-// Toggle a specific pending message's inclusion state
-function togglePendingMessage(messageId, selected) {
-    console.log(`Toggling message ${messageId} to ${selected}`);
-    sendWebSocketMessage({
-        type: 'toggle_pending_child_message',
-        message_id: messageId,
-        selected: selected
-    });
-}
-
-// Toggle all pending messages' inclusion state
-function toggleAllPendingMessages(selected) {
-    console.log(`Toggling all pending messages to ${selected}`);
-    pendingChildMessages.forEach(message => {
-        if (message.selected !== selected) {
-            togglePendingMessage(message.id, selected);
-        }
-    });
-}
-
-// Remove a pending message
-function removePendingMessage(messageId) {
-    console.log(`Removing pending message ${messageId}`);
-    sendWebSocketMessage({
-        type: 'remove_pending_child_message',
-        message_id: messageId
-    });
-}
 
 function formatJsonData(data) {
     try {
@@ -637,19 +395,6 @@ function formatJsonData(data) {
     }
 }
 
-function toggleChildData(messageId) {
-    const container = document.getElementById(messageId);
-    const content = container.querySelector('.child-data-content');
-    const toggle = container.parentElement.querySelector('.child-data-toggle');
-    
-    content.classList.toggle('expanded');
-    toggle.classList.toggle('expanded');
-    
-    // Update toggle text
-    const toggleText = toggle.querySelector('span');
-    toggleText.textContent = content.classList.contains('expanded') ? 'Hide Data' : 'View Data';
-}
-
 function renderEmptyState() {
     return `
         <div class="empty-state">
@@ -660,34 +405,6 @@ function renderEmptyState() {
             <p class="text-sm">Start a conversation!</p>
         </div>
     `;
-}
-
-function renderActorPanels() {
-    // Available Actors
-    elements.availableActors.innerHTML = availableChildren.length ?
-        availableChildren.map(actor => `
-            <div class="actor-card">
-                <div class="actor-name">${actor.name || actor.manifest_name}</div>
-                ${actor.description ? `<div class="actor-description">${actor.description}</div>` : ''}
-                <button class="actor-button start-button" onclick="startActor('${actor.manifest_name}')">
-                    Start
-                </button>
-            </div>
-        `).join('') :
-        '<div class="empty-state">No available actors</div>';
-
-    // Running Actors
-    elements.runningActors.innerHTML = runningChildren.length ?
-        runningChildren.map(actor => `
-            <div class="actor-card">
-                <div class="actor-name">${actor.manifest_name}</div>
-                <div class="actor-id">${actor.actor_id}</div>
-                <button class="actor-button stop-button" onclick="stopActor('${actor.actor_id}')>
-                    Stop
-                </button>
-            </div>
-        `).join('') :
-        '<div class="empty-state">No running actors</div>';
 }
 
 // Cost calculation
@@ -930,8 +647,6 @@ function switchChat(chatId) {
     if (chatId === currentChatId) return; // Already on this chat
     
     // Reset pending child messages when switching chats
-    pendingChildMessages = [];
-    renderPendingChildMessages();
     
     sendWebSocketMessage({
         type: 'switch_chat',
@@ -991,27 +706,6 @@ function scrollToBottom() {
     elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
 }
 
-// Actor management
-function startActor(manifestName) {
-    console.log(`Starting actor: ${manifestName}`, {
-        currentState: {
-            messageChainLength: messageChain.length,
-            currentHead: currentHead,
-            pendingChildMessages: pendingChildMessages.length
-        }
-    });
-    sendWebSocketMessage({
-        type: 'start_child',
-        manifest_name: manifestName
-    });
-}
-
-function stopActor(actorId) {
-    sendWebSocketMessage({
-        type: 'stop_child',
-        actor_id: actorId
-    });
-}
 
 // Message input handling
 let isWaitingForResponse = false;
@@ -1049,7 +743,6 @@ function sendMessage() {
         messageLength: content.length,
         messageChainLength: messageChain.length,
         currentHead: currentHead,
-        pendingChildMessages: pendingChildMessages.length
     });
     
     // Create temporary message object for optimistic rendering
@@ -1095,7 +788,6 @@ function generateLlmResponse() {
     console.log('Generating LLM response:', {
         messageChainLength: messageChain.length,
         currentHead: currentHead,
-        pendingChildMessages: pendingChildMessages.length,
         sortedChainLength: sortMessageChain().length
     });
     
@@ -1128,13 +820,6 @@ function toggleChatSidebar() {
             elements.expandChatSidebarButton.classList.remove('visible');
         }
     }
-}
-
-// Toggle child message content
-function toggleChildMessage(header) {
-    const content = header.nextElementSibling;
-    content.classList.toggle('expanded');
-    header.classList.toggle('collapsed');
 }
 
 // Toggle section
@@ -1208,21 +893,6 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.expandChatSidebarButton.addEventListener('click', toggleChatSidebar);
     }
     
-    // Actor panel toggle handlers
-    if (elements.collapseButton) {
-        elements.collapseButton.addEventListener('click', () => {
-            if (elements.actorPanel) elements.actorPanel.classList.add('collapsed');
-            if (elements.expandButton) elements.expandButton.classList.add('visible');
-        });
-    }
-    
-    if (elements.expandButton) {
-        elements.expandButton.addEventListener('click', () => {
-            if (elements.actorPanel) elements.actorPanel.classList.remove('collapsed');
-            if (elements.expandButton) elements.expandButton.classList.remove('visible');
-        });
-    }
-    
     // New chat button
     if (elements.newChatButton) {
         elements.newChatButton.addEventListener('click', createNewChat);
@@ -1254,9 +924,7 @@ function copyMessageText(messageId) {
         } else if (message.data.Chat.Assistant) {
             content = message.data.Chat.Assistant.content;
         }
-    } else if (message.data.ChildMessage) {
-        content = message.data.ChildMessage.text;
-    }
+    } 
     
     // Copy to clipboard
     navigator.clipboard.writeText(content)
