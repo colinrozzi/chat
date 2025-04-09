@@ -1,40 +1,34 @@
 # Chat Actor System
 
-A WebAssembly-based actor system that enables dynamic chat interactions with child actor capabilities. The system allows for real-time message processing, AI-powered responses via Claude API, and extensible child actor management.
+A WebAssembly-based actor system that enables dynamic chat interactions with Claude AI. The system allows for real-time message processing, AI-powered responses via Claude API, and comprehensive chat management.
 
 ## Overview
 
-The chat actor system serves as a parent actor that can:
-- Manage a conversation thread with message history
+The chat actor system serves as a standalone actor that can:
+- Manage multiple conversation threads with message history
 - Interact with the Claude API for AI responses
-- Spawn and manage child actors dynamically
-- Process messages through child actors for enhanced functionality
 - Maintain real-time WebSocket connections for updates
 - Serve a web interface for user interaction
 
 ## Core Features
 
 - 🎭 **Actor System Architecture**
-  - Parent/child actor relationship model
-  - Dynamic actor spawning and management
-  - Inter-actor message passing
+  - WebAssembly-based implementation
+  - State persistence via content-addressable storage
+  - Efficient message handling
 
 - 💬 **Chat Functionality**
+  - Multiple chat thread management
   - Threaded message history
-  - Message rollups with child actor responses
+  - Directed acyclic graph (DAG) message structure
   - Real-time updates via WebSocket
   - Web interface for interaction
 
 - 🤖 **Claude API Integration**
-  - Automated response generation
+  - Automated response generation using Claude 3.7 Sonnet
   - Context-aware conversations
   - Message history management
-
-- 👥 **Child Actor Framework**
-  - Dynamic child actor discovery
-  - Runtime actor management
-  - Extensible actor interface
-  - Message notification system
+  - Token usage tracking
 
 ## Project Structure
 
@@ -47,11 +41,13 @@ chat/
 │   ├── index.html      # Web interface
 │   ├── styles.css      # UI styling
 │   ├── chat.js         # Frontend JavaScript
-│   ├── api-key.txt     # Claude API credentials
-│   └── children/       # Child actor manifests
+│   └── api-key.txt     # Claude API credentials
 ├── src/
 │   ├── lib.rs          # Main actor implementation
-│   ├── children.rs     # Child actor management
+│   ├── state.rs        # State management
+│   ├── api/            # API clients (Claude)
+│   ├── messages/       # Message structure and storage
+│   ├── handlers/       # HTTP and WebSocket handlers
 │   └── bindings.rs     # Generated WIT bindings
 └── wit/                # WebAssembly interface definitions
 ```
@@ -68,35 +64,13 @@ struct Message {
     parent: Option<String>, // Parent message ID
     id: Option<String>   // Message identifier
 }
-
-enum StoredMessage {
-    Message(Message),
-    Rollup(RollupMessage)
-}
-
-struct RollupMessage {
-    original_message_id: String,
-    child_responses: Vec<ChildResponse>,
-    parent: Option<String>,
-    id: Option<String>
-}
 ```
-
-### Child Actor System
-
-Child actors can:
-- Process incoming messages
-- Generate responses
-- Contribute to message rollups
-- Maintain independent state
-- Be started/stopped dynamically
 
 ### Communication Channels
 
 The system implements multiple communication channels:
 - HTTP Server (Port 8084): Web interface and API endpoints
-- WebSocket Server (Port 8085): Real-time updates and commands
-- Message Server: Inter-actor communication
+- WebSocket Server: Real-time updates and commands
 - HTTP Client: Claude API interaction
 
 ## Setup & Development
@@ -177,52 +151,47 @@ To distribute your actor:
 2. The resulting package can be shared and contains all dependencies
 3. For NixOS users, they can simply add your flake to their inputs and use it directly
 
-### Creating Child Actors
-
-1. Create a new manifest in `assets/children/`:
-   ```toml
-   name = "Example Actor"
-   description = "Handles specific message processing"
-   version = "0.1.0"
-   component_path = "path/to/component.wasm"
-   ```
-2. Implement the actor interface in your component
-3. Build and deploy to the children directory
-
 ## API Endpoints
 
 - `GET /api/messages`: Retrieve full message history
-- `WS /`: WebSocket endpoint for real-time updates
-- Commands:
-  - `get_available_children`: List available child actors
-  - `get_running_children`: List active child actors
-  - `start_child`: Launch a child actor
-  - `stop_child`: Terminate a child actor
-  - `send_message`: Send a new chat message
-  - `get_messages`: Retrieve message updates
+- `GET /api/chats`: List all chats
+- `POST /api/chats`: Create a new chat
+- `GET /api/chats/{id}`: Get chat info
+- `PUT /api/chats/{id}`: Update chat info
+- `DELETE /api/chats/{id}`: Delete a chat
+- `WS /ws`: WebSocket endpoint for real-time updates
+
+## WebSocket Commands
+
+- `list_chats`: Get list of all available chats
+- `create_chat`: Create a new chat
+- `switch_chat`: Switch to a different chat thread
+- `rename_chat`: Rename an existing chat
+- `delete_chat`: Delete a chat
+- `send_message`: Send a new user message
+- `generate_llm_response`: Generate a Claude AI response
+- `get_message`: Retrieve a specific message
+- `get_head`: Get the current head message
 
 ## Current Status
 
 ### Implemented Features
-- Basic chat functionality with AI responses
-- Child actor management system
+- Multi-chat functionality with thread management
+- Claude AI integration for automated responses
 - Real-time WebSocket updates
-- Message rollup system
+- Message history with DAG structure
 - Web interface
-- Dynamic child actor discovery
+- Content-addressable storage
 
 ### In Progress
 - Enhanced error handling
-- Child actor state persistence
-- Extended child actor capabilities
 - Performance optimizations
+- UI/UX improvements
 
 ## Contributing
 
 Contributions are welcome! Areas for improvement include:
-- Additional child actor implementations
 - Enhanced error handling
 - UI/UX improvements
 - Documentation expansion
 - Testing infrastructure
-
