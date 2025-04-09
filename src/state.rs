@@ -277,7 +277,7 @@ impl State {
         ));
     }
 
-    pub fn generate_llm_response(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn generate_llm_response(&mut self, model_id: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
         log("[DEBUG] Getting anthropic messages");
         let messages = self.get_anthropic_messages();
         log(&format!(
@@ -295,7 +295,14 @@ impl State {
             }
         }
 
-        match self.claude_client.generate_response(messages) {
+        // Log which model is being used
+        if let Some(model) = &model_id {
+            log(&format!("[DEBUG] Using specified model: {}", model));
+        } else {
+            log("[DEBUG] Using default model (claude-3-7-sonnet-20250219)");
+        }
+
+        match self.claude_client.generate_response(messages, model_id) {
             Ok(assistant_msg) => {
                 log(&format!("Generated completion: {:?}", assistant_msg));
 

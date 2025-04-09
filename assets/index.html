@@ -91,6 +91,12 @@
                     <textarea id="messageInput" class="message-input"
                         placeholder="Type your message... (Press Enter for new line, Shift+Enter to send)"
                         rows="1"></textarea>
+                    <div class="model-selector-container">
+                        <select id="modelSelector" class="model-selector">
+                            <option value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet</option>
+                            <!-- Other models will be populated dynamically -->
+                        </select>
+                    </div>
                     <button id="generateButton" class="generate-button" disabled>
                         Generate
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">

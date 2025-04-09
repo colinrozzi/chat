@@ -3,6 +3,7 @@ let messageChain = [];
 let currentHead = null;
 let currentChatId = null;
 let chats = [];
+let models = [];
 let ws = null;
 let reconnectAttempts = 0;
 let totalCost = 0;
@@ -19,6 +20,7 @@ const elements = {
     messageInput: getElement('messageInput'),
     sendButton: getElement('sendButton'),
     generateButton: getElement('generateButton'),
+    modelSelector: getElement('modelSelector'),
     messagesContainer: getElement('messagesContainer'),
     connectionStatus: getElement('connectionStatus'),
     loadingOverlay: getElement('loadingOverlay'),
@@ -60,6 +62,7 @@ function connectWebSocket() {
         // Request initial state
         sendWebSocketMessage({ type: 'list_chats' });  // Get available chats
         sendWebSocketMessage({ type: 'get_head' });  // Initial head query
+        sendWebSocketMessage({ type: 'list_models' }); // Get available models
     };
     
     ws.onclose = () => {
@@ -195,6 +198,13 @@ function handleWebSocketMessage(data) {
                 chats = chats.filter(c => c.id !== data.chat_id);
                 renderChatList();
                 updateCurrentChatName();
+            }
+            break;
+            
+        case 'models_list':
+            if (data.models) {
+                models = data.models;
+                populateModelSelector();
             }
             break;
             
@@ -785,7 +795,11 @@ function generateLlmResponse() {
         return;
     }
     
+    // Get the selected model
+    const selectedModel = elements.modelSelector?.value;
+    
     console.log('Generating LLM response:', {
+        model: selectedModel,
         messageChainLength: messageChain.length,
         currentHead: currentHead,
         sortedChainLength: sortMessageChain().length
@@ -800,10 +814,11 @@ function generateLlmResponse() {
     elements.sendButton.disabled = true;
     elements.generateButton.disabled = true;
     
-    // Send the generate request
+    // Send the generate request with model ID
     console.log('Sending WebSocket message to generate LLM response');
     sendWebSocketMessage({
-        type: 'generate_llm_response'
+        type: 'generate_llm_response',
+        model_id: selectedModel
     });
 }
 
@@ -908,6 +923,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Handle window resize
     window.addEventListener('resize', checkMobileView);
+    
+    // Request available models
+    setTimeout(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            sendWebSocketMessage({ type: 'list_models' });
+        }
+    }, 1000); // Give the connection a moment to stabilize
 });
 
 // Copy message functions
@@ -961,6 +983,41 @@ function showCopySuccess(message) {
     `;
     elements.messagesContainer.prepend(successDiv);
     setTimeout(() => successDiv.remove(), 2000);
+}
+
+// Model selector functions
+function populateModelSelector() {
+    if (!elements.modelSelector || !models || models.length === 0) return;
+    
+    // Save the currently selected model if any
+    const currentSelection = elements.modelSelector.value;
+    
+    // Sort models with the most recent (highest versions) first
+    const sortedModels = [...models].sort((a, b) => {
+        // Special case: always put 3.7 Sonnet at the top
+        if (a.id === 'claude-3-7-sonnet-20250219') return -1;
+        if (b.id === 'claude-3-7-sonnet-20250219') return 1;
+        return b.id.localeCompare(a.id);
+    });
+    
+    // Clear current options
+    elements.modelSelector.innerHTML = '';
+    
+    // Add options for each model
+    sortedModels.forEach(model => {
+        const option = document.createElement('option');
+        option.value = model.id;
+        option.textContent = model.display_name;
+        elements.modelSelector.appendChild(option);
+    });
+    
+    // Restore selection if it exists, otherwise default to the first option
+    if (currentSelection && sortedModels.some(m => m.id === currentSelection)) {
+        elements.modelSelector.value = currentSelection;
+    } else if (sortedModels.length > 0) {
+        // Default to the first option (should be 3.7 Sonnet)
+        elements.modelSelector.value = sortedModels[0].id;
+    }
 }
 
 // Cleanup

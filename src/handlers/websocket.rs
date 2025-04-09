@@ -81,7 +81,18 @@ pub fn handle_message(
                             }
                         }
                         Some("generate_llm_response") => {
-                            handle_generate_llm_response(&mut current_state)
+                            // Extract optional model ID from the message
+                            let model_id = if let Some(model) = command["model_id"].as_str() {
+                                Some(model.to_string())
+                            } else {
+                                None
+                            };
+                            
+                            handle_generate_llm_response(&mut current_state, model_id)
+                        }
+                        
+                        Some("list_models") => {
+                            handle_list_models(&current_state)
                         }
                         Some("get_message") => {
                             if let Some(message_id) = command["message_id"].as_str() {
@@ -424,8 +435,9 @@ fn handle_send_message(
 
 fn handle_generate_llm_response(
     state: &mut State,
+    model_id: Option<String>,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    match state.generate_llm_response() {
+    match state.generate_llm_response(model_id) {
         Ok(_) => {
             // Response success - head will have been updated
             Ok((
@@ -517,6 +529,50 @@ fn handle_get_head(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse
             }],
         },),
     ))
+}
+
+fn handle_list_models(
+    state: &State,
+) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
+    match state.claude_client.list_available_models() {
+        Ok(models) => {
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "models_list",
+                                "models": models
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+        Err(e) => {
+            log(&format!("Failed to list models: {}", e));
+            Ok((
+                Some(serde_json::to_vec(state).unwrap()),
+                (WebsocketResponse {
+                    messages: vec![WebsocketMessage {
+                        ty: MessageType::Text,
+                        text: Some(
+                            json!({
+                                "type": "error",
+                                "message": format!("Failed to list models: {}", e)
+                            })
+                            .to_string(),
+                        ),
+                        data: None,
+                    }],
+                },),
+            ))
+        }
+    }
 }
 
 fn default_response(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {

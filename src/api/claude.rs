@@ -15,14 +15,55 @@ pub struct ClaudeClient {
     api_key: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ModelInfo {
+    pub id: String,
+    pub display_name: String,
+}
+
 impl ClaudeClient {
     pub fn new(api_key: String) -> Self {
         Self { api_key }
     }
 
+    pub fn list_available_models(&self) -> Result<Vec<ModelInfo>, Box<dyn std::error::Error>> {
+        let request = HttpRequest {
+            method: "GET".to_string(),
+            uri: "https://api.anthropic.com/v1/models".to_string(),
+            headers: vec![
+                ("x-api-key".to_string(), self.api_key.clone()),
+                ("anthropic-version".to_string(), "2023-06-01".to_string()),
+            ],
+            body: None,
+        };
+
+        let http_response = send_http(&request).map_err(|e| format!("HTTP request failed: {}", e))?;
+        let body = http_response.body.ok_or("No response body")?;
+        let models_response: Value = serde_json::from_slice(&body)?;
+        
+        // Parse the models from the response
+        let mut models = Vec::new();
+        if let Some(data) = models_response.get("data").and_then(|d| d.as_array()) {
+            for model_data in data {
+                if let (Some(id), Some(display_name)) = (
+                    model_data.get("id").and_then(|v| v.as_str()),
+                    model_data.get("display_name").and_then(|v| v.as_str()),
+                ) {
+                    models.push(ModelInfo {
+                        id: id.to_string(),
+                        display_name: display_name.to_string(),
+                    });
+                }
+            }
+        }
+        
+        Ok(models)
+    }
+
     pub fn generate_response(
         &self,
         messages: Vec<Message>,
+        model_id: Option<String>,
     ) -> Result<Message, Box<dyn std::error::Error>> {
         let anthropic_messages: Vec<AnthropicMessage> = messages
             .iter()
@@ -47,7 +88,7 @@ impl ClaudeClient {
                 ("anthropic-version".to_string(), "2023-06-01".to_string()),
             ],
             body: Some(serde_json::to_vec(&json!({
-                "model": "claude-3-7-sonnet-20250219",
+                "model": model_id.unwrap_or_else(|| "claude-3-7-sonnet-20250219".to_string()),
                 "max_tokens": 8192,
                 "messages": anthropic_messages,
             }))?),

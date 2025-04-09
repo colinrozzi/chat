@@ -1150,6 +1150,34 @@ p code, li code {
     background: var(--error);
 }
 
+/* Model Selector */
+.model-selector-container {
+    display: flex;
+    align-items: center;
+    margin-right: 8px;
+}
+
+.model-selector {
+    padding: 5px 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.model-selector:hover {
+    border-color: var(--accent-primary);
+}
+
+.model-selector:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px var(--accent-muted);
+}
+
 /* Input Area */
 .input-container {
     padding: 1rem 1.5rem;
