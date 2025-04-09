@@ -205,6 +205,8 @@ function handleWebSocketMessage(data) {
             if (data.models) {
                 models = data.models;
                 populateModelSelector();
+                // Update the model info in the sidebar
+                updateModelInfo();
             }
             break;
             
@@ -879,16 +881,36 @@ function toggleSection(sectionId) {
 function checkMobileView() {
     const isMobile = window.innerWidth <= 768;
     
-    if (isMobile && elements.chatSidebar) {
-        elements.chatSidebar.classList.add('collapsed');
-        if (elements.expandChatSidebarButton) {
-            elements.expandChatSidebarButton.classList.add('visible');
+    if (isMobile) {
+        // Collapse both sidebars on mobile
+        if (elements.chatSidebar) {
+            elements.chatSidebar.classList.add('collapsed');
+            if (elements.expandChatSidebarButton) {
+                elements.expandChatSidebarButton.classList.add('visible');
+            }
+        }
+        
+        if (elements.chatControlsSidebar) {
+            elements.chatControlsSidebar.classList.add('collapsed');
+            if (elements.expandChatControlsButton) {
+                elements.expandChatControlsButton.classList.add('visible');
+            }
+        }
+    } else if (window.innerWidth <= 1200) {
+        // On tablets, only collapse the controls sidebar
+        if (elements.chatControlsSidebar) {
+            elements.chatControlsSidebar.classList.add('collapsed');
+            if (elements.expandChatControlsButton) {
+                elements.expandChatControlsButton.classList.add('visible');
+            }
         }
     }
 }
 
 // Event listeners
+// Add initializeSidebars to DOMContentLoaded event
 document.addEventListener('DOMContentLoaded', () => {
+
     // Initialize WebSocket
     connectWebSocket();
     
@@ -940,6 +962,19 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.expandChatSidebarButton.addEventListener('click', toggleChatSidebar);
     }
     
+    // Chat controls sidebar toggle handlers
+    if (elements.collapseChatControlsButton) {
+        elements.collapseChatControlsButton.addEventListener('click', toggleChatControlsSidebar);
+    }
+    if (elements.expandChatControlsButton) {
+        elements.expandChatControlsButton.addEventListener('click', toggleChatControlsSidebar);
+    }
+    
+    // Model selector change handler
+    if (elements.controlsModelSelector) {
+        elements.controlsModelSelector.addEventListener('change', updateModelInfo);
+    }
+    
     // New chat button
     if (elements.newChatButton) {
         elements.newChatButton.addEventListener('click', createNewChat);
@@ -949,6 +984,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (elements.branchChatButton) {
         elements.branchChatButton.addEventListener('click', branchChat);
     }
+    
+    // Initialize sidebars
+    initializeSidebars();
     
     // Check for mobile view on load
     checkMobileView();
@@ -1049,6 +1087,17 @@ function populateModelSelector() {
     } else if (sortedModels.length > 0) {
         // Default to the first option (should be 3.7 Sonnet)
         elements.modelSelector.value = sortedModels[0].id;
+    }
+}
+
+// Make the chat controls sidebar collapsed by default on desktop
+function initializeSidebars() {
+    // On initial load, collapse the controls sidebar on desktop
+    if (window.innerWidth > 768 && elements.chatControlsSidebar) {
+        elements.chatControlsSidebar.classList.add('collapsed');
+        if (elements.expandChatControlsButton) {
+            elements.expandChatControlsButton.classList.add('visible');
+        }
     }
 }
 
