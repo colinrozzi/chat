@@ -1,3 +1,42 @@
+// Find the last used model ID by scanning the message chain
+function findLastUsedModel() {
+    // Use the sorted message chain to get messages in chronological order
+    const sortedMessages = sortMessageChain();
+    
+    // Find the last assistant message in the chain
+    for (let i = sortedMessages.length - 1; i >= 0; i--) {
+        const message = sortedMessages[i];
+        if (message.data && message.data.Chat && message.data.Chat.Assistant) {
+            const assistant = message.data.Chat.Assistant;
+            if (assistant.model) {
+                console.log(`Found last used model: ${assistant.model}`);
+                lastUsedModelId = assistant.model;
+                return lastUsedModelId;
+            }
+        }
+    }
+    
+    // If no assistant message found, return null
+    console.log('No assistant message found in the chain, no lastUsedModelId set');
+    return null;
+}
+
+// Update the selected model in the UI
+function updateModelSelector() {
+    // Check if we have a model to select and the model selector exists
+    if (!lastUsedModelId || !elements.controlsModelSelector) return;
+    
+    // Check if the model is available in the models list
+    if (models.some(model => model.id === lastUsedModelId)) {
+        console.log(`Setting model selector to last used model: ${lastUsedModelId}`);
+        elements.controlsModelSelector.value = lastUsedModelId;
+        // Update model info display
+        updateModelInfo();
+    } else {
+        console.log(`Last used model ${lastUsedModelId} not found in available models`);
+    }
+}
+
 // State management
 let messageChain = [];
 let currentHead = null;
@@ -7,6 +46,7 @@ let models = [];
 let ws = null;
 let reconnectAttempts = 0;
 let totalCost = 0;
+let lastUsedModelId = null; // Track the last used model ID
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 1000;
 
@@ -148,6 +188,9 @@ function handleWebSocketMessage(data) {
                     elements.headId.textContent = `Head: ${data.head.substring(0, 8)}...`;
                     requestMessage(data.head);
                     
+                    // After getting the new head, find the last used model
+                    findLastUsedModel();
+                    
                     // Enable generate button if we have messages
                     elements.generateButton.disabled = false;
                 }
@@ -241,6 +284,13 @@ function handleNewMessage(message) {
         if (message.data && message.data.Chat && message.data.Chat.Assistant) {
             const assistant = message.data.Chat.Assistant;
             calculateMessageCost(assistant.usage, true); // Add to total
+            
+            // Store the model ID from the last assistant message
+            lastUsedModelId = assistant.model;
+            console.log(`Stored last used model ID: ${lastUsedModelId}`);
+            
+            // Update the selected model in the UI if it exists
+            updateModelSelector();
         }
         messageChain.push(message);
     } else {
@@ -718,6 +768,7 @@ function branchChat() {
     // Message chain will be loaded when the server notifies us of the new chat
 }
 
+// Also need to find the last used model when we switch chats
 function switchChat(chatId) {
     if (chatId === currentChatId) return; // Already on this chat
     
@@ -731,6 +782,9 @@ function switchChat(chatId) {
     // Reset message chain - will be reloaded from server
     messageChain = [];
     currentHead = null;
+    
+    // Reset lastUsedModelId so it will be determined from the new chat
+    lastUsedModelId = null;
     
     // Disable generate button until messages are loaded
     elements.generateButton.disabled = true;
@@ -862,6 +916,12 @@ function generateLlmResponse() {
     
     // Get the selected model from the controls sidebar
     const selectedModel = elements.controlsModelSelector?.value;
+    
+    // Store this as the most recently used model
+    if (selectedModel) {
+        lastUsedModelId = selectedModel;
+        console.log(`Set lastUsedModelId to: ${lastUsedModelId}`);
+    }
     
     console.log('Generating LLM response:', {
         model: selectedModel,
@@ -1127,12 +1187,20 @@ function populateModelSelector() {
         elements.controlsModelSelector.appendChild(option);
     });
     
-    // Restore selection if it exists, otherwise default to the first option
-    if (currentSelection && sortedModels.some(m => m.id === currentSelection)) {
+    // Prioritize using the last used model if available
+    if (lastUsedModelId && sortedModels.some(m => m.id === lastUsedModelId)) {
+        elements.controlsModelSelector.value = lastUsedModelId;
+        console.log(`Set model selector to last used model: ${lastUsedModelId}`);
+    } 
+    // Otherwise restore previous selection if possible
+    else if (currentSelection && sortedModels.some(m => m.id === currentSelection)) {
         elements.controlsModelSelector.value = currentSelection;
-    } else if (sortedModels.length > 0) {
-        // Default to the first option (should be 3.7 Sonnet)
+        console.log(`Restored previous selection: ${currentSelection}`);
+    } 
+    // Default to the first option if nothing else works
+    else if (sortedModels.length > 0) {
         elements.controlsModelSelector.value = sortedModels[0].id;
+        console.log(`Defaulted to first model: ${sortedModels[0].id}`);
     }
     
     // Update model context window info
