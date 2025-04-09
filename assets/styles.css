@@ -64,7 +64,7 @@ code, pre, .actor-id, .head-id, .child-actor-id {
 /* Layout styles */
 .app {
     display: grid;
-    grid-template-columns: var(--sidebar-width) 1fr var(--sidebar-width);
+    grid-template-columns: var(--sidebar-width) 1fr;
     height: 100vh;
     background: var(--bg-primary);
     transition: grid-template-columns 0.3s ease;
@@ -72,17 +72,14 @@ code, pre, .actor-id, .head-id, .child-actor-id {
 
 /* When chat sidebar is collapsed */
 .app:has(.chat-sidebar.collapsed) {
-    grid-template-columns: 0 1fr var(--sidebar-width);
+    grid-template-columns: 0 1fr;
 }
 
-/* When actor panel is collapsed */
-.app:has(.actor-panel.collapsed) {
-    grid-template-columns: var(--sidebar-width) 1fr 0;
-}
+/* Legacy actor panel code removed */
 
-/* When both sidebars are collapsed */
-.app:has(.chat-sidebar.collapsed):has(.actor-panel.collapsed) {
-    grid-template-columns: 0 1fr 0;
+/* When chat sidebar is collapsed */
+.app:has(.chat-sidebar.collapsed) {
+    grid-template-columns: 0 1fr;
 }
 
 /* Chat Container */
@@ -140,16 +137,7 @@ code, pre, .actor-id, .head-id, .child-actor-id {
 /* Responsive Design */
 @media (max-width: 1200px) {
     .app {
-        grid-template-columns: var(--sidebar-width) 1fr 0;
-    }
-    
-    .actor-panel {
-        position: fixed;
-        right: 0;
-        top: 0;
-        bottom: 0;
-        z-index: 30;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        grid-template-columns: var(--sidebar-width) 1fr;
     }
     
     .expand-button {
@@ -163,25 +151,17 @@ code, pre, .actor-id, .head-id, .child-actor-id {
     }
     
     .app {
-        grid-template-columns: 0 1fr 0;
+        grid-template-columns: 0 1fr;
     }
     
-    .chat-sidebar, .actor-panel {
+    .chat-sidebar {
         position: fixed;
         top: 0;
         bottom: 0;
         z-index: 40;
         box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-    }
-    
-    .chat-sidebar {
         left: 0;
         transform: translateX(-100%);
-    }
-    
-    .actor-panel {
-        right: 0;
-        transform: translateX(100%);
     }
     
     .expand-chat-sidebar-button {
