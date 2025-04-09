@@ -25,6 +25,8 @@ pub enum Message {
         stop_sequence: Option<String>,
         message_type: String,
         usage: Usage,
+        input_cost_per_million_tokens: Option<f64>,
+        output_cost_per_million_tokens: Option<f64>,
     },
 }
 

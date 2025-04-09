@@ -283,7 +283,26 @@ function handleNewMessage(message) {
         // Add the cost to the total only when a new message is received
         if (message.data && message.data.Chat && message.data.Chat.Assistant) {
             const assistant = message.data.Chat.Assistant;
-            calculateMessageCost(assistant.usage, true); // Add to total
+            
+            // Calculate cost based on model-specific pricing if available
+            if (assistant.input_cost_per_million_tokens !== undefined && 
+                assistant.output_cost_per_million_tokens !== undefined) {
+                
+                if (assistant.input_cost_per_million_tokens !== null && 
+                    assistant.output_cost_per_million_tokens !== null) {
+                    
+                    const inputCost = (assistant.usage.input_tokens / 1000000) * assistant.input_cost_per_million_tokens;
+                    const outputCost = (assistant.usage.output_tokens / 1000000) * assistant.output_cost_per_million_tokens;
+                    totalCost += (inputCost + outputCost);
+                    totalInputTokens += assistant.usage.input_tokens;
+                    totalOutputTokens += assistant.usage.output_tokens;
+                    totalMessages++;
+                    updateStatsDisplay();
+                }
+            } else {
+                // Fallback to calculateMessageCost function
+                calculateMessageCost(assistant.usage, true, assistant.model);
+            }
             
             // Store the model ID from the last assistant message
             lastUsedModelId = assistant.model;
@@ -405,6 +424,22 @@ function renderMessage(message) {
             const isShortMessage = assistant.content.length < 100;
             const smallClass = isShortMessage ? 'small' : '';
             
+            // Calculate the message cost using the model-specific pricing if available
+            let costDisplay;
+            if (assistant.input_cost_per_million_tokens !== undefined && assistant.output_cost_per_million_tokens !== undefined) {
+                // If model-specific pricing is available in the message
+                if (assistant.input_cost_per_million_tokens === null || assistant.output_cost_per_million_tokens === null) {
+                    costDisplay = "Unknown";
+                } else {
+                    const inputCost = (assistant.usage.input_tokens / 1000000) * assistant.input_cost_per_million_tokens;
+                    const outputCost = (assistant.usage.output_tokens / 1000000) * assistant.output_cost_per_million_tokens;
+                    costDisplay = (inputCost + outputCost).toFixed(4);
+                }
+            } else {
+                // Fallback to the function if pricing not in message
+                costDisplay = calculateMessageCost(assistant.usage, false, assistant.model);
+            }
+            
             return `
                 <div class="message assistant ${smallClass}" data-message-id="${message.id}">
                     ${formatMessageContent(assistant.content)}
@@ -433,7 +468,7 @@ function renderMessage(message) {
                             <span class="metadata-label">Tokens:</span> ${assistant.usage.input_tokens} in / ${assistant.usage.output_tokens} out of ${getModelMaxTokens(assistant.model)}
                         </div>
                         <div class="metadata-item">
-                            <span class="metadata-label">Cost:</span> ${calculateMessageCost(assistant.usage, false)}
+                            <span class="metadata-label">Cost:</span> ${costDisplay}
                         </div>
                         <div class="metadata-item">
                             <span class="metadata-label">Stop Reason:</span> ${assistant.stop_reason}
@@ -512,12 +547,68 @@ let totalInputTokens = 0;
 let totalOutputTokens = 0;
 let totalMessages = 0;
 
-function calculateMessageCost(usage, addToTotal = false) {
-    const INPUT_COST_PER_MILLION = 3;
-    const OUTPUT_COST_PER_MILLION = 15;
+function getModelPricing(modelId) {
+    // Default to Claude 3.7 Sonnet pricing
+    let inputCost = 3.00;
+    let outputCost = 15.00;
     
-    const inputCost = (usage.input_tokens / 1000000) * INPUT_COST_PER_MILLION;
-    const outputCost = (usage.output_tokens / 1000000) * OUTPUT_COST_PER_MILLION;
+    switch(modelId) {
+        // Claude 3.7 models
+        case "claude-3-7-sonnet-20250219":
+            inputCost = 3.00;
+            outputCost = 15.00;
+            break;
+            
+        // Claude 3.5 models
+        case "claude-3-5-sonnet-20241022":
+        case "claude-3-5-sonnet-20240620":
+            inputCost = 3.00;
+            outputCost = 15.00;
+            break;
+            
+        case "claude-3-5-haiku-20241022":
+            inputCost = 0.80;
+            outputCost = 4.00;
+            break;
+            
+        // Claude 3 models
+        case "claude-3-opus-20240229":
+            inputCost = 15.00;
+            outputCost = 75.00;
+            break;
+            
+        case "claude-3-sonnet-20240229":
+            inputCost = 3.00;
+            outputCost = 15.00;
+            break;
+            
+        case "claude-3-haiku-20240307":
+            inputCost = 0.25;
+            outputCost = 1.25;
+            break;
+            
+        // Default or unknown model - use null to indicate unknown pricing
+        default:
+            return { inputCost: null, outputCost: null };
+    }
+    
+    return { inputCost, outputCost };
+}
+
+function calculateMessageCost(usage, addToTotal = false, modelId = null) {
+    // If no model ID provided, use the last used model ID
+    modelId = modelId || lastUsedModelId || "claude-3-7-sonnet-20250219";
+    
+    // Get pricing for this specific model
+    const pricing = getModelPricing(modelId);
+    
+    // If pricing is unknown for this model, return "Unknown"
+    if (pricing.inputCost === null || pricing.outputCost === null) {
+        return "Unknown";
+    }
+    
+    const inputCost = (usage.input_tokens / 1000000) * pricing.inputCost;
+    const outputCost = (usage.output_tokens / 1000000) * pricing.outputCost;
     const messageCost = inputCost + outputCost;
     
     // Update total cost only when explicitly requested

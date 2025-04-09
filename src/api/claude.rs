@@ -26,6 +26,54 @@ fn get_model_max_tokens(model_id: &str) -> u32 {
     }
 }
 
+// Pricing structure for Claude models
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ModelPricing {
+    pub input_cost_per_million_tokens: Option<f64>,
+    pub output_cost_per_million_tokens: Option<f64>,
+}
+
+// Helper function to get pricing for a given model
+pub fn get_model_pricing(model_id: &str) -> ModelPricing {
+    match model_id {
+        // Claude 3.7 models
+        "claude-3-7-sonnet-20250219" => ModelPricing {
+            input_cost_per_million_tokens: Some(3.00),
+            output_cost_per_million_tokens: Some(15.00),
+        },
+        
+        // Claude 3.5 models
+        "claude-3-5-sonnet-20241022" | "claude-3-5-sonnet-20240620" => ModelPricing {
+            input_cost_per_million_tokens: Some(3.00),
+            output_cost_per_million_tokens: Some(15.00),
+        },
+        "claude-3-5-haiku-20241022" => ModelPricing {
+            input_cost_per_million_tokens: Some(0.80),
+            output_cost_per_million_tokens: Some(4.00),
+        },
+        
+        // Claude 3 models
+        "claude-3-opus-20240229" => ModelPricing {
+            input_cost_per_million_tokens: Some(15.00),
+            output_cost_per_million_tokens: Some(75.00),
+        },
+        "claude-3-haiku-20240307" => ModelPricing {
+            input_cost_per_million_tokens: Some(0.25),
+            output_cost_per_million_tokens: Some(1.25),
+        },
+        "claude-3-sonnet-20240229" => ModelPricing {
+            input_cost_per_million_tokens: Some(3.00),
+            output_cost_per_million_tokens: Some(15.00),
+        },
+        
+        // For older or unknown models, return None to indicate unknown pricing
+        _ => ModelPricing {
+            input_cost_per_million_tokens: None,
+            output_cost_per_million_tokens: None,
+        },
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AnthropicMessage {
     pub role: String,
@@ -170,6 +218,9 @@ impl ClaudeClient {
                 .ok_or("No output tokens")? as u32,
         };
 
+        // Get pricing information for this model
+        let pricing = get_model_pricing(&model);
+        
         Ok(Message::Assistant {
             content,
             id,
@@ -178,6 +229,8 @@ impl ClaudeClient {
             stop_sequence,
             message_type,
             usage,
+            input_cost_per_million_tokens: pricing.input_cost_per_million_tokens,
+            output_cost_per_million_tokens: pricing.output_cost_per_million_tokens,
         })
     }
 }
