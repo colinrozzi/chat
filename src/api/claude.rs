@@ -4,6 +4,28 @@ use crate::messages::{Message, Usage};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+// Helper function to get max tokens for a given model
+fn get_model_max_tokens(model_id: &str) -> u32 {
+    match model_id {
+        // Claude 3.7 models
+        "claude-3-7-sonnet-20250219" => 8192,
+        
+        // Claude 3.5 models
+        "claude-3-5-sonnet-20241022" | "claude-3-5-haiku-20241022" | "claude-3-5-sonnet-20240620" => 8192,
+        
+        // Claude 3 models
+        "claude-3-opus-20240229" => 4096,
+        "claude-3-sonnet-20240229" => 4096,
+        "claude-3-haiku-20240307" => 4096,
+        
+        // Claude 2 models
+        "claude-2.1" | "claude-2.0" => 4096,
+        
+        // Default case
+        _ => 4096, // Conservative default
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AnthropicMessage {
     pub role: String,
@@ -19,6 +41,7 @@ pub struct ClaudeClient {
 pub struct ModelInfo {
     pub id: String,
     pub display_name: String,
+    pub max_tokens: u32, // Added max_tokens field
 }
 
 impl ClaudeClient {
@@ -49,9 +72,13 @@ impl ClaudeClient {
                     model_data.get("id").and_then(|v| v.as_str()),
                     model_data.get("display_name").and_then(|v| v.as_str()),
                 ) {
+                    // Get max tokens based on model ID
+                    let max_tokens = get_model_max_tokens(id);
+                    
                     models.push(ModelInfo {
                         id: id.to_string(),
                         display_name: display_name.to_string(),
+                        max_tokens,
                     });
                 }
             }
@@ -65,6 +92,12 @@ impl ClaudeClient {
         messages: Vec<Message>,
         model_id: Option<String>,
     ) -> Result<Message, Box<dyn std::error::Error>> {
+        // Get the model ID
+        let model = model_id.unwrap_or_else(|| "claude-3-7-sonnet-20250219".to_string());
+        
+        // Get appropriate max_tokens for this model
+        let max_tokens = get_model_max_tokens(&model);
+        
         let anthropic_messages: Vec<AnthropicMessage> = messages
             .iter()
             .map(|msg| AnthropicMessage {
@@ -88,8 +121,8 @@ impl ClaudeClient {
                 ("anthropic-version".to_string(), "2023-06-01".to_string()),
             ],
             body: Some(serde_json::to_vec(&json!({
-                "model": model_id.unwrap_or_else(|| "claude-3-7-sonnet-20250219".to_string()),
-                "max_tokens": 8192,
+                "model": model,
+                "max_tokens": max_tokens,
                 "messages": anthropic_messages,
             }))?),
         };

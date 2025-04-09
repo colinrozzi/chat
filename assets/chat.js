@@ -373,7 +373,7 @@ function renderMessage(message) {
                             <span class="metadata-label">Model:</span> ${assistant.model}
                         </div>
                         <div class="metadata-item">
-                            <span class="metadata-label">Tokens:</span> ${assistant.usage.input_tokens} in / ${assistant.usage.output_tokens} out
+                            <span class="metadata-label">Tokens:</span> ${assistant.usage.input_tokens} in / ${assistant.usage.output_tokens} out of ${getModelMaxTokens(assistant.model)}
                         </div>
                         <div class="metadata-item">
                             <span class="metadata-label">Cost:</span> ${calculateMessageCost(assistant.usage, false)}
@@ -415,6 +415,38 @@ function renderEmptyState() {
             <p class="text-sm">Start a conversation!</p>
         </div>
     `;
+}
+
+// Helper to get max tokens for a model based on model data
+function getModelMaxTokens(modelId) {
+    // Find the model in our models array
+    const model = models.find(m => m.id === modelId);
+    if (model && model.max_tokens) {
+        return model.max_tokens;
+    }
+    
+    // Fallback values if not in models array
+    switch(modelId) {
+        // Claude 3.7 models
+        case "claude-3-7-sonnet-20250219": return 8192;
+        
+        // Claude 3.5 models
+        case "claude-3-5-sonnet-20241022":
+        case "claude-3-5-haiku-20241022":
+        case "claude-3-5-sonnet-20240620": return 8192;
+        
+        // Claude 3 models
+        case "claude-3-opus-20240229":
+        case "claude-3-sonnet-20240229":
+        case "claude-3-haiku-20240307": return 4096;
+        
+        // Claude 2 models
+        case "claude-2.1":
+        case "claude-2.0": return 4096;
+        
+        // Default case
+        default: return 4096; // Conservative default
+    }
 }
 
 // Cost calculation
@@ -1007,7 +1039,7 @@ function populateModelSelector() {
     sortedModels.forEach(model => {
         const option = document.createElement('option');
         option.value = model.id;
-        option.textContent = model.display_name;
+        option.textContent = `${model.display_name} (${model.max_tokens} tokens)`;
         elements.modelSelector.appendChild(option);
     });
     
