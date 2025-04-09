@@ -112,10 +112,18 @@ The system implements multiple communication channels:
    ```bash
    rustup target add wasm32-unknown-unknown
    ```
-2. Build the project:
+
+2. Install the Rust Component tools:
    ```bash
-   cargo build --target wasm32-unknown-unknown --release
+   cargo install cargo-component
    ```
+
+3. Build the project as a WebAssembly component:
+   ```bash
+   cargo component build --release --target wasm32-unknown-unknown
+   ```
+
+   Note: This project is compiled to a WebAssembly component and run in a custom actor system, so standard Cargo build commands will not work correctly.
 
 ### Running
 

@@ -1,4 +1,6 @@
 [package]
+# This project is a WebAssembly component and must be built with cargo-component:
+# cargo component build --release --target wasm32-unknown-unknown
 name = "chat"
 version = "0.1.0"
 edition = "2021"

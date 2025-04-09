@@ -1,3 +1,16 @@
+//! # Chat WebAssembly Component
+//!
+//! This is a WebAssembly component for a chat application that integrates with Claude AI.
+//!
+//! ## Building
+//!
+//! This project must be built with cargo-component:
+//! ```bash
+//! cargo component build --release --target wasm32-unknown-unknown
+//! ```
+//! Standard cargo build commands will not work correctly.
+//!
+
 mod api;
 mod bindings;
 mod fs;
