@@ -20,15 +20,9 @@ const elements = {
     messageInput: getElement('messageInput'),
     sendButton: getElement('sendButton'),
     generateButton: getElement('generateButton'),
-    modelSelector: getElement('modelSelector'),
     messagesContainer: getElement('messagesContainer'),
     connectionStatus: getElement('connectionStatus'),
     loadingOverlay: getElement('loadingOverlay'),
-    actorPanel: getElement('actorPanel'),
-    collapseButton: getElement('collapseButton'),
-    expandButton: getElement('expandButton'),
-    availableActors: getElement('availableActors'),
-    runningActors: getElement('runningActors'),
     headId: getElement('headId'),
     chatSidebar: getElement('chatSidebar'),
     chatList: getElement('chatList'),
@@ -36,7 +30,18 @@ const elements = {
     newChatButton: getElement('newChatButton'),
     branchChatButton: getElement('branchChatButton'),
     collapseChatSidebarButton: getElement('collapseChatSidebarButton'),
-    expandChatSidebarButton: getElement('expandChatSidebarButton')
+    expandChatSidebarButton: getElement('expandChatSidebarButton'),
+    // Chat Controls Sidebar Elements
+    chatControlsSidebar: getElement('chatControlsSidebar'),
+    collapseChatControlsButton: getElement('collapseChatControlsButton'),
+    expandChatControlsButton: getElement('expandChatControlsButton'),
+    controlsModelSelector: getElement('controlsModelSelector'),
+    modelContextWindow: getElement('modelContextWindow'),
+    modelInfo: getElement('modelInfo'),
+    // Stats elements
+    statsMessageCount: getElement('statsMessageCount'),
+    statsTokenCount: getElement('statsTokenCount'),
+    statsTotalCost: getElement('statsTotalCost')
 };
 
 // WebSocket setup
@@ -452,6 +457,11 @@ function getModelMaxTokens(modelId) {
 }
 
 // Cost calculation
+// Track token usage stats
+let totalInputTokens = 0;
+let totalOutputTokens = 0;
+let totalMessages = 0;
+
 function calculateMessageCost(usage, addToTotal = false) {
     const INPUT_COST_PER_MILLION = 3;
     const OUTPUT_COST_PER_MILLION = 15;
@@ -463,7 +473,10 @@ function calculateMessageCost(usage, addToTotal = false) {
     // Update total cost only when explicitly requested
     if (addToTotal) {
         totalCost += messageCost;
-        updateTotalCostDisplay();
+        totalInputTokens += usage.input_tokens;
+        totalOutputTokens += usage.output_tokens;
+        totalMessages++;
+        updateStatsDisplay();
     }
     
     // Format to 4 decimal places
@@ -473,7 +486,25 @@ function calculateMessageCost(usage, addToTotal = false) {
 function updateTotalCostDisplay() {
     const costElement = document.querySelector('.cost-value');
     if (costElement) {
-        costElement.textContent = `$${totalCost.toFixed(4)}`;
+        costElement.textContent = `${totalCost.toFixed(4)}`;
+    }
+}
+
+function updateStatsDisplay() {
+    // Update the cost in the header
+    updateTotalCostDisplay();
+    
+    // Update the stats in the controls sidebar
+    if (elements.statsMessageCount) {
+        elements.statsMessageCount.textContent = totalMessages;
+    }
+    
+    if (elements.statsTokenCount) {
+        elements.statsTokenCount.textContent = `${totalInputTokens} in / ${totalOutputTokens} out`;
+    }
+    
+    if (elements.statsTotalCost) {
+        elements.statsTotalCost.textContent = `${totalCost.toFixed(4)}`;
     }
 }
 
@@ -829,8 +860,8 @@ function generateLlmResponse() {
         return;
     }
     
-    // Get the selected model
-    const selectedModel = elements.modelSelector?.value;
+    // Get the selected model from the controls sidebar
+    const selectedModel = elements.controlsModelSelector?.value;
     
     console.log('Generating LLM response:', {
         model: selectedModel,
@@ -867,6 +898,21 @@ function toggleChatSidebar() {
             elements.expandChatSidebarButton.classList.add('visible');
         } else {
             elements.expandChatSidebarButton.classList.remove('visible');
+        }
+    }
+}
+
+// Toggle chat controls sidebar
+function toggleChatControlsSidebar() {
+    if (!elements.chatControlsSidebar) return;
+    
+    elements.chatControlsSidebar.classList.toggle('collapsed');
+    
+    if (elements.expandChatControlsButton) {
+        if (elements.chatControlsSidebar.classList.contains('collapsed')) {
+            elements.expandChatControlsButton.classList.add('visible');
+        } else {
+            elements.expandChatControlsButton.classList.remove('visible');
         }
     }
 }
@@ -1057,10 +1103,10 @@ function showCopySuccess(message) {
 
 // Model selector functions
 function populateModelSelector() {
-    if (!elements.modelSelector || !models || models.length === 0) return;
+    if (!elements.controlsModelSelector || !models || models.length === 0) return;
     
     // Save the currently selected model if any
-    const currentSelection = elements.modelSelector.value;
+    const currentSelection = elements.controlsModelSelector.value;
     
     // Sort models with the most recent (highest versions) first
     const sortedModels = [...models].sort((a, b) => {
@@ -1071,23 +1117,37 @@ function populateModelSelector() {
     });
     
     // Clear current options
-    elements.modelSelector.innerHTML = '';
+    elements.controlsModelSelector.innerHTML = '';
     
     // Add options for each model
     sortedModels.forEach(model => {
         const option = document.createElement('option');
         option.value = model.id;
-        option.textContent = `${model.display_name} (${model.max_tokens} tokens)`;
-        elements.modelSelector.appendChild(option);
+        option.textContent = model.display_name;
+        elements.controlsModelSelector.appendChild(option);
     });
     
     // Restore selection if it exists, otherwise default to the first option
     if (currentSelection && sortedModels.some(m => m.id === currentSelection)) {
-        elements.modelSelector.value = currentSelection;
+        elements.controlsModelSelector.value = currentSelection;
     } else if (sortedModels.length > 0) {
         // Default to the first option (should be 3.7 Sonnet)
-        elements.modelSelector.value = sortedModels[0].id;
+        elements.controlsModelSelector.value = sortedModels[0].id;
     }
+    
+    // Update model context window info
+    updateModelInfo();
+}
+
+// Update the model info display in the controls sidebar
+function updateModelInfo() {
+    if (!elements.controlsModelSelector || !elements.modelContextWindow) return;
+    
+    const selectedModelId = elements.controlsModelSelector.value;
+    const maxTokens = getModelMaxTokens(selectedModelId);
+    
+    // Format with commas
+    elements.modelContextWindow.textContent = new Intl.NumberFormat().format(maxTokens) + ' tokens';
 }
 
 // Make the chat controls sidebar collapsed by default on desktop
