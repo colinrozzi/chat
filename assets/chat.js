@@ -440,6 +440,12 @@ function renderMessage(message) {
                 costDisplay = calculateMessageCost(assistant.usage, false, assistant.model);
             }
             
+            // Get provider name from the model ID
+            let providerName = "Claude";
+            if (assistant.model?.startsWith("gemini-")) {
+                providerName = "Gemini";
+            }
+            
             return `
                 <div class="message assistant ${smallClass}" data-message-id="${message.id}">
                     ${formatMessageContent(assistant.content)}
@@ -462,16 +468,19 @@ function renderMessage(message) {
                     </div>
                     <div class="message-metadata">
                         <div class="metadata-item">
+                            <span class="metadata-label">Provider:</span> ${providerName}
+                        </div>
+                        <div class="metadata-item">
                             <span class="metadata-label">Model:</span> ${assistant.model}
                         </div>
                         <div class="metadata-item">
-                            <span class="metadata-label">Tokens:</span> ${assistant.usage.input_tokens} in / ${assistant.usage.output_tokens} out of ${getModelMaxTokens(assistant.model)}
+                            <span class="metadata-label">Tokens:</span> ${assistant.usage.input_tokens || assistant.usage.prompt_tokens} in / ${assistant.usage.output_tokens || assistant.usage.completion_tokens} out of ${getModelMaxTokens(assistant.model)}
                         </div>
                         <div class="metadata-item">
                             <span class="metadata-label">Cost:</span> ${costDisplay}
                         </div>
                         <div class="metadata-item">
-                            <span class="metadata-label">Stop Reason:</span> ${assistant.stop_reason}
+                            <span class="metadata-label">Stop Reason:</span> ${assistant.stop_reason || assistant.finish_reason}
                         </div>
                     </div>
                 </div>
@@ -519,6 +528,10 @@ function getModelMaxTokens(modelId) {
     
     // Fallback values if not in models array
     switch(modelId) {
+        // Gemini models
+        case "gemini-2.0-flash":
+        case "gemini-2.0-pro": return 32768;
+            
         // Claude 3.7 models
         case "claude-3-7-sonnet-20250219": return 8192;
         
@@ -548,51 +561,43 @@ let totalOutputTokens = 0;
 let totalMessages = 0;
 
 function getModelPricing(modelId) {
-    // Default to Claude 3.7 Sonnet pricing
-    let inputCost = 3.00;
-    let outputCost = 15.00;
+    // Check if it's a Gemini model
+    if (modelId?.startsWith("gemini-")) {
+        if (modelId === "gemini-2.0-flash") {
+            return { inputCost: 0.35, outputCost: 1.05 };
+        } else if (modelId === "gemini-2.0-pro") {
+            return { inputCost: 3.50, outputCost: 10.50 };
+        }
+    }
     
+    // Claude model pricing
     switch(modelId) {
         // Claude 3.7 models
         case "claude-3-7-sonnet-20250219":
-            inputCost = 3.00;
-            outputCost = 15.00;
-            break;
+            return { inputCost: 3.00, outputCost: 15.00 };
             
         // Claude 3.5 models
         case "claude-3-5-sonnet-20241022":
         case "claude-3-5-sonnet-20240620":
-            inputCost = 3.00;
-            outputCost = 15.00;
-            break;
+            return { inputCost: 3.00, outputCost: 15.00 };
             
         case "claude-3-5-haiku-20241022":
-            inputCost = 0.80;
-            outputCost = 4.00;
-            break;
+            return { inputCost: 0.80, outputCost: 4.00 };
             
         // Claude 3 models
         case "claude-3-opus-20240229":
-            inputCost = 15.00;
-            outputCost = 75.00;
-            break;
+            return { inputCost: 15.00, outputCost: 75.00 };
             
         case "claude-3-sonnet-20240229":
-            inputCost = 3.00;
-            outputCost = 15.00;
-            break;
+            return { inputCost: 3.00, outputCost: 15.00 };
             
         case "claude-3-haiku-20240307":
-            inputCost = 0.25;
-            outputCost = 1.25;
-            break;
+            return { inputCost: 0.25, outputCost: 1.25 };
             
         // Default or unknown model - use null to indicate unknown pricing
         default:
             return { inputCost: null, outputCost: null };
     }
-    
-    return { inputCost, outputCost };
 }
 
 function calculateMessageCost(usage, addToTotal = false, modelId = null) {
@@ -607,15 +612,19 @@ function calculateMessageCost(usage, addToTotal = false, modelId = null) {
         return "Unknown";
     }
     
-    const inputCost = (usage.input_tokens / 1000000) * pricing.inputCost;
-    const outputCost = (usage.output_tokens / 1000000) * pricing.outputCost;
+    // Handle different field names for gemini vs claude
+    const inputTokens = usage.input_tokens || usage.prompt_tokens || 0;
+    const outputTokens = usage.output_tokens || usage.completion_tokens || 0;
+    
+    const inputCost = (inputTokens / 1000000) * pricing.inputCost;
+    const outputCost = (outputTokens / 1000000) * pricing.outputCost;
     const messageCost = inputCost + outputCost;
     
     // Update total cost only when explicitly requested
     if (addToTotal) {
         totalCost += messageCost;
-        totalInputTokens += usage.input_tokens;
-        totalOutputTokens += usage.output_tokens;
+        totalInputTokens += inputTokens;
+        totalOutputTokens += outputTokens;
         totalMessages++;
         updateStatsDisplay();
     }
@@ -1259,8 +1268,12 @@ function populateModelSelector() {
     // Save the currently selected model if any
     const currentSelection = elements.controlsModelSelector.value;
     
-    // Sort models with the most recent (highest versions) first
-    const sortedModels = [...models].sort((a, b) => {
+    // Group models by provider
+    const claudeModels = models.filter(m => !m.provider || m.provider === 'claude');
+    const geminiModels = models.filter(m => m.provider === 'gemini');
+    
+    // Sort Claude models with the most recent first
+    const sortedClaudeModels = [...claudeModels].sort((a, b) => {
         // Special case: always put 3.7 Sonnet at the top
         if (a.id === 'claude-3-7-sonnet-20250219') return -1;
         if (b.id === 'claude-3-7-sonnet-20250219') return 1;
@@ -1270,28 +1283,48 @@ function populateModelSelector() {
     // Clear current options
     elements.controlsModelSelector.innerHTML = '';
     
-    // Add options for each model
-    sortedModels.forEach(model => {
+    // Create Claude group
+    const claudeGroup = document.createElement('optgroup');
+    claudeGroup.label = 'Claude Models';
+    
+    // Add Claude options
+    sortedClaudeModels.forEach(model => {
         const option = document.createElement('option');
         option.value = model.id;
         option.textContent = model.display_name;
-        elements.controlsModelSelector.appendChild(option);
+        claudeGroup.appendChild(option);
     });
     
+    // Create Gemini group
+    const geminiGroup = document.createElement('optgroup');
+    geminiGroup.label = 'Gemini Models';
+    
+    // Add Gemini options
+    geminiModels.forEach(model => {
+        const option = document.createElement('option');
+        option.value = model.id;
+        option.textContent = model.display_name;
+        geminiGroup.appendChild(option);
+    });
+    
+    // Add groups to selector
+    elements.controlsModelSelector.appendChild(claudeGroup);
+    elements.controlsModelSelector.appendChild(geminiGroup);
+    
     // Prioritize using the last used model if available
-    if (lastUsedModelId && sortedModels.some(m => m.id === lastUsedModelId)) {
+    if (lastUsedModelId && models.some(m => m.id === lastUsedModelId)) {
         elements.controlsModelSelector.value = lastUsedModelId;
         console.log(`Set model selector to last used model: ${lastUsedModelId}`);
     } 
     // Otherwise restore previous selection if possible
-    else if (currentSelection && sortedModels.some(m => m.id === currentSelection)) {
+    else if (currentSelection && models.some(m => m.id === currentSelection)) {
         elements.controlsModelSelector.value = currentSelection;
         console.log(`Restored previous selection: ${currentSelection}`);
     } 
     // Default to the first option if nothing else works
-    else if (sortedModels.length > 0) {
-        elements.controlsModelSelector.value = sortedModels[0].id;
-        console.log(`Defaulted to first model: ${sortedModels[0].id}`);
+    else if (models.length > 0) {
+        elements.controlsModelSelector.value = models[0].id;
+        console.log(`Defaulted to first model: ${models[0].id}`);
     }
     
     // Update model context window info
