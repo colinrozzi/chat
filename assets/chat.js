@@ -1397,7 +1397,6 @@ function populateModelSelector() {
     const claudeModels = models.filter(m => !m.provider || m.provider === 'claude');
     const geminiModels = models.filter(m => m.provider === 'gemini');
     const openrouterModels = models.filter(m => m.provider === 'openrouter');
-    const openrouterModels = models.filter(m => m.provider === 'openrouter');
     
     // Sort Claude models with the most recent first
     const sortedClaudeModels = [...claudeModels].sort((a, b) => {
@@ -1495,7 +1494,7 @@ function updateModelInfo() {
             costInfoElem.textContent = 'Free';
         } else {
             costInfoElem.textContent = '$' +
-             + pricing.inputCost.toFixed(2) + ' / 
+             + pricing.inputCost.toFixed(2) + ' / '
              + pricing.outputCost.toFixed(2) + ' per 1M tokens (in/out)';
         }
     }
