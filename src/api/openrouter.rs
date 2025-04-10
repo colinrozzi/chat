@@ -310,6 +310,11 @@ impl LlmMessage for OpenRouterLlmMessage {
             return cost;
         }
         
+        // Check if using the free model
+        if is_llama4_maverick_free(&self.model) {
+            return 0.0;
+        }
+        
         // Otherwise calculate based on token counts and pricing
         let input_cost = self.input_cost_per_million_tokens.unwrap_or(5.0)
             * (self.input_tokens() as f64)
