@@ -229,10 +229,20 @@ function handleWebSocketMessage(data) {
             
         case 'chat_created':
             if (data.chat) {
+                console.log('Received chat_created event:', data.chat);
                 // Add to chats array if not already present
                 if (!chats.find(c => c.id === data.chat.id)) {
                     chats.push(data.chat);
+                    console.log('Added new chat to chats array:', data.chat);
+                } else {
+                    console.log('Chat already exists in array, updating');
+                    // Update existing chat with new data
+                    const index = chats.findIndex(c => c.id === data.chat.id);
+                    if (index !== -1) {
+                        chats[index] = { ...chats[index], ...data.chat };
+                    }
                 }
+                
                 // Update current chat ID
                 currentChatId = data.chat.id;
                 
@@ -245,20 +255,36 @@ function handleWebSocketMessage(data) {
                     elements.generateButton.disabled = true;
                 }
                 
+                // Hide loading overlay
+                elements.loadingOverlay.classList.remove('visible');
+                
                 renderChatList();
                 updateCurrentChatName();
+            } else {
+                console.error('Received chat_created event without chat data');
             }
             break;
             
         case 'chat_renamed':
             if (data.chat) {
+                console.log('Received chat_renamed event:', data.chat);
                 // Update chat in the array
                 const index = chats.findIndex(c => c.id === data.chat.id);
                 if (index !== -1) {
-                    chats[index] = { ...chats[index], ...data.chat };
+                    // Properly preserve all existing properties while updating only what changed
+                    chats[index] = { 
+                        ...chats[index], 
+                        name: data.chat.name || chats[index].name,
+                        icon: data.chat.icon !== undefined ? data.chat.icon : chats[index].icon
+                    };
+                    console.log('Updated chat in array:', chats[index]);
                     renderChatList();
                     updateCurrentChatName();
+                } else {
+                    console.warn('Received rename event for non-existent chat ID:', data.chat.id);
                 }
+            } else {
+                console.error('Received chat_renamed event without chat data');
             }
             break;
             
@@ -281,7 +307,18 @@ function handleWebSocketMessage(data) {
             break;
             
         case 'error':
-            showError(data.message || 'An error occurred');
+            console.error('Error from server:', data);
+            // Check if this is a chat operation error and provide more context
+            if (data.error_code === 'rename_chat_failed') {
+                showError(data.message || 'Failed to rename chat');
+            } else if (data.error_code === 'create_chat_failed') {
+                showError(data.message || 'Failed to create chat');
+            } else {
+                showError(data.message || 'An error occurred');
+            }
+            
+            // Hide loading overlay if it's visible
+            elements.loadingOverlay.classList.remove('visible');
             break;
     }
 }
@@ -413,6 +450,7 @@ function updateConnectionStatus(status) {
 }
 
 function showError(message) {
+    console.error('Error:', message);
     const errorDiv = document.createElement('div');
     errorDiv.className = 'error-message';
     errorDiv.innerHTML = `
@@ -425,6 +463,9 @@ function showError(message) {
     `;
     elements.messagesContainer.prepend(errorDiv);
     setTimeout(() => errorDiv.remove(), 5000);
+    
+    // Hide loading overlay if it's visible
+    elements.loadingOverlay.classList.remove('visible');
 }
 
 function renderMessages() {
@@ -945,23 +986,50 @@ function renderChatList() {
 
 function updateCurrentChatName() {
     const currentChat = chats.find(chat => chat.id === currentChatId);
-    elements.currentChatName.textContent = currentChat ? currentChat.name : 'No Chat Selected';
-    
-    // Make the chat name editable
-    elements.currentChatName.onclick = () => {
-        if (currentChatId) {
-            showRenameChat(currentChatId, elements.currentChatName.textContent);
-        }
-    };
+    if (currentChat) {
+        console.log('Updating current chat name to:', currentChat.name);
+        elements.currentChatName.textContent = currentChat.name;
+        
+        // Make the chat name editable
+        elements.currentChatName.onclick = () => {
+            if (currentChatId) {
+                showRenameChat(currentChatId, elements.currentChatName.textContent);
+            }
+        };
+        
+        // Add a visual indicator that the name is editable
+        elements.currentChatName.classList.add('editable');
+    } else {
+        console.log('No current chat selected');
+        elements.currentChatName.textContent = 'No Chat Selected';
+        elements.currentChatName.onclick = null;
+        elements.currentChatName.classList.remove('editable');
+    }
 }
 
 function createNewChat() {
     const chatName = prompt('Enter a name for the new chat:', 'New Chat');
     if (chatName === null) return; // User cancelled
     
+    // Validate the chat name
+    if (!chatName.trim()) {
+        showError('Chat name cannot be empty');
+        return;
+    }
+    
+    if (chatName.length > 50) {
+        showError('Chat name too long (maximum 50 characters)');
+        return;
+    }
+    
+    console.log(`Creating new chat with name: "${chatName}"`);
+    
+    // Show loading state
+    elements.loadingOverlay.classList.add('visible');
+    
     sendWebSocketMessage({
         type: 'create_chat',
-        name: chatName,
+        name: chatName.trim(),
         starting_head: null // No starting head for a fresh chat
     });
     
@@ -977,6 +1045,11 @@ function createNewChat() {
     
     // Disable generate button for the new empty chat
     elements.generateButton.disabled = true;
+    
+    // Hide loading state after a short delay (server should respond quickly)
+    setTimeout(() => {
+        elements.loadingOverlay.classList.remove('visible');
+    }, 1000);
 }
 
 function branchChat() {
@@ -1026,8 +1099,27 @@ function switchChat(chatId) {
 }
 
 function showRenameChat(chatId, currentName) {
-    const newName = prompt('Enter a new name for the chat:', currentName);
-    if (newName === null || newName === currentName) return; // User cancelled or unchanged
+    // Decode HTML entities in the current name for the prompt
+    const decodedCurrentName = currentName.replace(/&amp;/g, '&')
+                                         .replace(/&lt;/g, '<')
+                                         .replace(/&gt;/g, '>')
+                                         .replace(/&quot;/g, '"');
+    
+    const newName = prompt('Enter a new name for the chat:', decodedCurrentName);
+    if (newName === null || newName === decodedCurrentName) return; // User cancelled or unchanged
+    
+    // Validate the new name (e.g., not empty, not too long)
+    if (!newName.trim()) {
+        showError('Chat name cannot be empty');
+        return;
+    }
+    
+    if (newName.length > 50) {
+        showError('Chat name too long (maximum 50 characters)');
+        return;
+    }
+    
+    console.log(`Renaming chat ${chatId} from "${currentName}" to "${newName}"`);
     
     sendWebSocketMessage({
         type: 'rename_chat',
@@ -1053,8 +1145,11 @@ function confirmDeleteChat(chatId) {
 // WebSocket communication
 function sendWebSocketMessage(message) {
     if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(message));
+        const messageStr = JSON.stringify(message);
+        console.log('Sending WebSocket message:', message);
+        ws.send(messageStr);
     } else {
+        console.error('Cannot send message: WebSocket not connected', message);
         showError('Not connected to server');
     }
 }
