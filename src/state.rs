@@ -306,17 +306,29 @@ impl State {
         let is_gemini = model.starts_with("gemini-");
         let is_openrouter = model.contains("/") || model.starts_with("openai/") || 
                            model.starts_with("anthropic/") || model.starts_with("mistral/") || 
-                           model.starts_with("meta-llama/") || model.contains(":free") ||
+                           model.starts_with("meta-llama/") || model.starts_with("deepseek/") || 
+                           model.starts_with("openrouter/") || model.starts_with("qwen/") ||
+                           model.contains(":free") ||
+                           crate::api::openrouter::is_free_model(&model) ||
                            crate::api::openrouter::is_llama4_maverick_free(&model);
         
-        // Log which model is being used
+        // Log which model is being used (with enhanced detail)
         if let Some(model) = &model_id {
             log(&format!("[DEBUG] Using specified model: {}", model));
+            if crate::api::openrouter::is_free_model(model) {
+                log(&format!("[DEBUG] Model '{}' is a free model", model));
+            }
         } else if is_gemini {
             log("[DEBUG] Using default Gemini model (gemini-2.0-flash)");
         } else if is_openrouter {
             if crate::api::openrouter::is_llama4_maverick_free(&model) {
                 log("[DEBUG] Using Llama 4 Maverick free model via OpenRouter");
+            } else if model.starts_with("deepseek/") {
+                log(&format!("[DEBUG] Using DeepSeek model: {}", model));
+            } else if model.starts_with("qwen/") {
+                log(&format!("[DEBUG] Using Qwen model: {}", model));
+            } else if model.starts_with("openrouter/") {
+                log(&format!("[DEBUG] Using OpenRouter custom model: {}", model));
             } else {
                 log(&format!("[DEBUG] Using OpenRouter model: {}", model));
             }

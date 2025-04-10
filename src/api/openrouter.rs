@@ -12,6 +12,28 @@ pub fn is_llama4_maverick_free(model_id: &str) -> bool {
         || model_id == "llama-4-maverick-free"
 }
 
+// Helper function to check if a model ID is for any free model
+pub fn is_free_model(model_id: &str) -> bool {
+    // Check if it's Llama 4 Maverick free
+    if is_llama4_maverick_free(model_id) {
+        return true;
+    }
+
+    // Check for the :free suffix which indicates a free model
+    if model_id.ends_with(":free") {
+        return true;
+    }
+
+    // List of other free model IDs that don't follow the :free pattern
+    let free_models = [
+        "deepseek/deepseek-v3-base:free",
+        "qwen/qwen2.5-vl-3b-instruct:free",
+        "qwen/qwen2.5-vl-32b-instruct:free",
+    ];
+
+    free_models.contains(&model_id)
+}
+
 // Pricing structure for OpenRouter models (these would typically be fetched from the API)
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ModelPricing {
@@ -21,17 +43,30 @@ pub struct ModelPricing {
 
 // Helper function to get pricing for a given model
 pub fn get_model_pricing(model_id: &str) -> ModelPricing {
-    if is_llama4_maverick_free(model_id) {
+    if is_free_model(model_id) {
         return ModelPricing {
             input_cost_per_million_tokens: Some(0.0),  // Free model
             output_cost_per_million_tokens: Some(0.0), // Free model
         };
     }
 
-    // Default pricing for other models
-    ModelPricing {
-        input_cost_per_million_tokens: None,
-        output_cost_per_million_tokens: None,
+    // Model-specific pricing
+    match model_id {
+        "openrouter/quasar-alpha" => ModelPricing {
+            input_cost_per_million_tokens: Some(10.0), // Example pricing
+            output_cost_per_million_tokens: Some(30.0), // Example pricing
+        },
+        "openrouter/optimus-alpha" => ModelPricing {
+            input_cost_per_million_tokens: Some(10.0), // Example pricing
+            output_cost_per_million_tokens: Some(30.0), // Example pricing
+        },
+        _ => {
+            // Default pricing for other models
+            ModelPricing {
+                input_cost_per_million_tokens: None,
+                output_cost_per_million_tokens: None,
+            }
+        }
     }
 }
 
@@ -46,12 +81,6 @@ pub struct OpenRouterMessage {
 pub struct OpenRouterRequest {
     pub model: String,
     pub messages: Vec<OpenRouterMessage>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_tokens: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub temperature: Option<f32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub provider: Option<Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -135,10 +164,10 @@ impl OpenRouterClient {
     }
 
     pub fn list_available_models(&self) -> Result<Vec<ModelInfo>, Box<dyn std::error::Error>> {
-        // Instead of querying the API for all models, just return a hardcoded list with Llama 4 Maverick
-        log("[DEBUG] Using hardcoded Llama 4 Maverick model instead of querying all OpenRouter models");
+        // Instead of querying the API for all models, return a hardcoded list of models
+        log("[DEBUG] Using hardcoded models instead of querying all OpenRouter models");
 
-        // Create a hardcoded list with just the Llama 4 Maverick model
+        // Create a hardcoded list with models
         let mut models = Vec::new();
 
         // Add the Llama 4 Maverick free model
@@ -149,7 +178,47 @@ impl OpenRouterClient {
             provider: Some("openrouter".to_string()),
         });
 
-        // Return just this model
+        // DeepSeek V3 Base (free)
+        models.push(ModelInfo {
+            id: "deepseek/deepseek-v3-base:free".to_string(),
+            display_name: "DeepSeek V3 Base (free)".to_string(),
+            max_tokens: 128000, // 128k context window
+            provider: Some("openrouter".to_string()),
+        });
+
+        // OpenRouter Quasar Alpha
+        models.push(ModelInfo {
+            id: "openrouter/quasar-alpha".to_string(),
+            display_name: "OpenRouter Quasar Alpha".to_string(),
+            max_tokens: 128000, // 128k context window
+            provider: Some("openrouter".to_string()),
+        });
+
+        // OpenRouter Optimus Alpha
+        models.push(ModelInfo {
+            id: "openrouter/optimus-alpha".to_string(),
+            display_name: "OpenRouter Optimus Alpha".to_string(),
+            max_tokens: 128000, // 128k context window
+            provider: Some("openrouter".to_string()),
+        });
+
+        // Qwen 2.5 VL 3B Instruct (free)
+        models.push(ModelInfo {
+            id: "qwen/qwen2.5-vl-3b-instruct:free".to_string(),
+            display_name: "Qwen 2.5 VL 3B Instruct (free)".to_string(),
+            max_tokens: 32000, // 32k context window
+            provider: Some("openrouter".to_string()),
+        });
+
+        // Qwen 2.5 VL 32B Instruct (free)
+        models.push(ModelInfo {
+            id: "qwen/qwen2.5-vl-32b-instruct:free".to_string(),
+            display_name: "Qwen 2.5 VL 32B Instruct (free)".to_string(),
+            max_tokens: 32000, // 32k context window
+            provider: Some("openrouter".to_string()),
+        });
+
+        // Return the models
         Ok(models)
     }
 
@@ -184,27 +253,10 @@ impl OpenRouterClient {
                 .unwrap_or("https://openrouter.ai/api/v1".to_string())
         );
 
-        // Create request body with parameters optimized for Llama 4 Maverick
-        let request_body = if is_llama4_maverick_free(&model) {
-            // Parameters specifically optimized for Llama 4 Maverick
-            OpenRouterRequest {
-                model: model.clone(),
-                messages: openrouter_messages,
-                max_tokens: Some(2048), // Reasonable response length
-                temperature: Some(0.5), // Slightly lower temperature for more deterministic responses
-                provider: Some(json!({
-                    "sort": "throughput" // Prioritize throughput for faster responses
-                })),
-            }
-        } else {
-            // Default parameters for other models
-            OpenRouterRequest {
-                model: model.clone(),
-                messages: openrouter_messages,
-                max_tokens: Some(1024),
-                temperature: Some(0.7),
-                provider: None,
-            }
+        // Create request body with model-specific parameters
+        let request_body = OpenRouterRequest {
+            model: model.clone(),
+            messages: openrouter_messages,
         };
 
         // Prepare the request body - log it for debugging
@@ -332,19 +384,31 @@ impl LlmMessage for OpenRouterLlmMessage {
             return cost;
         }
 
-        // Check if using the free model
-        if is_llama4_maverick_free(&self.model) {
+        // Check if using a free model
+        if is_free_model(&self.model) {
+            log(&format!(
+                "[DEBUG] Using free model {}, cost is 0.0",
+                self.model
+            ));
             return 0.0;
         }
 
-        // Otherwise calculate based on token counts and pricing
-        let input_cost = self.input_cost_per_million_tokens.unwrap_or(5.0)
-            * (self.input_tokens() as f64)
-            / 1_000_000.0;
+        // Get model-specific pricing
+        let pricing = get_model_pricing(&self.model);
 
-        let output_cost = self.output_cost_per_million_tokens.unwrap_or(15.0)
-            * (self.output_tokens() as f64)
-            / 1_000_000.0;
+        // Calculate based on token counts and pricing
+        let input_cost_per_million = pricing
+            .input_cost_per_million_tokens
+            .unwrap_or(self.input_cost_per_million_tokens.unwrap_or(5.0));
+
+        let output_cost_per_million = pricing
+            .output_cost_per_million_tokens
+            .unwrap_or(self.output_cost_per_million_tokens.unwrap_or(15.0));
+
+        // Calculate costs
+        let input_cost = input_cost_per_million * (self.input_tokens() as f64) / 1_000_000.0;
+
+        let output_cost = output_cost_per_million * (self.output_tokens() as f64) / 1_000_000.0;
 
         input_cost + output_cost
     }
