@@ -1,15 +1,15 @@
 use crate::bindings::ntwk::theater::http_client::{send_http, HttpRequest};
 use crate::bindings::ntwk::theater::runtime::log;
-use crate::messages::{AssistantMessage, Message, ModelInfo, LlmMessage};
+use crate::messages::{AssistantMessage, LlmMessage, Message, ModelInfo};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha1::{Digest, Sha1};
 
 // Helper function to check if a model ID is for Llama 4 Maverick free
 pub fn is_llama4_maverick_free(model_id: &str) -> bool {
-    model_id == "meta-llama/llama-4-maverick:free" ||
-    model_id == "llama-4-maverick:free" ||
-    model_id == "llama-4-maverick-free"
+    model_id == "meta-llama/llama-4-maverick:free"
+        || model_id == "llama-4-maverick:free"
+        || model_id == "llama-4-maverick-free"
 }
 
 // Pricing structure for OpenRouter models (these would typically be fetched from the API)
@@ -23,11 +23,11 @@ pub struct ModelPricing {
 pub fn get_model_pricing(model_id: &str) -> ModelPricing {
     if is_llama4_maverick_free(model_id) {
         return ModelPricing {
-            input_cost_per_million_tokens: Some(0.0), // Free model
+            input_cost_per_million_tokens: Some(0.0),  // Free model
             output_cost_per_million_tokens: Some(0.0), // Free model
         };
     }
-    
+
     // Default pricing for other models
     ModelPricing {
         input_cost_per_million_tokens: None,
@@ -119,14 +119,17 @@ impl OpenRouterClient {
             } else {
                 &api_key
             };
-            log(&format!("Initializing OpenRouter client with API key starting with: {}...", visible_part));
+            log(&format!(
+                "Initializing OpenRouter client with API key starting with: {}...",
+                visible_part
+            ));
         } else {
             log("Warning: Empty OpenRouter API key provided");
         }
-        
-        Self { 
-            api_key, 
-            app_name, 
+
+        Self {
+            api_key,
+            app_name,
             url: url.or(Some("https://openrouter.ai/api/v1".to_string())),
         }
     }
@@ -134,10 +137,10 @@ impl OpenRouterClient {
     pub fn list_available_models(&self) -> Result<Vec<ModelInfo>, Box<dyn std::error::Error>> {
         // Instead of querying the API for all models, just return a hardcoded list with Llama 4 Maverick
         log("[DEBUG] Using hardcoded Llama 4 Maverick model instead of querying all OpenRouter models");
-        
+
         // Create a hardcoded list with just the Llama 4 Maverick model
         let mut models = Vec::new();
-        
+
         // Add the Llama 4 Maverick free model
         models.push(ModelInfo {
             id: "meta-llama/llama-4-maverick:free".to_string(),
@@ -145,7 +148,7 @@ impl OpenRouterClient {
             max_tokens: 1000000, // 1 million token context
             provider: Some("openrouter".to_string()),
         });
-        
+
         // Return just this model
         Ok(models)
     }
@@ -172,10 +175,15 @@ impl OpenRouterClient {
 
         // Get the model ID or use Llama 4 Maverick free as default
         let model = model_id.unwrap_or_else(|| "meta-llama/llama-4-maverick:free".to_string());
-        
+
         // Construct the request URL
-        let url = format!("{}/chat/completions", self.url.clone().unwrap_or("https://openrouter.ai/api/v1".to_string()));
-        
+        let url = format!(
+            "{}/chat/completions",
+            self.url
+                .clone()
+                .unwrap_or("https://openrouter.ai/api/v1".to_string())
+        );
+
         // Create request body with parameters optimized for Llama 4 Maverick
         let request_body = if is_llama4_maverick_free(&model) {
             // Parameters specifically optimized for Llama 4 Maverick
@@ -193,27 +201,24 @@ impl OpenRouterClient {
             OpenRouterRequest {
                 model: model.clone(),
                 messages: openrouter_messages,
-                max_tokens: Some(1024), 
+                max_tokens: Some(1024),
                 temperature: Some(0.7),
                 provider: None,
             }
         };
-        
+
         // Prepare the request body - log it for debugging
         let request_body_json = serde_json::to_string(&request_body).unwrap_or_default();
         log(&format!("OpenRouter request body: {}", request_body_json));
 
         // Set up headers
         let mut headers = vec![
-            ("Authorization".to_string(), format!("Bearer {}", self.api_key)),
+            (
+                "Authorization".to_string(),
+                format!("Bearer {}", self.api_key),
+            ),
             ("Content-Type".to_string(), "application/json".to_string()),
         ];
-        
-        // Add optional headers for app discovery on OpenRouter
-        if let Some(app_name) = &self.app_name {
-            headers.push(("X-Title".to_string(), app_name.clone()));
-            // Could also add HTTP-Referer if we had a URL
-        }
 
         // Create the HTTP request
         let request = HttpRequest {
@@ -223,27 +228,40 @@ impl OpenRouterClient {
             body: Some(serde_json::to_vec(&request_body)?),
         };
 
+        log("Sending OpenRouter request...");
+        log(&format!("Request: {:?}", request));
+
         // Send the request
-        let http_response = send_http(&request).map_err(|e| format!("HTTP request failed: {}", e))?;
-        
+        let http_response =
+            send_http(&request).map_err(|e| format!("HTTP request failed: {}", e))?;
+
         // Log the response for debugging
-        log(&format!("OpenRouter response status: {}", http_response.status));
-        
+        log(&format!(
+            "OpenRouter response status: {}",
+            http_response.status
+        ));
+
         // Check if the response status is not 2xx (success)
         if http_response.status < 200 || http_response.status >= 300 {
-            return Err(format!("OpenRouter API error: HTTP status {}", http_response.status).into());
+            return Err(
+                format!("OpenRouter API error: HTTP status {}", http_response.status).into(),
+            );
         }
-        
+
         // Check if we have a response body
         let body = http_response.body.ok_or("No response body")?;
-        
+
         // Log a truncated version of the response body for debugging
-        let body_preview = String::from_utf8_lossy(&body[..std::cmp::min(body.len(), 500)]).to_string();
-        log(&format!("OpenRouter response body preview: {}", body_preview));
-        
+        let body_preview =
+            String::from_utf8_lossy(&body[..std::cmp::min(body.len(), 500)]).to_string();
+        log(&format!(
+            "OpenRouter response body preview: {}",
+            body_preview
+        ));
+
         // Parse the response
         let response: OpenRouterResponse = serde_json::from_slice(&body)?;
-        
+
         // Log the parsed response
         log(&format!("Parsed OpenRouter response: {:?}", response));
 
@@ -251,7 +269,7 @@ impl OpenRouterClient {
         if response.choices.is_empty() {
             return Err("No response choices".into());
         }
-        
+
         let choice = &response.choices[0];
         let content = choice.message.content.clone();
 
@@ -296,12 +314,16 @@ impl LlmMessage for OpenRouterLlmMessage {
 
     fn input_tokens(&self) -> u32 {
         // Use native token count if available, otherwise use normalized count
-        self.usage.native_prompt_tokens.unwrap_or(self.usage.prompt_tokens)
+        self.usage
+            .native_prompt_tokens
+            .unwrap_or(self.usage.prompt_tokens)
     }
 
     fn output_tokens(&self) -> u32 {
         // Use native token count if available, otherwise use normalized count
-        self.usage.native_completion_tokens.unwrap_or(self.usage.completion_tokens)
+        self.usage
+            .native_completion_tokens
+            .unwrap_or(self.usage.completion_tokens)
     }
 
     fn calculate_cost(&self) -> f64 {
@@ -309,12 +331,12 @@ impl LlmMessage for OpenRouterLlmMessage {
         if let Some(cost) = self.usage.cost {
             return cost;
         }
-        
+
         // Check if using the free model
         if is_llama4_maverick_free(&self.model) {
             return 0.0;
         }
-        
+
         // Otherwise calculate based on token counts and pricing
         let input_cost = self.input_cost_per_million_tokens.unwrap_or(5.0)
             * (self.input_tokens() as f64)
