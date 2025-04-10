@@ -235,6 +235,16 @@ function handleWebSocketMessage(data) {
                 }
                 // Update current chat ID
                 currentChatId = data.chat.id;
+                
+                // Ensure the message display is cleared for the new chat
+                if (messageChain.length > 0) {
+                    messageChain = [];
+                    currentHead = null;
+                    elements.messagesContainer.innerHTML = renderEmptyState();
+                    elements.headId.textContent = '';
+                    elements.generateButton.disabled = true;
+                }
+                
                 renderChatList();
                 updateCurrentChatName();
             }
@@ -914,6 +924,15 @@ function createNewChat() {
     // Reset message chain for new chat
     messageChain = [];
     currentHead = null;
+    
+    // Clear the messages display immediately
+    elements.messagesContainer.innerHTML = renderEmptyState();
+    
+    // Update the head ID display
+    elements.headId.textContent = '';
+    
+    // Disable generate button for the new empty chat
+    elements.generateButton.disabled = true;
 }
 
 function branchChat() {
@@ -951,6 +970,12 @@ function switchChat(chatId) {
     
     // Reset lastUsedModelId so it will be determined from the new chat
     lastUsedModelId = null;
+    
+    // Clear the messages display immediately
+    elements.messagesContainer.innerHTML = renderEmptyState();
+    
+    // Update the head ID display
+    elements.headId.textContent = '';
     
     // Disable generate button until messages are loaded
     elements.generateButton.disabled = true;
