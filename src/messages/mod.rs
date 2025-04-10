@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use crate::api::claude::Usage as ClaudeUsage;
 use crate::api::gemini::{GeminiUsage, SafetyRating};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ChainEntry {
@@ -16,9 +16,7 @@ pub enum MessageData {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {
-    User {
-        content: String,
-    },
+    User { content: String },
     Assistant(AssistantMessage),
 }
 
@@ -63,7 +61,6 @@ pub struct GeminiMessage {
     pub id: String,
     pub model: String,
     pub finish_reason: String,
-    pub safety_ratings: Option<Vec<SafetyRating>>,
     pub usage: GeminiUsage,
     pub input_cost_per_million_tokens: Option<f64>,
     pub output_cost_per_million_tokens: Option<f64>,
@@ -74,41 +71,43 @@ impl LlmMessage for ClaudeMessage {
     fn content(&self) -> &str {
         &self.content
     }
-    
+
     fn model_id(&self) -> &str {
         &self.model
     }
-    
+
     fn provider_name(&self) -> &str {
         "claude"
     }
-    
+
     fn input_tokens(&self) -> u32 {
         self.usage.input_tokens
     }
-    
+
     fn output_tokens(&self) -> u32 {
         self.usage.output_tokens
     }
-    
+
     fn calculate_cost(&self) -> f64 {
-        let input_cost = self.input_cost_per_million_tokens.unwrap_or(3.0) * 
-            (self.usage.input_tokens as f64) / 1_000_000.0;
-            
-        let output_cost = self.output_cost_per_million_tokens.unwrap_or(15.0) * 
-            (self.usage.output_tokens as f64) / 1_000_000.0;
-            
+        let input_cost = self.input_cost_per_million_tokens.unwrap_or(3.0)
+            * (self.usage.input_tokens as f64)
+            / 1_000_000.0;
+
+        let output_cost = self.output_cost_per_million_tokens.unwrap_or(15.0)
+            * (self.usage.output_tokens as f64)
+            / 1_000_000.0;
+
         input_cost + output_cost
     }
-    
+
     fn stop_reason(&self) -> &str {
         &self.stop_reason
     }
-    
+
     fn message_id(&self) -> &str {
         &self.id
     }
-    
+
     fn provider_data(&self) -> Option<serde_json::Value> {
         Some(serde_json::json!({
             "stop_sequence": self.stop_sequence,
@@ -122,45 +121,45 @@ impl LlmMessage for GeminiMessage {
     fn content(&self) -> &str {
         &self.content
     }
-    
+
     fn model_id(&self) -> &str {
         &self.model
     }
-    
+
     fn provider_name(&self) -> &str {
         "gemini"
     }
-    
+
     fn input_tokens(&self) -> u32 {
         self.usage.prompt_tokens
     }
-    
+
     fn output_tokens(&self) -> u32 {
         self.usage.completion_tokens
     }
-    
+
     fn calculate_cost(&self) -> f64 {
-        let input_cost = self.input_cost_per_million_tokens.unwrap_or(0.35) * 
-            (self.usage.prompt_tokens as f64) / 1_000_000.0;
-            
-        let output_cost = self.output_cost_per_million_tokens.unwrap_or(1.05) * 
-            (self.usage.completion_tokens as f64) / 1_000_000.0;
-            
+        let input_cost = self.input_cost_per_million_tokens.unwrap_or(0.35)
+            * (self.usage.prompt_tokens as f64)
+            / 1_000_000.0;
+
+        let output_cost = self.output_cost_per_million_tokens.unwrap_or(1.05)
+            * (self.usage.completion_tokens as f64)
+            / 1_000_000.0;
+
         input_cost + output_cost
     }
-    
+
     fn stop_reason(&self) -> &str {
         &self.finish_reason
     }
-    
+
     fn message_id(&self) -> &str {
         &self.id
     }
-    
+
     fn provider_data(&self) -> Option<serde_json::Value> {
-        Some(serde_json::json!({
-            "safety_ratings": self.safety_ratings
-        }))
+        None
     }
 }
 
@@ -172,56 +171,56 @@ impl LlmMessage for AssistantMessage {
             AssistantMessage::Gemini(msg) => msg.content(),
         }
     }
-    
+
     fn model_id(&self) -> &str {
         match self {
             AssistantMessage::Claude(msg) => msg.model_id(),
             AssistantMessage::Gemini(msg) => msg.model_id(),
         }
     }
-    
+
     fn provider_name(&self) -> &str {
         match self {
             AssistantMessage::Claude(msg) => msg.provider_name(),
             AssistantMessage::Gemini(msg) => msg.provider_name(),
         }
     }
-    
+
     fn input_tokens(&self) -> u32 {
         match self {
             AssistantMessage::Claude(msg) => msg.input_tokens(),
             AssistantMessage::Gemini(msg) => msg.input_tokens(),
         }
     }
-    
+
     fn output_tokens(&self) -> u32 {
         match self {
             AssistantMessage::Claude(msg) => msg.output_tokens(),
             AssistantMessage::Gemini(msg) => msg.output_tokens(),
         }
     }
-    
+
     fn calculate_cost(&self) -> f64 {
         match self {
             AssistantMessage::Claude(msg) => msg.calculate_cost(),
             AssistantMessage::Gemini(msg) => msg.calculate_cost(),
         }
     }
-    
+
     fn stop_reason(&self) -> &str {
         match self {
             AssistantMessage::Claude(msg) => msg.stop_reason(),
             AssistantMessage::Gemini(msg) => msg.stop_reason(),
         }
     }
-    
+
     fn message_id(&self) -> &str {
         match self {
             AssistantMessage::Claude(msg) => msg.message_id(),
             AssistantMessage::Gemini(msg) => msg.message_id(),
         }
     }
-    
+
     fn provider_data(&self) -> Option<serde_json::Value> {
         match self {
             AssistantMessage::Claude(msg) => msg.provider_data(),

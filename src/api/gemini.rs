@@ -3,7 +3,7 @@ use crate::bindings::ntwk::theater::runtime::log;
 use crate::messages::{AssistantMessage, LlmMessage, Message, ModelInfo};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::time::{SystemTime, UNIX_EPOCH};
+use sha1::{Digest, Sha1};
 
 // Gemini request/response structures
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -31,21 +31,39 @@ pub struct GeminiResponseContent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GeminiCandidate {
     pub content: GeminiResponseContent,
+    #[serde(rename = "finishReason")]
     pub finish_reason: String,
-    pub safety_ratings: Option<Vec<SafetyRating>>,
+    pub index: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GeminiResponse {
     pub candidates: Vec<GeminiCandidate>,
+    #[serde(rename = "usageMetadata")]
     pub usage: GeminiUsage,
+    #[serde(rename = "modelVersion")]
+    pub model_version: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GeminiUsage {
+    #[serde(rename = "promptTokenCount", default)]
     pub prompt_tokens: u32,
+    #[serde(rename = "candidatesTokenCount", default)]
     pub completion_tokens: u32,
+    #[serde(rename = "totalTokenCount", default)]
     pub total_tokens: u32,
+    #[serde(rename = "promptTokensDetails", default)]
+    pub prompt_tokens_details: Option<Vec<TokenDetails>>,
+    #[serde(rename = "thoughtsTokenCount", default)]
+    pub thoughts_token_count: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TokenDetails {
+    pub modality: String,
+    #[serde(rename = "tokenCount")]
+    pub token_count: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -143,40 +161,48 @@ impl GeminiClient {
         let http_response =
             send_http(&request).map_err(|e| format!("HTTP request failed: {}", e))?;
 
-        log(format!(
-            "Gemini response: {}",
-            String::from_utf8_lossy(&http_response.body.clone().unwrap_or_default())
-        )
-        .as_str());
+        log(format!("Gemini response: {:?}", http_response).as_str());
 
         // Parse the response
+        log("Parsing Gemini response");
+        log(format!("Response status: {}", http_response.status).as_str());
+        log(format!("Response body: {:?}", http_response.body).as_str());
         let body = http_response.body.ok_or("No response body")?;
+        log(format!("Response body: {:?}", String::from_utf8_lossy(&body)).as_str());
         let response: GeminiResponse = serde_json::from_slice(&body)?;
+        log(format!("Parsed Gemini response: {:?}", response).as_str());
 
         // Extract the response content
         if response.candidates.is_empty() {
             return Err("No response candidates".into());
         }
 
+        log(format!("Response candidates: {:?}", response.candidates).as_str());
+
         let candidate = &response.candidates[0];
+
+        log(format!("Candidate: {:?}", candidate).as_str());
 
         // Extract text from the response
         let parts = &candidate.content.parts;
+        log(format!("Response parts: {:?}", parts).as_str());
         if parts.is_empty() {
+            log("Response parts are empty");
             return Err("No text parts in response".into());
         }
+        log(format!("Response part: {:?}", parts[0]).as_str());
 
         let content = parts[0].text.clone();
 
-        // Create a unique ID for the message using SystemTime
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis();
-        let id = format!("gemini-{}", timestamp);
-
         // Get pricing for this model
         let pricing = get_model_pricing(&model);
+
+        let mut hasher = sha1::Sha1::new();
+
+        // get the message id from the sha1 hash of the content
+        hasher.update(content.as_bytes());
+        let id = hasher.finalize();
+        let id = format!("{:x}", id);
 
         // Create our message
         let gemini_message = GeminiMessage {
@@ -184,7 +210,6 @@ impl GeminiClient {
             id,
             model,
             finish_reason: candidate.finish_reason.clone(),
-            safety_ratings: candidate.safety_ratings.clone(),
             usage: response.usage.clone(),
             input_cost_per_million_tokens: pricing.input_cost_per_million_tokens,
             output_cost_per_million_tokens: pricing.output_cost_per_million_tokens,
