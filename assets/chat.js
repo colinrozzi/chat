@@ -506,6 +506,25 @@ function renderMessage(message) {
                 } else {
                     costDisplay = "Unknown";
                 }
+            } else if (assistantMsg.OpenRouter) {
+                // Handle OpenRouter messages
+                const openrouter = assistantMsg.OpenRouter;
+                content = openrouter.content;
+                model = openrouter.model;
+                usage = openrouter.usage;
+                stopReason = openrouter.finish_reason;
+                providerName = "OpenRouter";
+                
+                // Calculate cost for OpenRouter
+                if (openrouter.input_cost_per_million_tokens !== null && openrouter.output_cost_per_million_tokens !== null) {
+                    const inputCost = (openrouter.usage.prompt_tokens / 1000000) * openrouter.input_cost_per_million_tokens;
+                    const outputCost = (openrouter.usage.completion_tokens / 1000000) * openrouter.output_cost_per_million_tokens;
+                    costDisplay = (inputCost + outputCost).toFixed(4);
+                } else if (openrouter.usage.cost !== null) {
+                    costDisplay = openrouter.usage.cost.toFixed(4);
+                } else {
+                    costDisplay = "Unknown";
+                }
             } else {
                 // Fallback for older message structure
                 content = assistantMsg.content || "Content unavailable";
@@ -1253,8 +1272,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // One event handler for all keyboard shortcuts
     elements.messageInput.addEventListener('keydown', (event) => {
-        console.log(`Key pressed: ${event.key}, Shift: ${event.shiftKey}, Ctrl: ${event.ctrlKey}, Meta: ${event.metaKey}`);
-        
         if (event.key === 'Enter') {
             // Shift+Enter to send message
             if (event.shiftKey) {
@@ -1268,7 +1285,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('Generating response with Ctrl/Cmd+Enter');
                 generateLlmResponse();
             }
-            // Normal Enter just allows the newline (default behavior)
         }
     });
     
