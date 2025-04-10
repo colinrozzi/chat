@@ -132,141 +132,21 @@ impl OpenRouterClient {
     }
 
     pub fn list_available_models(&self) -> Result<Vec<ModelInfo>, Box<dyn std::error::Error>> {
-        // Construct the URL for the models endpoint
-        let url = format!("{}/models", self.url.clone().unwrap_or("https://openrouter.ai/api/v1".to_string()));
+        // Instead of querying the API for all models, just return a hardcoded list with Llama 4 Maverick
+        log("[DEBUG] Using hardcoded Llama 4 Maverick model instead of querying all OpenRouter models");
         
-        log(&format!("[DEBUG] Fetching models from OpenRouter URL: {}", url));
-        
-        let mut headers = vec![
-            ("Authorization".to_string(), format!("Bearer {}", self.api_key)),
-            ("Content-Type".to_string(), "application/json".to_string()),
-        ];
-        
-        log(&format!("[DEBUG] Using API key starting with: {}...", 
-            if self.api_key.len() > 5 { &self.api_key[0..5] } else { "<empty>" }));
-        
-        // Add optional headers for app discovery on OpenRouter
-        if let Some(app_name) = &self.app_name {
-            headers.push(("X-Title".to_string(), app_name.clone()));
-        }
-        
-        let request = HttpRequest {
-            method: "GET".to_string(),
-            uri: url,
-            headers,
-            body: None,
-        };
-
-        log("[DEBUG] Sending request to OpenRouter API");
-        let http_response = match send_http(&request) {
-            Ok(response) => {
-                log(&format!("[DEBUG] Received response from OpenRouter API with status: {}", response.status));
-                response
-            }
-            Err(e) => {
-                log(&format!("[ERROR] HTTP request to OpenRouter API failed: {}", e));
-                return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, e)));
-            }
-        };
-        
-        // Check if we have a response body
-        let body = match http_response.body {
-            Some(body) => {
-                if body.is_empty() {
-                    log("[ERROR] Empty response body from OpenRouter API");
-                    return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "Empty response body")));
-                }
-                body
-            }
-            None => {
-                log("[ERROR] No response body from OpenRouter API");
-                return Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "No response body")));
-            }
-        };
-        
-        // Parse the response
-        let models_response: Value = match serde_json::from_slice(&body) {
-            Ok(json) => {
-                log("[DEBUG] Successfully parsed OpenRouter API response");
-                json
-            }
-            Err(e) => {
-                let response_text = String::from_utf8_lossy(&body);
-                log(&format!("[ERROR] Failed to parse OpenRouter API response: {}", e));
-                log(&format!("[DEBUG] Raw response: {}", response_text));
-                return Err(Box::new(e));
-            }
-        };
-        
-        // Log the response for debugging
-        log(&format!("OpenRouter models response: {:?}", models_response));
-        
-        // Parse the models from the response
+        // Create a hardcoded list with just the Llama 4 Maverick model
         let mut models = Vec::new();
         
-        if let Some(data) = models_response.get("data").and_then(|d| d.as_array()) {
-            log(&format!("[DEBUG] Found {} models in OpenRouter response", data.len()));
-            for model_data in data {
-                if let (Some(id), Some(context_length)) = (
-                    model_data.get("id").and_then(|v| v.as_str()),
-                    model_data.get("context_length").and_then(|v| v.as_u64()),
-                ) {
-                    // Get the display name or use the ID if not available
-                    let display_name = model_data.get("name")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or(id);
-                    
-                    log(&format!("[DEBUG] Found model: {} ({})", display_name, id));
-                    
-                    // Add the model to the list
-                    models.push(ModelInfo {
-                        id: id.to_string(),
-                        display_name: display_name.to_string(),
-                        max_tokens: context_length as u32,
-                        provider: Some("openrouter".to_string()),
-                    });
-                }
-            }
-        }
-        
-        // Always ensure that Llama 4 Maverick free is in the list
-        let llama4_model_id = "meta-llama/llama-4-maverick:free";
-        
-        // Check if Llama 4 Maverick is already in the list
-        let has_llama4 = models.iter().any(|model| is_llama4_maverick_free(&model.id));
-        
-        if !has_llama4 {
-            log("[DEBUG] Adding Llama 4 Maverick free model to the list");
-            models.push(ModelInfo {
-                id: llama4_model_id.to_string(),
-                display_name: "Llama 4 Maverick (free)".to_string(),
-                max_tokens: 1000000, // 1 million token context
-                provider: Some("openrouter".to_string()),
-            });
-        }
-        
-        // If we don't find models from the API or there's an error, add at least Llama 4 Maverick free
-        if models.is_empty() {
-            // Add Llama 4 Maverick free model with hardcoded info
-            models.push(ModelInfo {
-                id: "meta-llama/llama-4-maverick:free".to_string(),
-                display_name: "Llama 4 Maverick (free)".to_string(),
-                max_tokens: 1000000, // 1 million token context
-                provider: Some("openrouter".to_string()),
-            });
-        }
-        
-        // Make sure Llama 4 Maverick shows up at the top of the list
-        models.sort_by(|a, b| {
-            if is_llama4_maverick_free(&a.id) {
-                std::cmp::Ordering::Less
-            } else if is_llama4_maverick_free(&b.id) {
-                std::cmp::Ordering::Greater
-            } else {
-                a.display_name.cmp(&b.display_name)
-            }
+        // Add the Llama 4 Maverick free model
+        models.push(ModelInfo {
+            id: "meta-llama/llama-4-maverick:free".to_string(),
+            display_name: "Llama 4 Maverick (free)".to_string(),
+            max_tokens: 1000000, // 1 million token context
+            provider: Some("openrouter".to_string()),
         });
         
+        // Return just this model
         Ok(models)
     }
 
