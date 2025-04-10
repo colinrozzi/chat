@@ -1,6 +1,6 @@
 use crate::bindings::ntwk::theater::http_client::{send_http, HttpRequest};
 use crate::bindings::ntwk::theater::runtime::log;
-use crate::messages::{AssistantMessage, Message, ModelInfo, LlmMessage};
+use crate::messages::{AssistantMessage, LlmMessage, Message, ModelInfo};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -60,13 +60,9 @@ use crate::messages::GeminiMessage;
 // Pricing structure for Gemini models
 pub fn get_model_pricing(model_id: &str) -> ModelPricing {
     match model_id {
-        "gemini-2.0-flash" => ModelPricing {
+        "gemini-2.5-pro-exp-03-25" => ModelPricing {
             input_cost_per_million_tokens: Some(0.35),
             output_cost_per_million_tokens: Some(1.05),
-        },
-        "gemini-2.0-pro" => ModelPricing {
-            input_cost_per_million_tokens: Some(3.50),
-            output_cost_per_million_tokens: Some(10.50),
         },
         // Default case
         _ => ModelPricing {
@@ -79,8 +75,7 @@ pub fn get_model_pricing(model_id: &str) -> ModelPricing {
 // Get max tokens for Gemini models
 pub fn get_model_max_tokens(model_id: &str) -> u32 {
     match model_id {
-        "gemini-2.0-flash" => 32768,
-        "gemini-2.0-pro" => 32768,
+        "gemini-2.5-pro-exp-03-25" => 32768,
         _ => 4096, // Default conservative value
     }
 }
@@ -107,11 +102,11 @@ impl GeminiClient {
         model_id: Option<String>,
     ) -> Result<AssistantMessage, Box<dyn std::error::Error>> {
         // Get the model ID or use default
-        let model = model_id.unwrap_or_else(|| "gemini-2.0-flash".to_string());
-        
+        let model = model_id.unwrap_or_else(|| "gemini-2.5-pro-exp-03-25".to_string());
+
         // Convert our internal message format to Gemini format
         let mut gemini_contents: Vec<GeminiContent> = Vec::new();
-        
+
         for msg in messages {
             match msg {
                 Message::User { content } => {
@@ -119,13 +114,15 @@ impl GeminiClient {
                         role: "user".to_string(),
                         parts: vec![GeminiPart { text: content }],
                     });
-                },
+                }
                 Message::Assistant(assistant_msg) => {
                     gemini_contents.push(GeminiContent {
                         role: "model".to_string(),
-                        parts: vec![GeminiPart { text: assistant_msg.content().to_string() }],
+                        parts: vec![GeminiPart {
+                            text: assistant_msg.content().to_string(),
+                        }],
                     });
-                },
+                }
             }
         }
 
@@ -136,44 +133,51 @@ impl GeminiClient {
                 "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
                 model, self.api_key
             ),
-            headers: vec![
-                ("Content-Type".to_string(), "application/json".to_string()),
-            ],
-            body: Some(serde_json::to_vec(&GeminiRequest { contents: gemini_contents })?),
+            headers: vec![("Content-Type".to_string(), "application/json".to_string())],
+            body: Some(serde_json::to_vec(&GeminiRequest {
+                contents: gemini_contents,
+            })?),
         };
 
         // Send the request
-        let http_response = send_http(&request)
-            .map_err(|e| format!("HTTP request failed: {}", e))?;
-        
+        let http_response =
+            send_http(&request).map_err(|e| format!("HTTP request failed: {}", e))?;
+
+        log(format!(
+            "Gemini response: {}",
+            String::from_utf8_lossy(&http_response.body.clone().unwrap_or_default())
+        )
+        .as_str());
+
         // Parse the response
         let body = http_response.body.ok_or("No response body")?;
         let response: GeminiResponse = serde_json::from_slice(&body)?;
-        
+
         // Extract the response content
         if response.candidates.is_empty() {
             return Err("No response candidates".into());
         }
-        
+
         let candidate = &response.candidates[0];
-        
+
         // Extract text from the response
         let parts = &candidate.content.parts;
         if parts.is_empty() {
             return Err("No text parts in response".into());
         }
-        
+
         let content = parts[0].text.clone();
-        
+
         // Create a unique ID for the message using SystemTime
-        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis();
         let id = format!("gemini-{}", timestamp);
-        
+
         // Get pricing for this model
         let pricing = get_model_pricing(&model);
-        
+
         // Create our message
         let gemini_message = GeminiMessage {
             content,
@@ -185,26 +189,18 @@ impl GeminiClient {
             input_cost_per_million_tokens: pricing.input_cost_per_million_tokens,
             output_cost_per_million_tokens: pricing.output_cost_per_million_tokens,
         };
-        
+
         // Wrap in the enum
         Ok(AssistantMessage::Gemini(gemini_message))
     }
-    
+
     pub fn list_available_models(&self) -> Result<Vec<ModelInfo>, Box<dyn std::error::Error>> {
         // Return available Gemini models
-        Ok(vec![
-            ModelInfo {
-                id: "gemini-2.0-flash".to_string(),
-                display_name: "Gemini 2.0 Flash".to_string(),
-                max_tokens: 32768,
-                provider: Some("gemini".to_string()),
-            },
-            ModelInfo {
-                id: "gemini-2.0-pro".to_string(),
-                display_name: "Gemini 2.0 Pro".to_string(),
-                max_tokens: 32768,
-                provider: Some("gemini".to_string()),
-            },
-        ])
+        Ok(vec![ModelInfo {
+            id: "gemini-2.5-pro-exp-03-25".to_string(),
+            display_name: "Gemini 2.5 Pro Experimental".to_string(),
+            max_tokens: 32768,
+            provider: Some("gemini".to_string()),
+        }])
     }
 }

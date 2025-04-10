@@ -7,10 +7,22 @@ function findLastUsedModel() {
     for (let i = sortedMessages.length - 1; i >= 0; i--) {
         const message = sortedMessages[i];
         if (message.data && message.data.Chat && message.data.Chat.Assistant) {
-            const assistant = message.data.Chat.Assistant;
-            if (assistant.model) {
-                console.log(`Found last used model: ${assistant.model}`);
-                lastUsedModelId = assistant.model;
+            const assistantMsg = message.data.Chat.Assistant;
+            let model;
+            
+            // Handle nested structure
+            if (assistantMsg.Claude) {
+                model = assistantMsg.Claude.model;
+            } else if (assistantMsg.Gemini) {
+                model = assistantMsg.Gemini.model;
+            } else {
+                // Fallback for older structure
+                model = assistantMsg.model;
+            }
+            
+            if (model) {
+                console.log(`Found last used model: ${model}`);
+                lastUsedModelId = model;
                 return lastUsedModelId;
             }
         }
@@ -279,42 +291,71 @@ function handleNewMessage(message) {
     
     // Add to message chain if not already present
     if (!messageChain.find(m => m.id === message.id)) {
-        console.log(`Adding new message to chain: ${message.id}, parents: ${JSON.stringify(message.parents || [])}`);
-        // Add the cost to the total only when a new message is received
-        if (message.data && message.data.Chat && message.data.Chat.Assistant) {
-            const assistant = message.data.Chat.Assistant;
-            
-            // Calculate cost based on model-specific pricing if available
-            if (assistant.input_cost_per_million_tokens !== undefined && 
-                assistant.output_cost_per_million_tokens !== undefined) {
-                
-                if (assistant.input_cost_per_million_tokens !== null && 
-                    assistant.output_cost_per_million_tokens !== null) {
-                    
-                    const inputCost = (assistant.usage.input_tokens / 1000000) * assistant.input_cost_per_million_tokens;
-                    const outputCost = (assistant.usage.output_tokens / 1000000) * assistant.output_cost_per_million_tokens;
-                    totalCost += (inputCost + outputCost);
-                    totalInputTokens += assistant.usage.input_tokens;
-                    totalOutputTokens += assistant.usage.output_tokens;
-                    totalMessages++;
-                    updateStatsDisplay();
-                }
-            } else {
-                // Fallback to calculateMessageCost function
-                calculateMessageCost(assistant.usage, true, assistant.model);
-            }
-            
-            // Store the model ID from the last assistant message
-            lastUsedModelId = assistant.model;
-            console.log(`Stored last used model ID: ${lastUsedModelId}`);
-            
-            // Update the selected model in the UI if it exists
-            updateModelSelector();
+    console.log(`Adding new message to chain: ${message.id}, parents: ${JSON.stringify(message.parents || [])}`);
+    // Add the cost to the total only when a new message is received
+    if (message.data && message.data.Chat && message.data.Chat.Assistant) {
+    const assistantMsg = message.data.Chat.Assistant;
+    
+    // Handle the new nested structure (Claude or Gemini)
+    if (assistantMsg.Claude) {
+    const claude = assistantMsg.Claude;
+    // Calculate cost based on model-specific pricing if available
+    if (claude.input_cost_per_million_tokens !== undefined && 
+    claude.output_cost_per_million_tokens !== undefined) {
+    
+    if (claude.input_cost_per_million_tokens !== null && 
+        claude.output_cost_per_million_tokens !== null) {
+        
+        const inputCost = (claude.usage.input_tokens / 1000000) * claude.input_cost_per_million_tokens;
+        const outputCost = (claude.usage.output_tokens / 1000000) * claude.output_cost_per_million_tokens;
+        totalCost += (inputCost + outputCost);
+        totalInputTokens += claude.usage.input_tokens;
+            totalOutputTokens += claude.usage.output_tokens;
+                totalMessages++;
+            updateStatsDisplay();
         }
-        messageChain.push(message);
-    } else {
-        console.log(`Message ${message.id} already exists in chain, skipping`);
-    }
+        } else {
+            // Fallback to calculateMessageCost function
+            calculateMessageCost(claude.usage, true, claude.model);
+        }
+        
+        // Store the model ID from the last assistant message
+        lastUsedModelId = claude.model;
+        console.log(`Stored last used model ID: ${lastUsedModelId}`);
+        } else if (assistantMsg.Gemini) {
+            const gemini = assistantMsg.Gemini;
+                // Calculate cost based on model-specific pricing if available
+            if (gemini.input_cost_per_million_tokens !== undefined && 
+                    gemini.output_cost_per_million_tokens !== undefined) {
+                        
+                        if (gemini.input_cost_per_million_tokens !== null && 
+                            gemini.output_cost_per_million_tokens !== null) {
+                            
+                            const inputCost = (gemini.usage.prompt_tokens / 1000000) * gemini.input_cost_per_million_tokens;
+                            const outputCost = (gemini.usage.completion_tokens / 1000000) * gemini.output_cost_per_million_tokens;
+                            totalCost += (inputCost + outputCost);
+                            totalInputTokens += gemini.usage.prompt_tokens;
+                            totalOutputTokens += gemini.usage.completion_tokens;
+                            totalMessages++;
+                            updateStatsDisplay();
+                        }
+                    } else {
+                        // Fallback to calculateMessageCost function
+                        calculateMessageCost(gemini.usage, true, gemini.model);
+                    }
+                    
+                    // Store the model ID from the last assistant message
+                    lastUsedModelId = gemini.model;
+                    console.log(`Stored last used model ID: ${lastUsedModelId}`);
+                }
+                
+                // Update the selected model in the UI if it exists
+                updateModelSelector();
+            }
+            messageChain.push(message);
+        } else {
+            console.log(`Message ${message.id} already exists in chain, skipping`);
+        }
 
     // Request parent messages if needed
     if (message.parents && message.parents.length > 0) {
@@ -419,36 +460,61 @@ function renderMessage(message) {
                 </div>
             `;
         } else if (msg.Assistant) {
-            const assistant = msg.Assistant;
-            // Determine if this is a short message (less than 100 characters)
-            const isShortMessage = assistant.content.length < 100;
-            const smallClass = isShortMessage ? 'small' : '';
+            const assistantMsg = msg.Assistant;
+            let content, model, usage, stopReason, providerName;
             
-            // Calculate the message cost using the model-specific pricing if available
-            let costDisplay;
-            if (assistant.input_cost_per_million_tokens !== undefined && assistant.output_cost_per_million_tokens !== undefined) {
-                // If model-specific pricing is available in the message
-                if (assistant.input_cost_per_million_tokens === null || assistant.output_cost_per_million_tokens === null) {
-                    costDisplay = "Unknown";
-                } else {
-                    const inputCost = (assistant.usage.input_tokens / 1000000) * assistant.input_cost_per_million_tokens;
-                    const outputCost = (assistant.usage.output_tokens / 1000000) * assistant.output_cost_per_million_tokens;
+            // Handle the nested structure (Claude or Gemini)
+            if (assistantMsg.Claude) {
+                const claude = assistantMsg.Claude;
+                content = claude.content;
+                model = claude.model;
+                usage = claude.usage;
+                stopReason = claude.stop_reason;
+                providerName = "Claude";
+                
+                // Calculate cost for Claude
+                if (claude.input_cost_per_million_tokens !== null && claude.output_cost_per_million_tokens !== null) {
+                    const inputCost = (claude.usage.input_tokens / 1000000) * claude.input_cost_per_million_tokens;
+                    const outputCost = (claude.usage.output_tokens / 1000000) * claude.output_cost_per_million_tokens;
                     costDisplay = (inputCost + outputCost).toFixed(4);
+                } else {
+                    costDisplay = "Unknown";
+                }
+            } else if (assistantMsg.Gemini) {
+                const gemini = assistantMsg.Gemini;
+                content = gemini.content;
+                model = gemini.model;
+                usage = gemini.usage;
+                stopReason = gemini.finish_reason;
+                providerName = "Gemini";
+                
+                // Calculate cost for Gemini
+                if (gemini.input_cost_per_million_tokens !== null && gemini.output_cost_per_million_tokens !== null) {
+                    const inputCost = (gemini.usage.prompt_tokens / 1000000) * gemini.input_cost_per_million_tokens;
+                    const outputCost = (gemini.usage.completion_tokens / 1000000) * gemini.output_cost_per_million_tokens;
+                    costDisplay = (inputCost + outputCost).toFixed(4);
+                } else {
+                    costDisplay = "Unknown";
                 }
             } else {
-                // Fallback to the function if pricing not in message
-                costDisplay = calculateMessageCost(assistant.usage, false, assistant.model);
+                // Fallback for older message structure
+                content = assistantMsg.content || "Content unavailable";
+                model = assistantMsg.model || "Unknown model";
+                usage = assistantMsg.usage || { input_tokens: 0, output_tokens: 0 };
+                stopReason = assistantMsg.stop_reason || assistantMsg.finish_reason || "Unknown";
+                providerName = model?.startsWith("gemini-") ? "Gemini" : "Claude";
+                
+                // Fallback cost calculation
+                costDisplay = calculateMessageCost(usage, false, model);
             }
             
-            // Get provider name from the model ID
-            let providerName = "Claude";
-            if (assistant.model?.startsWith("gemini-")) {
-                providerName = "Gemini";
-            }
+            // Determine if this is a short message (less than 100 characters)
+            const isShortMessage = content?.length < 100;
+            const smallClass = isShortMessage ? 'small' : '';
             
             return `
                 <div class="message assistant ${smallClass}" data-message-id="${message.id}">
-                    ${formatMessageContent(assistant.content)}
+                    ${formatMessageContent(content)}
                     <div class="message-actions">
                         <button class="message-action-button" onclick="copyMessageText('${message.id}')">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -471,16 +537,16 @@ function renderMessage(message) {
                             <span class="metadata-label">Provider:</span> ${providerName}
                         </div>
                         <div class="metadata-item">
-                            <span class="metadata-label">Model:</span> ${assistant.model}
+                            <span class="metadata-label">Model:</span> ${model}
                         </div>
                         <div class="metadata-item">
-                            <span class="metadata-label">Tokens:</span> ${assistant.usage.input_tokens || assistant.usage.prompt_tokens} in / ${assistant.usage.output_tokens || assistant.usage.completion_tokens} out of ${getModelMaxTokens(assistant.model)}
+                            <span class="metadata-label">Tokens:</span> ${usage ? (usage.input_tokens || usage.prompt_tokens || 0) : 0} in / ${usage ? (usage.output_tokens || usage.completion_tokens || 0) : 0} out of ${getModelMaxTokens(model)}
                         </div>
                         <div class="metadata-item">
                             <span class="metadata-label">Cost:</span> ${costDisplay}
                         </div>
                         <div class="metadata-item">
-                            <span class="metadata-label">Stop Reason:</span> ${assistant.stop_reason || assistant.finish_reason}
+                            <span class="metadata-label">Stop Reason:</span> ${stopReason}
                         </div>
                     </div>
                 </div>
@@ -1220,7 +1286,16 @@ function copyMessageText(messageId) {
         if (message.data.Chat.User) {
             content = message.data.Chat.User.content;
         } else if (message.data.Chat.Assistant) {
-            content = message.data.Chat.Assistant.content;
+            const assistantMsg = message.data.Chat.Assistant;
+            // Handle nested structure
+            if (assistantMsg.Claude) {
+                content = assistantMsg.Claude.content;
+            } else if (assistantMsg.Gemini) {
+                content = assistantMsg.Gemini.content;
+            } else {
+                // Fallback for older structure
+                content = assistantMsg.content || '';
+            }
         }
     } 
     
