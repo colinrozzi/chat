@@ -5,23 +5,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha1::{Digest, Sha1};
 
-// Helper function to get max tokens for a given model
-pub fn get_model_max_tokens(model_id: &str) -> u32 {
-    match model_id {
-        // Claude models via OpenRouter
-        m if m.contains("claude") => 100000,
-        // Gemini models via OpenRouter
-        m if m.contains("gemini") => 32768,
-        // GPT models via OpenRouter
-        m if m.contains("gpt-4") => 128000,
-        m if m.contains("gpt-3.5") => 16384,
-        // Anthropic models via OpenRouter
-        m if m.contains("anthropic") => 100000,
-        // Mistral models via OpenRouter
-        m if m.contains("mistral") => 32768,
-        // Default case
-        _ => 8192, // Conservative default
-    }
+// Helper function to check if a model ID is for Llama 4 Maverick free
+pub fn is_llama4_maverick_free(model_id: &str) -> bool {
+    model_id == "meta-llama/llama-4-maverick:free" ||
+    model_id == "llama-4-maverick:free" ||
+    model_id == "llama-4-maverick-free"
 }
 
 // Pricing structure for OpenRouter models (these would typically be fetched from the API)
@@ -33,59 +21,17 @@ pub struct ModelPricing {
 
 // Helper function to get pricing for a given model
 pub fn get_model_pricing(model_id: &str) -> ModelPricing {
-    // Note: These are approximate values, actual pricing should be obtained from OpenRouter's API
-    match model_id {
-        // Claude models
-        m if m.contains("claude-3-opus") => ModelPricing {
-            input_cost_per_million_tokens: Some(15.00),
-            output_cost_per_million_tokens: Some(75.00),
-        },
-        m if m.contains("claude-3-sonnet") => ModelPricing {
-            input_cost_per_million_tokens: Some(3.00),
-            output_cost_per_million_tokens: Some(15.00),
-        },
-        m if m.contains("claude-3-haiku") => ModelPricing {
-            input_cost_per_million_tokens: Some(0.25),
-            output_cost_per_million_tokens: Some(1.25),
-        },
-        
-        // OpenAI models
-        m if m.contains("gpt-4-turbo") => ModelPricing {
-            input_cost_per_million_tokens: Some(10.00),
-            output_cost_per_million_tokens: Some(30.00),
-        },
-        m if m.contains("gpt-4") => ModelPricing {
-            input_cost_per_million_tokens: Some(30.00),
-            output_cost_per_million_tokens: Some(60.00),
-        },
-        m if m.contains("gpt-3.5") => ModelPricing {
-            input_cost_per_million_tokens: Some(0.50),
-            output_cost_per_million_tokens: Some(1.50),
-        },
-        
-        // Anthropic models
-        m if m.contains("anthropic") => ModelPricing {
-            input_cost_per_million_tokens: Some(3.00),
-            output_cost_per_million_tokens: Some(15.00),
-        },
-        
-        // Gemini models
-        m if m.contains("gemini") => ModelPricing {
-            input_cost_per_million_tokens: Some(0.35),
-            output_cost_per_million_tokens: Some(1.05),
-        },
-        
-        // Mistral models
-        m if m.contains("mistral") => ModelPricing {
-            input_cost_per_million_tokens: Some(2.00),
-            output_cost_per_million_tokens: Some(6.00),
-        },
-        
-        // For unknown models, return None to indicate unknown pricing
-        _ => ModelPricing {
-            input_cost_per_million_tokens: None,
-            output_cost_per_million_tokens: None,
-        },
+    if is_llama4_maverick_free(model_id) {
+        return ModelPricing {
+            input_cost_per_million_tokens: Some(0.0), // Free model
+            output_cost_per_million_tokens: Some(0.0), // Free model
+        };
+    }
+    
+    // Default pricing for other models
+    ModelPricing {
+        input_cost_per_million_tokens: None,
+        output_cost_per_million_tokens: None,
     }
 }
 
@@ -242,6 +188,28 @@ impl OpenRouterClient {
             }
         }
         
+        // If we don't find models from the API or there's an error, add at least Llama 4 Maverick free
+        if models.is_empty() {
+            // Add Llama 4 Maverick free model with hardcoded info
+            models.push(ModelInfo {
+                id: "meta-llama/llama-4-maverick:free".to_string(),
+                display_name: "Llama 4 Maverick (free)".to_string(),
+                max_tokens: 1000000, // 1 million token context
+                provider: Some("openrouter".to_string()),
+            });
+        }
+        
+        // Make sure Llama 4 Maverick shows up at the top of the list
+        models.sort_by(|a, b| {
+            if is_llama4_maverick_free(&a.id) {
+                std::cmp::Ordering::Less
+            } else if is_llama4_maverick_free(&b.id) {
+                std::cmp::Ordering::Greater
+            } else {
+                a.display_name.cmp(&b.display_name)
+            }
+        });
+        
         Ok(models)
     }
 
@@ -265,19 +233,33 @@ impl OpenRouterClient {
             })
             .collect();
 
-        // Get the model ID or use a default
-        let model = model_id.unwrap_or_else(|| "anthropic/claude-3-sonnet".to_string());
+        // Get the model ID or use Llama 4 Maverick free as default
+        let model = model_id.unwrap_or_else(|| "meta-llama/llama-4-maverick:free".to_string());
         
         // Construct the request URL
         let url = format!("{}/chat/completions", self.url.clone().unwrap_or("https://openrouter.ai/api/v1".to_string()));
         
-        // Create request body
-        let request_body = OpenRouterRequest {
-            model: model.clone(),
-            messages: openrouter_messages,
-            max_tokens: Some(1024), // Use a reasonable default, can be model-specific
-            temperature: Some(0.7), // Standard temperature
-            provider: None, // Use default provider routing
+        // Create request body with parameters optimized for Llama 4 Maverick
+        let request_body = if is_llama4_maverick_free(&model) {
+            // Parameters specifically optimized for Llama 4 Maverick
+            OpenRouterRequest {
+                model: model.clone(),
+                messages: openrouter_messages,
+                max_tokens: Some(2048), // Reasonable response length
+                temperature: Some(0.5), // Slightly lower temperature for more deterministic responses
+                provider: Some(json!({
+                    "sort": "throughput" // Prioritize throughput for faster responses
+                })),
+            }
+        } else {
+            // Default parameters for other models
+            OpenRouterRequest {
+                model: model.clone(),
+                messages: openrouter_messages,
+                max_tokens: Some(1024), 
+                temperature: Some(0.7),
+                provider: None,
+            }
         };
         
         // Prepare the request body - log it for debugging

@@ -302,10 +302,12 @@ impl State {
         }
 
         // Determine which provider to use based on model ID
-        let model = model_id.clone().unwrap_or_else(|| "claude-3-7-sonnet-20250219".to_string());
+        let model = model_id.clone().unwrap_or_else(|| "meta-llama/llama-4-maverick:free".to_string());
         let is_gemini = model.starts_with("gemini-");
-        let is_openrouter = model.contains("/") || model.starts_with("openai/") || model.starts_with("anthropic/") || 
-                           model.starts_with("mistral/") || model.starts_with("meta-llama/");
+        let is_openrouter = model.contains("/") || model.starts_with("openai/") || 
+                           model.starts_with("anthropic/") || model.starts_with("mistral/") || 
+                           model.starts_with("meta-llama/") || model.contains(":free") ||
+                           crate::api::openrouter::is_llama4_maverick_free(&model);
         
         // Log which model is being used
         if let Some(model) = &model_id {
@@ -313,7 +315,11 @@ impl State {
         } else if is_gemini {
             log("[DEBUG] Using default Gemini model (gemini-2.0-flash)");
         } else if is_openrouter {
-            log(&format!("[DEBUG] Using OpenRouter model: {}", model));
+            if crate::api::openrouter::is_llama4_maverick_free(&model) {
+                log("[DEBUG] Using Llama 4 Maverick free model via OpenRouter");
+            } else {
+                log(&format!("[DEBUG] Using OpenRouter model: {}", model));
+            }
         } else {
             log("[DEBUG] Using default Claude model (claude-3-7-sonnet-20250219)");
         }

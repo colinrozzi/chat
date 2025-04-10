@@ -201,9 +201,22 @@ To distribute your actor:
 - `get_message`: Retrieve a specific message
 - `get_head`: Get the current head message
 
-## Using OpenRouter with the Chat Actor
+## Using Llama 4 Maverick Free with the Chat Actor
 
-### Setup
+This chat actor now includes special support for Meta's Llama 4 Maverick free model via OpenRouter.
+
+### About Llama 4 Maverick
+
+Llama 4 Maverick is a high-capacity multimodal language model from Meta, built on a mixture-of-experts (MoE) architecture with 128 experts and 17 billion active parameters per forward pass (400B total parameters). Notable features include:
+
+- Multimodal capabilities (text and image input)
+- 1 million token context window
+- Instruction-tuned for assistant-like behavior
+- Support for 12 languages
+
+### Using Llama 4 Maverick Free
+
+To use the Llama 4 Maverick free model, set up OpenRouter as described below. The model will be used by default when using the OpenRouter client.
 
 1. Create an account on [OpenRouter](https://openrouter.ai/) if you don't have one already
 2. Generate an API key from the OpenRouter dashboard
@@ -214,30 +227,18 @@ To distribute your actor:
    }
    ```
 
-### Using OpenRouter Models
+### Sending Messages with Llama 4 Maverick
 
-OpenRouter gives you access to models from multiple providers through a single API. To use OpenRouter models with the chat actor, simply specify the model ID in the `generate_llm_response` WebSocket command:
+To explicitly use Llama 4 Maverick, send the WebSocket command:
 
 ```json
 {
   "type": "generate_llm_response",
-  "model_id": "openai/gpt-4-turbo"
+  "model_id": "meta-llama/llama-4-maverick:free"
 }
 ```
 
-Model formats include:
-
-- `anthropic/claude-3-opus-20240229`
-- `anthropic/claude-3-sonnet-20240229`
-- `openai/gpt-4-turbo`
-- `mistral/mistral-large`
-- `meta-llama/llama-3-70b-instruct`
-
-You can get a complete list of available models by using the `list_models` WebSocket command.
-
-### Rate Limits and Pricing
-
-OpenRouter uses a credit system. Check the [OpenRouter pricing page](https://openrouter.ai/docs/pricing) for the current rates for each model.
+Alternatively, the model will be used by default when you request an OpenRouter model without specifying a specific one.
 
 ## Current Status
 
@@ -245,7 +246,7 @@ OpenRouter uses a credit system. Check the [OpenRouter pricing page](https://ope
 - Multi-chat functionality with thread management
 - Claude AI integration for automated responses
 - Gemini API integration
-- OpenRouter integration for multiple model providers
+- Llama 4 Maverick integration via OpenRouter
 - Real-time WebSocket updates
 - Message history with DAG structure
 - Web interface
