@@ -578,12 +578,24 @@ fn handle_list_models(
         })
         .collect();
     
+    // Add more detailed logging
+    log("[DEBUG] Requesting models from OpenRouter");
     // Get OpenRouter models
     let openrouter_models = match state.openrouter_client.list_available_models() {
-        Ok(models) => models,
+        Ok(models) => {
+            log(&format!("[DEBUG] Successfully retrieved {} OpenRouter models", models.len()));
+            models
+        }
         Err(e) => {
-            log(&format!("Failed to list OpenRouter models: {}", e));
-            vec![] // Return empty list on error
+            log(&format!("[ERROR] Failed to list OpenRouter models: {}", e));
+            // Add a hardcoded model for Llama 4 Maverick
+            log("[DEBUG] Adding hardcoded Llama 4 Maverick model");
+            vec![crate::messages::ModelInfo {
+                id: "meta-llama/llama-4-maverick:free".to_string(),
+                display_name: "Llama 4 Maverick (free)".to_string(),
+                max_tokens: 1000000, // 1 million token context
+                provider: Some("openrouter".to_string()),
+            }]
         }
     };
     
@@ -606,6 +618,17 @@ fn handle_list_models(
         gemini_models_with_provider,
         openrouter_models_with_provider,
     ].concat();
+    
+    // Log the combined models for debugging
+    log(&format!("[DEBUG] Total models available: {}", all_models.len()));
+    
+    // Log each model for debugging
+    for (i, model) in all_models.iter().enumerate() {
+        log(&format!("[DEBUG] Model {}: {} (provider: {})",
+            i,
+            model["display_name"].as_str().unwrap_or("Unknown"), 
+            model["provider"].as_str().unwrap_or("Unknown")));
+    }
     
     Ok((
         Some(serde_json::to_vec(state).unwrap()),

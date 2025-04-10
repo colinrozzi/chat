@@ -134,6 +134,14 @@ impl ActorGuest for Component {
         let server_id = setup_http_server(init_data.websocket_port)?;
         log("HTTP server set up successfully");
 
+        // Log the OpenRouter API key (partially redacted for security)
+        let openrouter_key_preview = if init_data.openrouter_api_key.len() > 8 {
+            &init_data.openrouter_api_key[0..8]
+        } else {
+            "<empty>"
+        };
+        log(&format!("OpenRouter API key starts with: {}...", openrouter_key_preview));
+
         // Initialize state with all API keys
         let initial_state = State::new(
             id,
