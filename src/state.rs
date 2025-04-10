@@ -1,5 +1,6 @@
 use crate::api::claude::ClaudeClient;
 use crate::api::gemini::GeminiClient;
+use crate::api::openrouter::OpenRouterClient;
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::messages::store::MessageStore;
 use crate::messages::{ChainEntry, ChatInfo, Message, MessageData};
@@ -22,7 +23,8 @@ pub struct State {
     pub head: Option<String>, // Legacy, kept for backward compatibility
     pub current_chat_id: Option<String>,
     pub claude_client: ClaudeClient,
-    pub gemini_client: GeminiClient, // Add Gemini client
+    pub gemini_client: GeminiClient,
+    pub openrouter_client: OpenRouterClient, // Add OpenRouter client
     pub connected_clients: HashMap<String, bool>,
     pub store: MessageStore,
     pub server_id: u64,

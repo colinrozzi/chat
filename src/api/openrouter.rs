@@ -166,6 +166,18 @@ pub struct OpenRouterLlmMessage {
 
 impl OpenRouterClient {
     pub fn new(api_key: String, app_name: Option<String>, url: Option<String>) -> Self {
+        if !api_key.is_empty() {
+            // Log the first few characters of the API key for debugging, without exposing the entire key
+            let visible_part = if api_key.len() > 8 {
+                &api_key[0..8]
+            } else {
+                &api_key
+            };
+            log(&format!("Initializing OpenRouter client with API key starting with: {}...", visible_part));
+        } else {
+            log("Warning: Empty OpenRouter API key provided");
+        }
+        
         Self { 
             api_key, 
             app_name, 
@@ -259,9 +271,6 @@ impl OpenRouterClient {
         // Construct the request URL
         let url = format!("{}/chat/completions", self.url.clone().unwrap_or("https://openrouter.ai/api/v1".to_string()));
         
-        // Calculate appropriate max_tokens for this model
-        let max_tokens = get_model_max_tokens(&model);
-        
         // Create request body
         let request_body = OpenRouterRequest {
             model: model.clone(),
@@ -270,6 +279,10 @@ impl OpenRouterClient {
             temperature: Some(0.7), // Standard temperature
             provider: None, // Use default provider routing
         };
+        
+        // Prepare the request body - log it for debugging
+        let request_body_json = serde_json::to_string(&request_body).unwrap_or_default();
+        log(&format!("OpenRouter request body: {}", request_body_json));
 
         // Set up headers
         let mut headers = vec![
@@ -295,10 +308,19 @@ impl OpenRouterClient {
         let http_response = send_http(&request).map_err(|e| format!("HTTP request failed: {}", e))?;
         
         // Log the response for debugging
-        log(&format!("OpenRouter response: {:?}", http_response));
+        log(&format!("OpenRouter response status: {}", http_response.status));
+        
+        // Check if the response status is not 2xx (success)
+        if http_response.status < 200 || http_response.status >= 300 {
+            return Err(format!("OpenRouter API error: HTTP status {}", http_response.status).into());
+        }
         
         // Check if we have a response body
         let body = http_response.body.ok_or("No response body")?;
+        
+        // Log a truncated version of the response body for debugging
+        let body_preview = String::from_utf8_lossy(&body[..std::cmp::min(body.len(), 500)]).to_string();
+        log(&format!("OpenRouter response body preview: {}", body_preview));
         
         // Parse the response
         let response: OpenRouterResponse = serde_json::from_slice(&body)?;
