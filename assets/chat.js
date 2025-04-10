@@ -603,6 +603,17 @@ function getModelMaxTokens(modelId) {
     }
     
     // Fallback values if not in models array
+    
+    // Check for OpenRouter models
+    if (modelId?.includes('/')) {
+        // Check specifically for Llama 4 Maverick free
+        if (modelId === "meta-llama/llama-4-maverick:free" || 
+            modelId === "llama-4-maverick:free" || 
+            modelId === "llama-4-maverick-free") {
+            return 1000000; // 1 million tokens context window
+        }
+    }
+    
     switch(modelId) {
         // Gemini models
         case "gemini-2.0-flash":
@@ -644,6 +655,20 @@ function getModelPricing(modelId) {
         } else if (modelId === "gemini-2.0-pro") {
             return { inputCost: 3.50, outputCost: 10.50 };
         }
+    }
+    
+    // Check for OpenRouter models
+    if (modelId?.includes('/')) {
+        // Check specifically for Llama 4 Maverick free
+        if (modelId === "meta-llama/llama-4-maverick:free" || 
+            modelId === "llama-4-maverick:free" || 
+            modelId === "llama-4-maverick-free") {
+            return { inputCost: 0.00, outputCost: 0.00 }; // Free model
+        }
+        
+        // For other OpenRouter models, provide default pricing or unknown
+        // This is a placeholder - real pricing would depend on the specific model
+        return { inputCost: null, outputCost: null };
     }
     
     // Claude model pricing
@@ -1371,6 +1396,8 @@ function populateModelSelector() {
     // Group models by provider
     const claudeModels = models.filter(m => !m.provider || m.provider === 'claude');
     const geminiModels = models.filter(m => m.provider === 'gemini');
+    const openrouterModels = models.filter(m => m.provider === 'openrouter');
+    const openrouterModels = models.filter(m => m.provider === 'openrouter');
     
     // Sort Claude models with the most recent first
     const sortedClaudeModels = [...claudeModels].sort((a, b) => {
@@ -1407,9 +1434,22 @@ function populateModelSelector() {
         geminiGroup.appendChild(option);
     });
     
+    // Create OpenRouter group
+    const openrouterGroup = document.createElement('optgroup');
+    openrouterGroup.label = 'OpenRouter Models';
+    
+    // Add OpenRouter options
+    openrouterModels.forEach(model => {
+        const option = document.createElement('option');
+        option.value = model.id;
+        option.textContent = model.display_name;
+        openrouterGroup.appendChild(option);
+    });
+    
     // Add groups to selector
     elements.controlsModelSelector.appendChild(claudeGroup);
     elements.controlsModelSelector.appendChild(geminiGroup);
+    elements.controlsModelSelector.appendChild(openrouterGroup);
     
     // Prioritize using the last used model if available
     if (lastUsedModelId && models.some(m => m.id === lastUsedModelId)) {
@@ -1437,9 +1477,28 @@ function updateModelInfo() {
     
     const selectedModelId = elements.controlsModelSelector.value;
     const maxTokens = getModelMaxTokens(selectedModelId);
+    const modelInfo = document.getElementById('modelInfo');
     
     // Format with commas
     elements.modelContextWindow.textContent = new Intl.NumberFormat().format(maxTokens) + ' tokens';
+    
+    // Update cost information based on the model
+    const costInfoElem = modelInfo.querySelector('.info-value:not(#modelContextWindow)');
+    if (costInfoElem) {
+        // Get model pricing
+        const pricing = getModelPricing(selectedModelId);
+        
+        // Update cost display
+        if (pricing.inputCost === null || pricing.outputCost === null) {
+            costInfoElem.textContent = 'Cost information unavailable';
+        } else if (pricing.inputCost === 0 && pricing.outputCost === 0) {
+            costInfoElem.textContent = 'Free';
+        } else {
+            costInfoElem.textContent = '$' +
+             + pricing.inputCost.toFixed(2) + ' / 
+             + pricing.outputCost.toFixed(2) + ' per 1M tokens (in/out)';
+        }
+    }
 }
 
 // Make the chat controls sidebar collapsed by default on desktop
