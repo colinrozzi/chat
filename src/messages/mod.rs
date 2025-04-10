@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::api::claude::Usage as ClaudeUsage;
-use crate::api::gemini::GeminiUsage;
-use crate::api::gemini::SafetyRating;
+use crate::api::gemini::{GeminiUsage, SafetyRating};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ChainEntry {

@@ -1,6 +1,6 @@
 use crate::bindings::ntwk::theater::http_client::{send_http, HttpRequest};
 use crate::bindings::ntwk::theater::runtime::log;
-use crate::messages::{AssistantMessage, ClaudeMessage, Message, ModelInfo};
+use crate::messages::{AssistantMessage, ClaudeMessage, Message, ModelInfo, LlmMessage};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 

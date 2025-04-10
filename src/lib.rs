@@ -32,12 +32,10 @@ use bindings::ntwk::theater::http_types::{
 use bindings::ntwk::theater::message_server_host::send_on_channel;
 use bindings::ntwk::theater::runtime::log;
 use bindings::ntwk::theater::store;
-use bindings::ntwk::theater::supervisor::spawn;
 use bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
 use state::State;
 
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct InitData {

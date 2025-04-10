@@ -11,6 +11,7 @@ toml = "0.7.6"
 sha1 = "0.10.6"
 wit-bindgen-rt = { version = "0.39.0", features = ["bitflags"] }
 serde = { version = "1.0", features = ["derive"] }
+chrono = "0.4"
 
 [lib]
 crate-type = ["cdylib"]

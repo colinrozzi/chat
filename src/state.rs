@@ -1,15 +1,13 @@
 use crate::api::claude::ClaudeClient;
 use crate::api::gemini::GeminiClient;
-use crate::bindings::ntwk::theater::message_server_host::request;
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::messages::store::MessageStore;
-use crate::messages::{AssistantMessage, ChainEntry, ChatInfo, Message, MessageData};
+use crate::messages::{ChainEntry, ChatInfo, Message, MessageData};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::error::Error;
-use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -440,11 +438,7 @@ impl State {
                 log(&format!(
                     "[DEBUG] Processing message ID: {}, type: {:?}",
                     message_id,
-                    if let MessageData::Chat(_) = &entry.data {
-                        "Chat"
-                    } else {
-                        "ChildMessage"
-                    }
+                    "Chat" // All messages are Chat type now
                 ));
 
                 // Log parent information

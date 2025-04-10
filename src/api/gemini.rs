@@ -1,8 +1,9 @@
 use crate::bindings::ntwk::theater::http_client::{send_http, HttpRequest};
 use crate::bindings::ntwk::theater::runtime::log;
-use crate::messages::{AssistantMessage, Message, ModelInfo};
+use crate::messages::{AssistantMessage, Message, ModelInfo, LlmMessage};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 // Gemini request/response structures
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -53,17 +54,8 @@ pub struct SafetyRating {
     pub probability: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct GeminiMessage {
-    pub content: String,
-    pub id: String,
-    pub model: String,
-    pub finish_reason: String,
-    pub safety_ratings: Option<Vec<SafetyRating>>,
-    pub usage: GeminiUsage,
-    pub input_cost_per_million_tokens: Option<f64>,
-    pub output_cost_per_million_tokens: Option<f64>,
-}
+// Using the GeminiMessage struct from messages module
+use crate::messages::GeminiMessage;
 
 // Pricing structure for Gemini models
 pub fn get_model_pricing(model_id: &str) -> ModelPricing {
@@ -173,8 +165,11 @@ impl GeminiClient {
         
         let content = parts[0].text.clone();
         
-        // Create a unique ID for the message
-        let id = format!("gemini-{}", chrono::Utc::now().timestamp_millis());
+        // Create a unique ID for the message using SystemTime
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        let id = format!("gemini-{}", timestamp);
         
         // Get pricing for this model
         let pricing = get_model_pricing(&model);
