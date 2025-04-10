@@ -202,7 +202,7 @@ code, pre, .actor-id, .head-id, .child-actor-id {
     }
     
     .message {
-        max-width: 90%;
+        max-width: 98%;
     }
     
     .message-action-button span {
@@ -245,7 +245,7 @@ code, pre, .actor-id, .head-id, .child-actor-id {
     }
     
     .message {
-        max-width: 95%;
+        max-width: 98%;
         padding: 0.875rem;
     }
     
@@ -649,7 +649,7 @@ code, pre, .actor-id, .head-id, .child-actor-id {
 
 /* Message Bubbles */
 .message {
-    max-width: 80%;
+    max-width: 98%;
     padding: 1rem 1.2rem;
     border-radius: 1rem;
     line-height: 1.6;
