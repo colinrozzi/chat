@@ -230,16 +230,25 @@ function handleWebSocketMessage(data) {
         case 'chat_created':
             if (data.chat) {
                 console.log('Received chat_created event:', data.chat);
+                
+                // Remove any temporary chats first
+                chats = chats.filter(c => !c.isTemporary);
+                
                 // Add to chats array if not already present
                 if (!chats.find(c => c.id === data.chat.id)) {
                     chats.push(data.chat);
-                    console.log('Added new chat to chats array:', data.chat);
+                    console.log(`Added new chat to chats array: ${data.chat.id} - ${data.chat.name}`);
                 } else {
-                    console.log('Chat already exists in array, updating');
+                    console.log(`Chat already exists in array, updating: ${data.chat.id}`);
                     // Update existing chat with new data
                     const index = chats.findIndex(c => c.id === data.chat.id);
                     if (index !== -1) {
-                        chats[index] = { ...chats[index], ...data.chat };
+                        chats[index] = { 
+                            ...chats[index], 
+                            ...data.chat,
+                            name: data.chat.name || chats[index].name, // Ensure name is preserved
+                            icon: data.chat.icon !== undefined ? data.chat.icon : chats[index].icon
+                        };
                     }
                 }
                 
@@ -260,8 +269,12 @@ function handleWebSocketMessage(data) {
                 
                 renderChatList();
                 updateCurrentChatName();
+                
+                // Show success notification
+                showSuccess(`Chat "${data.chat.name}" created successfully`);
             } else {
                 console.error('Received chat_created event without chat data');
+                showError('Error creating chat: Invalid response from server');
             }
             break;
             
@@ -271,20 +284,29 @@ function handleWebSocketMessage(data) {
                 // Update chat in the array
                 const index = chats.findIndex(c => c.id === data.chat.id);
                 if (index !== -1) {
+                    // Store the old name for logging
+                    const oldName = chats[index].name;
+                    
                     // Properly preserve all existing properties while updating only what changed
                     chats[index] = { 
                         ...chats[index], 
                         name: data.chat.name || chats[index].name,
                         icon: data.chat.icon !== undefined ? data.chat.icon : chats[index].icon
                     };
-                    console.log('Updated chat in array:', chats[index]);
+                    console.log(`Updated chat in array: ${chats[index].id} renamed from "${oldName}" to "${chats[index].name}"`);
+                    
                     renderChatList();
                     updateCurrentChatName();
+                    
+                    // Show success notification
+                    showSuccess(`Chat renamed to "${chats[index].name}" successfully`);
                 } else {
                     console.warn('Received rename event for non-existent chat ID:', data.chat.id);
+                    showError('Error: Chat not found');
                 }
             } else {
                 console.error('Received chat_renamed event without chat data');
+                showError('Error renaming chat: Invalid response from server');
             }
             break;
             
@@ -986,9 +1008,15 @@ function renderChatList() {
 
 function updateCurrentChatName() {
     const currentChat = chats.find(chat => chat.id === currentChatId);
+    console.log('Updating current chat name:', currentChat);
+    
     if (currentChat) {
-        console.log('Updating current chat name to:', currentChat.name);
-        elements.currentChatName.textContent = currentChat.name;
+        // Safely handle potential null/undefined name
+        const displayName = currentChat.name || 'Unnamed Chat';
+        elements.currentChatName.textContent = displayName;
+        
+        // Add a title attribute for tooltip on hover
+        elements.currentChatName.title = `${displayName} (Click to rename)`;
         
         // Make the chat name editable
         elements.currentChatName.onclick = () => {
@@ -1002,6 +1030,7 @@ function updateCurrentChatName() {
     } else {
         console.log('No current chat selected');
         elements.currentChatName.textContent = 'No Chat Selected';
+        elements.currentChatName.title = 'No Chat Selected';
         elements.currentChatName.onclick = null;
         elements.currentChatName.classList.remove('editable');
     }
@@ -1022,14 +1051,33 @@ function createNewChat() {
         return;
     }
     
-    console.log(`Creating new chat with name: "${chatName}"`);
+    const trimmedName = chatName.trim();
+    console.log(`Creating new chat with name: "${trimmedName}"`);
     
     // Show loading state
     elements.loadingOverlay.classList.add('visible');
     
+    // Add a temporary entry to the chats array while we wait for server response
+    const tempId = 'temp-' + Date.now();
+    const tempChat = {
+        id: tempId,
+        name: trimmedName,
+        isTemporary: true
+    };
+    
+    // Add to chats array and render with loading state
+    chats.push(tempChat);
+    renderChatList();
+    
+    // Highlight the temporary chat
+    const tempChatElement = document.querySelector(`.chat-item[data-chat-id="${tempId}"] .chat-item-name`);
+    if (tempChatElement) {
+        tempChatElement.innerHTML += ' <span class="loading-text">(Creating...)</span>';
+    }
+    
     sendWebSocketMessage({
         type: 'create_chat',
-        name: chatName.trim(),
+        name: trimmedName,
         starting_head: null // No starting head for a fresh chat
     });
     
@@ -1046,10 +1094,18 @@ function createNewChat() {
     // Disable generate button for the new empty chat
     elements.generateButton.disabled = true;
     
-    // Hide loading state after a short delay (server should respond quickly)
+    // If no server response after 5 seconds, remove temporary chat and show error
     setTimeout(() => {
+        // Check if temporary chat still exists (server didn't respond)
+        const tempChatStillExists = chats.some(c => c.id === tempId);
+        if (tempChatStillExists) {
+            // Remove temporary chat from array
+            chats = chats.filter(c => c.id !== tempId);
+            renderChatList();
+            showError('Failed to create chat. Server did not respond.');
+        }
         elements.loadingOverlay.classList.remove('visible');
-    }, 1000);
+    }, 5000);
 }
 
 function branchChat() {
@@ -1119,12 +1175,26 @@ function showRenameChat(chatId, currentName) {
         return;
     }
     
-    console.log(`Renaming chat ${chatId} from "${currentName}" to "${newName}"`);
+    console.log(`Renaming chat ${chatId} from "${currentName}" to "${newName.trim()}"`); // Trim the name
+    
+    // Show visual feedback that rename is in progress
+    const chatElement = document.querySelector(`.chat-item[data-chat-id="${chatId}"] .chat-item-name`);
+    if (chatElement) {
+        const originalText = chatElement.textContent;
+        chatElement.textContent = 'Renaming...';
+        
+        // Restore original text after a delay if the rename operation takes too long
+        setTimeout(() => {
+            if (chatElement.textContent === 'Renaming...') {
+                chatElement.textContent = originalText;
+            }
+        }, 3000);
+    }
     
     sendWebSocketMessage({
         type: 'rename_chat',
         chat_id: chatId,
-        name: newName
+        name: newName.trim() // Ensure we trim the name
     });
 }
 
@@ -1484,6 +1554,21 @@ function copyMessageId(messageId) {
 }
 
 function showCopySuccess(message) {
+    const successDiv = document.createElement('div');
+    successDiv.className = 'success-message';
+    successDiv.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+        ${message}
+    `;
+    elements.messagesContainer.prepend(successDiv);
+    setTimeout(() => successDiv.remove(), 2000);
+}
+
+function showSuccess(message) {
+    console.log('Success:', message);
     const successDiv = document.createElement('div');
     successDiv.className = 'success-message';
     successDiv.innerHTML = `

@@ -1097,6 +1097,36 @@ p code, li code {
     cursor: pointer;
     transition: all 0.2s ease;
     border: 1px solid transparent;
+    position: relative;
+}
+
+.current-chat-name.editable::after {
+    content: "✏️";
+    font-size: 0.8rem;
+    margin-left: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.current-chat-name.editable:hover::after {
+    opacity: 0.8;
+}
+
+.current-chat-name:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+.current-chat-name:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    background: var(--bg-secondary);
+} var(--text-primary);
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
 }
 
 .current-chat-name:hover {
@@ -1448,6 +1478,60 @@ p code, li code {
 
 .success-message svg {
     color: var(--success);
+}
+
+/* Error Message */
+.error-message {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-tertiary);
+    color: var(--error);
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--error);
+    z-index: 50;
+    animation: fadeInOut 2s ease-in-out;
+}
+
+.error-message svg {
+    color: var(--error);
+}
+
+/* Loading Text */
+.loading-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+/* Editable Indicator */
+.current-chat-name.editable {
+    position: relative;
+}
+
+.current-chat-name.editable::after {
+    content: "✏️";
+    font-size: 0.8rem;
+    margin-left: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.current-chat-name.editable:hover::after {
+    opacity: 0.8;
 }
 
 
