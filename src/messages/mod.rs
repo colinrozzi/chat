@@ -1,5 +1,6 @@
 use crate::api::claude::Usage as ClaudeUsage;
 use crate::api::gemini::{GeminiUsage, SafetyRating};
+use crate::api::openrouter::OpenRouterLlmMessage;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -52,6 +53,7 @@ pub struct ClaudeMessage {
 pub enum AssistantMessage {
     Claude(ClaudeMessage),
     Gemini(GeminiMessage),
+    OpenRouter(OpenRouterLlmMessage),
 }
 
 // Gemini-specific message implementation
@@ -169,6 +171,7 @@ impl LlmMessage for AssistantMessage {
         match self {
             AssistantMessage::Claude(msg) => msg.content(),
             AssistantMessage::Gemini(msg) => msg.content(),
+            AssistantMessage::OpenRouter(msg) => msg.content(),
         }
     }
 
@@ -176,6 +179,7 @@ impl LlmMessage for AssistantMessage {
         match self {
             AssistantMessage::Claude(msg) => msg.model_id(),
             AssistantMessage::Gemini(msg) => msg.model_id(),
+            AssistantMessage::OpenRouter(msg) => msg.model_id(),
         }
     }
 
@@ -183,6 +187,7 @@ impl LlmMessage for AssistantMessage {
         match self {
             AssistantMessage::Claude(msg) => msg.provider_name(),
             AssistantMessage::Gemini(msg) => msg.provider_name(),
+            AssistantMessage::OpenRouter(msg) => msg.provider_name(),
         }
     }
 
@@ -190,6 +195,7 @@ impl LlmMessage for AssistantMessage {
         match self {
             AssistantMessage::Claude(msg) => msg.input_tokens(),
             AssistantMessage::Gemini(msg) => msg.input_tokens(),
+            AssistantMessage::OpenRouter(msg) => msg.input_tokens(),
         }
     }
 
@@ -197,6 +203,7 @@ impl LlmMessage for AssistantMessage {
         match self {
             AssistantMessage::Claude(msg) => msg.output_tokens(),
             AssistantMessage::Gemini(msg) => msg.output_tokens(),
+            AssistantMessage::OpenRouter(msg) => msg.output_tokens(),
         }
     }
 
@@ -204,6 +211,7 @@ impl LlmMessage for AssistantMessage {
         match self {
             AssistantMessage::Claude(msg) => msg.calculate_cost(),
             AssistantMessage::Gemini(msg) => msg.calculate_cost(),
+            AssistantMessage::OpenRouter(msg) => msg.calculate_cost(),
         }
     }
 
@@ -211,6 +219,7 @@ impl LlmMessage for AssistantMessage {
         match self {
             AssistantMessage::Claude(msg) => msg.stop_reason(),
             AssistantMessage::Gemini(msg) => msg.stop_reason(),
+            AssistantMessage::OpenRouter(msg) => msg.stop_reason(),
         }
     }
 
@@ -218,6 +227,7 @@ impl LlmMessage for AssistantMessage {
         match self {
             AssistantMessage::Claude(msg) => msg.message_id(),
             AssistantMessage::Gemini(msg) => msg.message_id(),
+            AssistantMessage::OpenRouter(msg) => msg.message_id(),
         }
     }
 
@@ -225,6 +235,7 @@ impl LlmMessage for AssistantMessage {
         match self {
             AssistantMessage::Claude(msg) => msg.provider_data(),
             AssistantMessage::Gemini(msg) => msg.provider_data(),
+            AssistantMessage::OpenRouter(msg) => msg.provider_data(),
         }
     }
 }
@@ -256,6 +267,13 @@ impl From<ClaudeMessage> for AssistantMessage {
 impl From<GeminiMessage> for AssistantMessage {
     fn from(msg: GeminiMessage) -> Self {
         AssistantMessage::Gemini(msg)
+    }
+}
+
+// Implement conversion from OpenRouterLlmMessage to AssistantMessage
+impl From<OpenRouterLlmMessage> for AssistantMessage {
+    fn from(msg: OpenRouterLlmMessage) -> Self {
+        AssistantMessage::OpenRouter(msg)
     }
 }
 

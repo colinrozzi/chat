@@ -578,10 +578,33 @@ fn handle_list_models(
         })
         .collect();
     
+    // Get OpenRouter models
+    let openrouter_models = match state.openrouter_client.list_available_models() {
+        Ok(models) => models,
+        Err(e) => {
+            log(&format!("Failed to list OpenRouter models: {}", e));
+            vec![] // Return empty list on error
+        }
+    };
+    
+    // Add provider field to OpenRouter models if not already present
+    let openrouter_models_with_provider: Vec<Value> = openrouter_models
+        .iter()
+        .map(|model| {
+            json!({
+                "id": model.id,
+                "display_name": model.display_name,
+                "max_tokens": model.max_tokens,
+                "provider": model.provider.clone().unwrap_or_else(|| "openrouter".to_string())
+            })
+        })
+        .collect();
+    
     // Combine all models
     let all_models: Vec<Value> = [
         claude_models_with_provider,
         gemini_models_with_provider,
+        openrouter_models_with_provider,
     ].concat();
     
     Ok((

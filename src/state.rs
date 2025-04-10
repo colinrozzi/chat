@@ -36,7 +36,8 @@ impl State {
         id: String,
         store_id: String,
         anthropic_api_key: String,
-        gemini_api_key: String, // Add Gemini API key
+        gemini_api_key: String,
+        openrouter_api_key: String, // Add OpenRouter API key
         server_id: u64,
         websocket_port: u16,
         head: Option<String>,
@@ -46,7 +47,8 @@ impl State {
             head,
             current_chat_id: None,
             claude_client: ClaudeClient::new(anthropic_api_key.clone()),
-            gemini_client: GeminiClient::new(gemini_api_key.clone()), // Initialize Gemini client
+            gemini_client: GeminiClient::new(gemini_api_key.clone()),
+            openrouter_client: OpenRouterClient::new(openrouter_api_key.clone(), Some("Chat Actor".to_string()), None), // Initialize OpenRouter client
             connected_clients: HashMap::new(),
             store: MessageStore::new(store_id.clone()),
             server_id,
@@ -300,12 +302,16 @@ impl State {
         // Determine which provider to use based on model ID
         let model = model_id.clone().unwrap_or_else(|| "claude-3-7-sonnet-20250219".to_string());
         let is_gemini = model.starts_with("gemini-");
+        let is_openrouter = model.contains("/") || model.starts_with("openai/") || model.starts_with("anthropic/") || 
+                           model.starts_with("mistral/") || model.starts_with("meta-llama/");
         
         // Log which model is being used
         if let Some(model) = &model_id {
             log(&format!("[DEBUG] Using specified model: {}", model));
         } else if is_gemini {
             log("[DEBUG] Using default Gemini model (gemini-2.0-flash)");
+        } else if is_openrouter {
+            log(&format!("[DEBUG] Using OpenRouter model: {}", model));
         } else {
             log("[DEBUG] Using default Claude model (claude-3-7-sonnet-20250219)");
         }
@@ -313,6 +319,8 @@ impl State {
         // Call appropriate client
         let result = if is_gemini {
             self.gemini_client.generate_response(messages, model_id)
+        } else if is_openrouter {
+            self.openrouter_client.generate_response(messages, model_id)
         } else {
             self.claude_client.generate_response(messages, model_id)
         };

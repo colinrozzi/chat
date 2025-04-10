@@ -24,8 +24,10 @@ The chat actor system serves as a standalone actor that can:
   - Real-time updates via WebSocket
   - Web interface for interaction
 
-- 🤖 **Claude API Integration**
+- 🤖 **AI Model Integration**
   - Automated response generation using Claude 3.7 Sonnet
+  - Gemini API integration
+  - OpenRouter API integration for multiple model providers
   - Context-aware conversations
   - Message history management
   - Token usage tracking
@@ -80,13 +82,18 @@ The system implements multiple communication channels:
 - Nix with flakes enabled (or alternatively: Rust toolchain with `wasm32-unknown-unknown` target)
 - Theater runtime system
 - Claude API key
+- OpenRouter API key (for accessing additional models)
 
 ### Installation
 
 1. Clone the repository
-2. Set up the Claude API key:
-   ```bash
-   echo "your-api-key" > assets/api-key.txt
+2. Set up the API keys in init.json:
+   ```json
+   {
+     "anthropic_api_key": "your-claude-api-key",
+     "gemini_api_key": "your-gemini-api-key",
+     "openrouter_api_key": "your-openrouter-api-key"
+   }
    ```
 
 #### Using Nix Flake (Recommended)
@@ -177,7 +184,20 @@ To distribute your actor:
 - `rename_chat`: Rename an existing chat
 - `delete_chat`: Delete a chat
 - `send_message`: Send a new user message
-- `generate_llm_response`: Generate a Claude AI response
+- `generate_llm_response`: Generate an AI response using specified model (Claude, Gemini, or any OpenRouter model)
+  - Optional parameter: `model_id` to specify the model to use
+  - Examples: 
+    - Claude: `"claude-3-7-sonnet-20250219"`
+    - Gemini: `"gemini-2.5-pro-exp-03-25"`
+    - OpenRouter: `"anthropic/claude-3-opus-20240229", "openai/gpt-4-turbo", "mistral/mistral-large"`
+  - Example usage:
+    ```json
+    {
+      "type": "generate_llm_response",
+      "model_id": "openai/gpt-4-turbo"
+    }
+    ```
+- `list_models`: Get a list of all available models from all providers
 - `get_message`: Retrieve a specific message
 - `get_head`: Get the current head message
 

@@ -1,2 +1,3 @@
 pub mod claude;
-pub mod gemini;  // Add the new Gemini module
+pub mod gemini;
+pub mod openrouter;  // Add the new OpenRouter module
