@@ -201,11 +201,51 @@ To distribute your actor:
 - `get_message`: Retrieve a specific message
 - `get_head`: Get the current head message
 
+## Using OpenRouter with the Chat Actor
+
+### Setup
+
+1. Create an account on [OpenRouter](https://openrouter.ai/) if you don't have one already
+2. Generate an API key from the OpenRouter dashboard
+3. Update the `init.json` file with your API key:
+   ```json
+   {
+     "openrouter_api_key": "your-openrouter-api-key"
+   }
+   ```
+
+### Using OpenRouter Models
+
+OpenRouter gives you access to models from multiple providers through a single API. To use OpenRouter models with the chat actor, simply specify the model ID in the `generate_llm_response` WebSocket command:
+
+```json
+{
+  "type": "generate_llm_response",
+  "model_id": "openai/gpt-4-turbo"
+}
+```
+
+Model formats include:
+
+- `anthropic/claude-3-opus-20240229`
+- `anthropic/claude-3-sonnet-20240229`
+- `openai/gpt-4-turbo`
+- `mistral/mistral-large`
+- `meta-llama/llama-3-70b-instruct`
+
+You can get a complete list of available models by using the `list_models` WebSocket command.
+
+### Rate Limits and Pricing
+
+OpenRouter uses a credit system. Check the [OpenRouter pricing page](https://openrouter.ai/docs/pricing) for the current rates for each model.
+
 ## Current Status
 
 ### Implemented Features
 - Multi-chat functionality with thread management
 - Claude AI integration for automated responses
+- Gemini API integration
+- OpenRouter integration for multiple model providers
 - Real-time WebSocket updates
 - Message history with DAG structure
 - Web interface
