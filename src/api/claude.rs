@@ -1,11 +1,11 @@
 use crate::bindings::ntwk::theater::http_client::{send_http, HttpRequest};
 use crate::bindings::ntwk::theater::runtime::log;
-use crate::messages::{Message, Usage};
+use crate::messages::{AssistantMessage, ClaudeMessage, Message, ModelInfo};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 // Helper function to get max tokens for a given model
-fn get_model_max_tokens(model_id: &str) -> u32 {
+pub fn get_model_max_tokens(model_id: &str) -> u32 {
     match model_id {
         // Claude 3.7 models
         "claude-3-7-sonnet-20250219" => 8192,
@@ -86,10 +86,9 @@ pub struct ClaudeClient {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ModelInfo {
-    pub id: String,
-    pub display_name: String,
-    pub max_tokens: u32, // Added max_tokens field
+pub struct Usage {
+    pub input_tokens: u32,
+    pub output_tokens: u32,
 }
 
 impl ClaudeClient {
@@ -127,6 +126,7 @@ impl ClaudeClient {
                         id: id.to_string(),
                         display_name: display_name.to_string(),
                         max_tokens,
+                        provider: Some("claude".to_string()),
                     });
                 }
             }
@@ -139,7 +139,7 @@ impl ClaudeClient {
         &self,
         messages: Vec<Message>,
         model_id: Option<String>,
-    ) -> Result<Message, Box<dyn std::error::Error>> {
+    ) -> Result<AssistantMessage, Box<dyn std::error::Error>> {
         // Get the model ID
         let model = model_id.unwrap_or_else(|| "claude-3-7-sonnet-20250219".to_string());
         
@@ -151,11 +151,11 @@ impl ClaudeClient {
             .map(|msg| AnthropicMessage {
                 role: match msg {
                     Message::User { .. } => "user".to_string(),
-                    Message::Assistant { .. } => "assistant".to_string(),
+                    Message::Assistant(_) => "assistant".to_string(),
                 },
                 content: match msg {
                     Message::User { content } => content.clone(),
-                    Message::Assistant { content, .. } => content.clone(),
+                    Message::Assistant(assistant_msg) => assistant_msg.content().to_string(),
                 },
             })
             .collect();
@@ -221,7 +221,8 @@ impl ClaudeClient {
         // Get pricing information for this model
         let pricing = get_model_pricing(&model);
         
-        Ok(Message::Assistant {
+        // Create the Claude message
+        let claude_message = ClaudeMessage {
             content,
             id,
             model,
@@ -231,6 +232,9 @@ impl ClaudeClient {
             usage,
             input_cost_per_million_tokens: pricing.input_cost_per_million_tokens,
             output_cost_per_million_tokens: pricing.output_cost_per_million_tokens,
-        })
+        };
+        
+        // Wrap in the enum
+        Ok(AssistantMessage::Claude(claude_message))
     }
 }

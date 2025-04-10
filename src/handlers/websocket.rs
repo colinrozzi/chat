@@ -534,45 +534,72 @@ fn handle_get_head(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse
 fn handle_list_models(
     state: &State,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    match state.claude_client.list_available_models() {
-        Ok(models) => {
-            Ok((
-                Some(serde_json::to_vec(state).unwrap()),
-                (WebsocketResponse {
-                    messages: vec![WebsocketMessage {
-                        ty: MessageType::Text,
-                        text: Some(
-                            json!({
-                                "type": "models_list",
-                                "models": models
-                            })
-                            .to_string(),
-                        ),
-                        data: None,
-                    }],
-                },),
-            ))
-        }
+    // Get Claude models
+    let claude_models = match state.claude_client.list_available_models() {
+        Ok(models) => models,
         Err(e) => {
-            log(&format!("Failed to list models: {}", e));
-            Ok((
-                Some(serde_json::to_vec(state).unwrap()),
-                (WebsocketResponse {
-                    messages: vec![WebsocketMessage {
-                        ty: MessageType::Text,
-                        text: Some(
-                            json!({
-                                "type": "error",
-                                "message": format!("Failed to list models: {}", e)
-                            })
-                            .to_string(),
-                        ),
-                        data: None,
-                    }],
-                },),
-            ))
+            log(&format!("Failed to list Claude models: {}", e));
+            vec![] // Return empty list on error
         }
-    }
+    };
+    
+    // Add provider field to Claude models if not already present
+    let claude_models_with_provider: Vec<Value> = claude_models
+        .iter()
+        .map(|model| {
+            json!({
+                "id": model.id,
+                "display_name": model.display_name,
+                "max_tokens": model.max_tokens,
+                "provider": model.provider.clone().unwrap_or_else(|| "claude".to_string())
+            })
+        })
+        .collect();
+    
+    // Get Gemini models
+    let gemini_models = match state.gemini_client.list_available_models() {
+        Ok(models) => models,
+        Err(e) => {
+            log(&format!("Failed to list Gemini models: {}", e));
+            vec![] // Return empty list on error
+        }
+    };
+    
+    // Add provider field to Gemini models if not already present
+    let gemini_models_with_provider: Vec<Value> = gemini_models
+        .iter()
+        .map(|model| {
+            json!({
+                "id": model.id,
+                "display_name": model.display_name,
+                "max_tokens": model.max_tokens,
+                "provider": model.provider.clone().unwrap_or_else(|| "gemini".to_string())
+            })
+        })
+        .collect();
+    
+    // Combine all models
+    let all_models: Vec<Value> = [
+        claude_models_with_provider,
+        gemini_models_with_provider,
+    ].concat();
+    
+    Ok((
+        Some(serde_json::to_vec(state).unwrap()),
+        (WebsocketResponse {
+            messages: vec![WebsocketMessage {
+                ty: MessageType::Text,
+                text: Some(
+                    json!({
+                        "type": "models_list",
+                        "models": all_models
+                    })
+                    .to_string(),
+                ),
+                data: None,
+            }],
+        },),
+    ))
 }
 
 fn default_response(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {

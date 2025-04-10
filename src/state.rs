@@ -1,8 +1,9 @@
 use crate::api::claude::ClaudeClient;
+use crate::api::gemini::GeminiClient;
 use crate::bindings::ntwk::theater::message_server_host::request;
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::messages::store::MessageStore;
-use crate::messages::{ChainEntry, ChatInfo, Message, MessageData};
+use crate::messages::{AssistantMessage, ChainEntry, ChatInfo, Message, MessageData};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -23,6 +24,7 @@ pub struct State {
     pub head: Option<String>, // Legacy, kept for backward compatibility
     pub current_chat_id: Option<String>,
     pub claude_client: ClaudeClient,
+    pub gemini_client: GeminiClient, // Add Gemini client
     pub connected_clients: HashMap<String, bool>,
     pub store: MessageStore,
     pub server_id: u64,
@@ -35,7 +37,8 @@ impl State {
     pub fn new(
         id: String,
         store_id: String,
-        api_key: String,
+        anthropic_api_key: String,
+        gemini_api_key: String, // Add Gemini API key
         server_id: u64,
         websocket_port: u16,
         head: Option<String>,
@@ -44,7 +47,8 @@ impl State {
             id,
             head,
             current_chat_id: None,
-            claude_client: ClaudeClient::new(api_key.clone()),
+            claude_client: ClaudeClient::new(anthropic_api_key.clone()),
+            gemini_client: GeminiClient::new(gemini_api_key.clone()), // Initialize Gemini client
             connected_clients: HashMap::new(),
             store: MessageStore::new(store_id.clone()),
             server_id,
@@ -278,10 +282,10 @@ impl State {
     }
 
     pub fn generate_llm_response(&mut self, model_id: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
-        log("[DEBUG] Getting anthropic messages");
+        log("[DEBUG] Getting messages for LLM response");
         let messages = self.get_anthropic_messages();
         log(&format!(
-            "[DEBUG] Got {} anthropic messages",
+            "[DEBUG] Got {} messages",
             messages.len()
         ));
 
@@ -295,20 +299,33 @@ impl State {
             }
         }
 
+        // Determine which provider to use based on model ID
+        let model = model_id.clone().unwrap_or_else(|| "claude-3-7-sonnet-20250219".to_string());
+        let is_gemini = model.starts_with("gemini-");
+        
         // Log which model is being used
         if let Some(model) = &model_id {
             log(&format!("[DEBUG] Using specified model: {}", model));
+        } else if is_gemini {
+            log("[DEBUG] Using default Gemini model (gemini-2.0-flash)");
         } else {
-            log("[DEBUG] Using default model (claude-3-7-sonnet-20250219)");
+            log("[DEBUG] Using default Claude model (claude-3-7-sonnet-20250219)");
         }
 
-        match self.claude_client.generate_response(messages, model_id) {
+        // Call appropriate client
+        let result = if is_gemini {
+            self.gemini_client.generate_response(messages, model_id)
+        } else {
+            self.claude_client.generate_response(messages, model_id)
+        };
+
+        match result {
             Ok(assistant_msg) => {
                 log(&format!("Generated completion: {:?}", assistant_msg));
 
                 // Add LLM response to chain with all parents
-                let parents_clone = parents.clone();
-                self.add_to_chain(MessageData::Chat(assistant_msg), parents);
+                let message = Message::Assistant(assistant_msg);
+                self.add_to_chain(MessageData::Chat(message), parents);
 
                 Ok(())
             }

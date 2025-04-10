@@ -45,6 +45,7 @@ struct InitData {
     websocket_port: u16,
     store_id: Option<String>,
     anthropic_api_key: String,
+    gemini_api_key: String, // Add Gemini API key field
     assets_store_id: Option<String>,
     assets_runtime_content_fs: Option<String>,
 }
@@ -134,11 +135,12 @@ impl ActorGuest for Component {
         let server_id = setup_http_server(init_data.websocket_port)?;
         log("HTTP server set up successfully");
 
-        // Initialize state with content filesystem
+        // Initialize state with both API keys
         let initial_state = State::new(
             id,
             store_id,
             init_data.anthropic_api_key,
+            init_data.gemini_api_key, // Pass the Gemini API key
             server_id,
             init_data.websocket_port,
             init_data.head,
