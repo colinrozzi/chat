@@ -31,7 +31,7 @@
         # Custom Rust with wasm-tools and targeted to wasm
         rustWithWasmTools = pkgs.rust-bin.stable.latest.default.override {
           extensions = [ "rust-src" "clippy" ];
-          targets = [ "wasm32-unknown-unknown" "wasm32-wasi" ];
+          targets = [ "wasm32-unknown-unknown" ];
         };
 
         # Set up crane lib with our custom toolchain
@@ -112,9 +112,13 @@
             
             # Create required directories
             mkdir -p .cargo
+
+            echo "running cargo component build"
             
             # Build the component
             ${cargoComponentWrapper}/bin/cargo-component component build --release --target wasm32-unknown-unknown
+
+            echo "built"
             
             # Validate that we built a proper WebAssembly component
             ${pkgs.wasm-tools}/bin/wasm-tools validate target/wasm32-unknown-unknown/release/chat.wasm || echo "Warning: wasm validation failed but continuing anyway"
