@@ -11,9 +11,10 @@
       let
         pkgs = import nixpkgs { inherit system; };
         fetchcargo = pkgs.rustPlatform.fetchCargoTarball;
-        buildWasmPackage = import ./build-wasm-package.nix {
-          inherit (pkgs) stdenv fetchcargo rustc cargo git cacert;
-        };
+buildWasmPackage = import ./build-wasm-package.nix {
+    inherit (pkgs) stdenv rustc cargo git cacert;
+    inherit fetchcargo;
+  };
       in {
         packages.default = buildWasmPackage {
           pname = "chat-actor";
