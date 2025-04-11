@@ -1,68 +1,74 @@
 {
-  description = "Chat actor WASM component";
+  description = "Rust WASM Component Project";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, rust-overlay }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
-        fetchcargo = pkgs.rustPlatform.fetchCargoTarball;
-        buildWasmPackage = import ./build-wasm-package.nix {
-          inherit (pkgs) stdenv rustc cargo git cacert;
-          inherit fetchcargo;
+        overlays = [ (import rust-overlay) ];
+        pkgs = import nixpkgs {
+          inherit system overlays;
         };
-      in {
-        packages.default = buildWasmPackage {
-          pname = "chat-actor";
+        
+        # Custom Rust with wasm-tools and cargo-component
+        rustWithWasmTools = pkgs.rust-bin.stable.latest.default.override {
+          extensions = [ "rust-src" ];
+          targets = [ "wasm32-unknown-unknown" "wasm32-wasi" ];
+        };
+        
+        # Build the WASM component
+        buildRustWasmComponent = pkgs.stdenv.mkDerivation {
+          pname = "rust-wasm-component";
           version = "0.1.0";
           src = ./.;
-          cargoSha256 = "0000000000000000000000000000000000000000000000000000"; # Replace after first build
-
-          nativeBuildInputs = with pkgs; [
-            esbuild
-            cargo-component
-            nodejs
+          
+          nativeBuildInputs = [
+            rustWithWasmTools
+            pkgs.cargo-component
+            pkgs.wasm-tools
           ];
-
+          
           buildPhase = ''
-            export CARGO_HOME=$TMPDIR/cargo-home
-            export RUSTUP_HOME=$TMPDIR/rustup-home
-            export CARGO_TARGET_DIR=target
-
-            echo "== Bundling frontend with esbuild =="
-            mkdir -p assets/dist
-            ${pkgs.esbuild}/bin/esbuild \
-              --bundle assets/src/index.js \
-              --outfile=assets/dist/chat.js
-
-            echo "== Building WASM component =="
-            cargo component build --release --target wasm32-unknown-unknown --output target
+            export HOME=$(mktemp -d)
+            cargo component build --release
           '';
-
+          
           installPhase = ''
-            echo "== Installing chat WASM component =="
             mkdir -p $out/lib
-            cp target/wasm32-unknown-unknown/release/chat.wasm $out/lib/
-            cp -r assets $out/
-            cp actor.portable.toml $out/
+            cp target/wasm32-wasi/release/*.wasm $out/lib/
           '';
         };
-
+      in
+      {
+        packages = {
+          default = buildRustWasmComponent;
+        };
+        
         devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            rustc
-            cargo
-            esbuild
-            cargo-component
-            nodejs
+          buildInputs = [
+            rustWithWasmTools
+            pkgs.cargo-component
+            pkgs.wasm-tools
           ];
+          
           shellHook = ''
-            echo "Welcome to the Chat Actor WASM dev shell!"
+            echo "Rust WASM component development environment"
+            echo "Available commands:"
+            echo "  cargo component build - Build the WASM component"
+            echo "  cargo component build --release - Build in release mode"
           '';
         };
-      });
+      }
+    );
 }
