@@ -19,7 +19,7 @@
         };
         
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
-          extensions = [ "rust-src" "rust-analyzer" "rustup" ];
+          extensions = [ "rust-src" "rust-analyzer" ];
           targets = [ "wasm32-unknown-unknown" "wasm32-wasip1" ];
         };
 
@@ -50,6 +50,7 @@
             wasm-tools
             binaryen
             cacert
+            rustup  # Add the rustup package directly
           ];
           
           buildInputs = with pkgs; [ 
@@ -76,6 +77,10 @@
             
             # Add cargo binary location to PATH
             export PATH=$CARGO_HOME/bin:$PATH
+            
+            # Initialize rustup and add the wasm32-wasip1 target
+            rustup toolchain install stable
+            rustup target add wasm32-wasip1
             
             # Build the WebAssembly component
             cargo component build --release --target wasm32-unknown-unknown
