@@ -23,7 +23,7 @@ pub fn handle_request(
     match path {
         "/index.html" => serve_file("index.html", "text/html", &mut state),
         "/styles.css" => serve_file("styles.css", "text/css", &mut state),
-        "/chat.js" => serve_bundled_js(&mut state),
+        "/chat.js" => serve_file("chat.js", "application/javascript", &mut state),
         "/api/messages" => handle_messages_api(&req, &mut state),
         "/api/chats" => handle_chats_api(&req, &mut state),
         uri if uri.starts_with("/api/chats/") => handle_chat_detail_api(&req, &mut state),
@@ -72,7 +72,7 @@ fn serve_bundled_js(state: &mut State) -> Result<(Option<Vec<u8>>, (ClientHttpRe
                 body: Some(modified_content.as_bytes().to_vec()),
             };
             Ok((Some(serde_json::to_vec(state).unwrap()), (response,)))
-        },
+        }
         None => {
             // Fall back to the original chat.js if the bundled version doesn't exist
             log("Bundled JS not found, falling back to original chat.js");
