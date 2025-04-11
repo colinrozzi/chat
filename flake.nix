@@ -44,25 +44,38 @@
           version = "0.1.0";
           src = ./.;
 
-          nativeBuildInputs = with pkgs; [
+          nativeBuildInputs = with pkgs; [ 
             rustToolchain
-            pkg-config
+            pkg-config 
             wasm-tools
             binaryen
+            cacert
+          ];
+          
+          buildInputs = with pkgs; [ 
+            openssl
+            cacert
           ];
 
           buildPhase = ''
             # Set up cargo home
             export CARGO_HOME=$(mktemp -d)
             
+            # Ensure SSL certificates are available
+            export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
+            export NIX_SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
+
+            echo "installing cargo-component"
+            
             # Install cargo-component
-            cargo install cargo-component --version 0.4.0
+            cargo install cargo-component
+
+            echo "building chat actor"
             
             # Build the WebAssembly component
             cargo component build --release --target wasm32-unknown-unknown
             
-            # Optimize the Wasm binary
-            wasm-opt -Os ./target/wasm32-unknown-unknown/release/chat.wasm -o ./target/wasm32-unknown-unknown/release/chat.opt.wasm
+
           '';
 
           installPhase = ''
@@ -71,7 +84,7 @@
             cp ./target/wasm32-unknown-unknown/release/chat.wasm $out/lib/
           '';
 
-          # Allow network access during build for cargo install
+          # Allow network access during build
           __noChroot = true;
         };
       });
