@@ -25,61 +25,42 @@
           extensions = [ "rust-src" ];
         };
       in {
-        packages.default = pkgs.stdenv.mkDerivation {
-          name = "chat-actor";
+        packages.default = pkgs.rustPlatform.buildRustPackage {
+          pname = "chat-actor";
+          version = "0.1.0";
+
           src = ./.;
-          
+
+          useFetchCargoVendor = true;
+          cargoHash = "sha256-RSsYmToNPKQYBzx5QskWUpdumn7jbyI5Ad3IIf8p1dA=";
+
           nativeBuildInputs = with pkgs; [
-            rustToolchain
-            pkg-config
             esbuild
             cargo-component
-            bash
-            which
+            nodejs
+            lld_19
           ];
-          
-          dontPatch = true;
-          dontConfigure = true;
-          
-          buildPhase = ''
-            # Ensure cargo and cargo-component are in the PATH
-            export PATH="${rustToolchain}/bin:${pkgs.cargo-component}/bin:$PATH"
-            
-            # Print debug information
-            echo "== Build Environment =="
-            echo "PATH: $PATH"
-            echo "$(which cargo) (version: $(cargo --version))"
-            echo "$(which cargo-component) (version: $(cargo-component --version))"
-            echo "$(which esbuild) (version: $(esbuild --version))"
 
-            # Create necessary directories
+          cargoBuildFlags = [
+            "--target=wasm32-unknown-unknown"
+          ];
+
+          # 👇 This runs before `cargo build`
+          preBuild = ''
+            echo "== Bundling frontend with esbuild =="
+
             mkdir -p assets/dist
-
-            # Bundle JavaScript assets
-            echo "== Bundling JavaScript =="
-            esbuild \
-              assets/src/index.js \
-              --bundle \
-              --minify \
+            ${pkgs.esbuild}/bin/esbuild \
+              --bundle assets/src/index.js \
               --outfile=assets/dist/chat.js
-
-            # Build Rust component
-            echo "== Building Rust Component =="
-            export CARGO_HOME=cargo
-            export CARGO_TARGET_DIR=target
-            mkdir -p $CARGO_HOME $CARGO_TARGET_DIR
-            cargo component build --release --target wasm32-unknown-unknown \
-              --out-dir $CARGO_TARGET_DIR/wasm32-unknown-unknown/release \
-              --target-dir $CARGO_TARGET_DIR
           '';
-          
+
           installPhase = ''
-            echo "== Installing to $out =="
+            echo "== Installing chat wasm component =="
             mkdir -p $out/lib
             cp target/wasm32-unknown-unknown/release/chat.wasm $out/lib/
             cp -r assets $out/
             cp actor.portable.toml $out/
-            echo "== Build Completed Successfully =="
           '';
         };
         
@@ -93,20 +74,6 @@
           
           shellHook = ''
             echo "Chat Actor Development Environment"
-            
-            # Add a dev script for frontend development
-            function dev-frontend() {
-              mkdir -p assets/dist
-              ${pkgs.esbuild}/bin/esbuild \\
-                --bundle assets/src/index.js \\
-                --outfile=assets/dist/chat.js \\
-                --servedir=assets \\
-                --serve=0.0.0.0:8085 \\
-                --watch
-            }
-            
-            echo "Available commands:"
-            echo "  dev-frontend - Start the frontend development server"
           '';
         };
       }
