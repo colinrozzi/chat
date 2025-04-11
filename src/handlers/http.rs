@@ -23,7 +23,7 @@ pub fn handle_request(
     match path {
         "/index.html" => serve_file("index.html", "text/html", &mut state),
         "/styles.css" => serve_file("styles.css", "text/css", &mut state),
-        "/chat.js" => serve_chat_js(&mut state),
+        "/chat.js" => serve_bundled_js(&mut state),
         "/api/messages" => handle_messages_api(&req, &mut state),
         "/api/chats" => handle_chats_api(&req, &mut state),
         uri if uri.starts_with("/api/chats/") => handle_chat_detail_api(&req, &mut state),
@@ -51,9 +51,12 @@ fn serve_file(
         .unwrap_or_else(|| not_found())
 }
 
-fn serve_chat_js(state: &mut State) -> Result<(Option<Vec<u8>>, (ClientHttpResponse,)), String> {
-    get_resource("chat.js")
-        .map(|(content, _)| {
+// Updated to check for bundled JS in dist directory first
+fn serve_bundled_js(state: &mut State) -> Result<(Option<Vec<u8>>, (ClientHttpResponse,)), String> {
+    // First try to get the bundled JS from the dist directory
+    match get_resource("dist/chat.js") {
+        Some((content, _)) => {
+            log("Serving bundled JS from dist directory");
             // Replace the placeholder with the actual WebSocket port
             let modified_content = content.replace("{{WEBSOCKET_PORT}}", "8084");
 
@@ -69,8 +72,31 @@ fn serve_chat_js(state: &mut State) -> Result<(Option<Vec<u8>>, (ClientHttpRespo
                 body: Some(modified_content.as_bytes().to_vec()),
             };
             Ok((Some(serde_json::to_vec(state).unwrap()), (response,)))
-        })
-        .unwrap_or_else(|| not_found())
+        },
+        None => {
+            // Fall back to the original chat.js if the bundled version doesn't exist
+            log("Bundled JS not found, falling back to original chat.js");
+            get_resource("chat.js")
+                .map(|(content, _)| {
+                    // Replace the placeholder with the actual WebSocket port
+                    let modified_content = content.replace("{{WEBSOCKET_PORT}}", "8084");
+
+                    let response = ClientHttpResponse {
+                        status: 200,
+                        headers: vec![
+                            (
+                                "Content-Type".to_string(),
+                                "application/javascript".to_string(),
+                            ),
+                            ("Cache-Control".to_string(), "no-cache".to_string()),
+                        ],
+                        body: Some(modified_content.as_bytes().to_vec()),
+                    };
+                    Ok((Some(serde_json::to_vec(state).unwrap()), (response,)))
+                })
+                .unwrap_or_else(|| not_found())
+        }
+    }
 }
 
 fn handle_messages_api(

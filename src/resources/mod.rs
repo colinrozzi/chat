@@ -8,6 +8,7 @@ pub const STYLES_CSS: &str = include_str!("../../assets/styles.css");
 
 // JavaScript files
 pub const CHAT_JS: &str = include_str!("../../assets/chat.js");
+pub const DIST_JS: &str = include_str!("../../assets/dist/chat.js");
 
 // Function to get a resource by path
 pub fn get_resource(path: &str) -> Option<(&'static str, &'static str)> {
@@ -16,6 +17,7 @@ pub fn get_resource(path: &str) -> Option<(&'static str, &'static str)> {
         "index.html" => Some((INDEX_HTML, "text/html")),
         "styles.css" => Some((STYLES_CSS, "text/css")),
         "chat.js" => Some((CHAT_JS, "application/javascript")),
+        "dist/chat.js" => Some((DIST_JS, "application/javascript")),
         _ => None,
     }
 }
