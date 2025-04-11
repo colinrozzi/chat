@@ -1,7 +1,7 @@
 name = "chat"
 version = "0.1.0"
 description = "chat actor for LLM chat application using content-fs for storage"
-component_path = "/nix/store/rbravaadrl9q4mm771cfxmd822qbwydh-chat-actor-0.1.0/lib/chat.wasm"
+component_path = "/nix/store/38spljq87pmvvja75lfq7mvc56kxzgvx-chat-actor-0.1.0/lib/chat.wasm"
 init_state = "/Users/colinrozzi/work/actors/chat/init.json"
 
 [interface]

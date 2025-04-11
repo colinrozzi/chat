@@ -34,6 +34,9 @@
             wasmtime
             binaryen
             wasm-tools
+            # Frontend build tools
+            esbuild
+            nodejs
           ];
 
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
@@ -50,7 +53,9 @@
             wasm-tools
             binaryen
             cacert
-            rustup  # Add the rustup package directly
+            rustup
+            esbuild
+            nodejs
           ];
           
           buildInputs = with pkgs; [ 
@@ -65,18 +70,28 @@
             export CARGO_COMPONENT_CACHE_DIR=$(mktemp -d)
             export CARGO_NET_GIT_FETCH_WITH_CLI=true
             export RUSTUP_HOME=$(mktemp -d)
+            export HOME=$(mktemp -d)
+
+
+            # Create dist directory
+            mkdir -p assets/dist
+
+            # Bundle the JavaScript with esbuild
+            esbuild assets/src/index.js \
+              --bundle \
+              --minify \
+              --sourcemap \
+              --outfile=assets/dist/chat.js \
+              --target=es2020 \
+              --format=esm \
+              --platform=browser
             
             # Ensure SSL certificates are available
             export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
             export NIX_SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
             
             # Install cargo-component
-            cargo install cargo-component 
-
-            echo $(cargo component --version)
-            
-            # Add cargo binary location to PATH
-            export PATH=$CARGO_HOME/bin:$PATH
+            cargo install cargo-component
             
             # Initialize rustup and add the wasm32-wasip1 target
             rustup toolchain install stable
@@ -84,11 +99,12 @@
             
             # Build the WebAssembly component
             cargo component build --release --target wasm32-unknown-unknown
-            
           '';
 
           installPhase = ''
-            mkdir -p $out/lib
+            mkdir -p $out/{lib,assets}
+            
+            # Install WebAssembly files
             cp ./target/wasm32-unknown-unknown/release/chat.wasm $out/lib/
           '';
 
