@@ -1,5 +1,5 @@
 // WebSocket service for communication with the server
-import { ws, reconnectAttempts, MAX_RECONNECT_ATTEMPTS, RECONNECT_DELAY } from '../components/app.js';
+import { reconnectAttempts, MAX_RECONNECT_ATTEMPTS, RECONNECT_DELAY, setReconnectAttempts } from '../components/app.js';
 import { elements } from '../utils/elements.js';
 import { updateConnectionStatus, showError } from '../utils/ui.js';
 import { handleWebSocketMessage } from './message-handler.js';
@@ -18,7 +18,7 @@ export function connectWebSocket() {
     updateConnectionStatus('connected');
     
     // Reset reconnect attempts counter
-    reconnectAttempts = 0;
+    setReconnectAttempts(0);
     
     // Request initial state
     sendWebSocketMessage({ type: 'list_chats' }, wsConnection);  // Get available chats
@@ -34,8 +34,8 @@ export function connectWebSocket() {
     
     // Disconnection handling with exponential backoff
     if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-      reconnectAttempts++;
-      setTimeout(connectWebSocket, RECONNECT_DELAY * Math.min(reconnectAttempts, 30));
+      setReconnectAttempts(reconnectAttempts + 1);
+      setTimeout(connectWebSocket, RECONNECT_DELAY * Math.min(reconnectAttempts + 1, 30));
     }
   };
   
@@ -47,17 +47,17 @@ export function connectWebSocket() {
       // Enhanced logging for debugging child actor issues
       if (data.type === 'messages_updated' || data.type === 'head') {
         console.log('HEAD UPDATE - Before processing:', {
-          oldHead: global.currentHead,
+          oldHead: window.currentHead,
           newHead: data.head,
-          messageChainLength: global.messageChain.length,
-          messageIDs: global.messageChain.map(m => m.id)
+          messageChainLength: window.messageChain?.length || 0,
+          messageIDs: window.messageChain?.map(m => m.id) || []
         });
       } else if (data.type === 'message') {
         console.log('MESSAGE RECEIVED - Details:', {
           messageId: data.message?.id,
           messageParents: data.message?.parents,
           messageType: data.message?.data ? Object.keys(data.message.data)[0] : 'unknown',
-          currentChainLength: global.messageChain.length
+          currentChainLength: window.messageChain?.length || 0
         });
       }
       
@@ -76,7 +76,7 @@ export function connectWebSocket() {
     showError('Connection error occurred');
   };
   
-  // Store the WebSocket connection
+  // Return the WebSocket connection
   return wsConnection;
 }
 

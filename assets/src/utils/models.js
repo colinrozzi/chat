@@ -1,6 +1,11 @@
 // Model utility functions
-import { messageChain, models, lastUsedModelId } from '../components/app.js';
+import { 
+  messageChain, models, lastUsedModelId, 
+  totalCost, totalInputTokens, totalOutputTokens, totalMessages,
+  setTotalCost, setTotalInputTokens, setTotalOutputTokens, setTotalMessages
+} from '../components/app.js';
 import { sortMessageChain } from './message-chain.js';
+import { updateStatsDisplay } from './ui.js';
 
 // Find the last used model ID by scanning the message chain
 export function findLastUsedModel() {
@@ -28,7 +33,9 @@ export function findLastUsedModel() {
       
       if (model) {
         console.log(`Found last used model: ${model}`);
-        window.lastUsedModelId = model;
+        import('../components/app.js').then(({ setLastUsedModelId }) => {
+          setLastUsedModelId(model);
+        });
         return model;
       }
     }
@@ -164,10 +171,11 @@ export function calculateMessageCost(usage, addToTotal = false, modelId = null) 
   
   // Update total cost only when explicitly requested
   if (addToTotal) {
-    window.totalCost += messageCost;
-    window.totalInputTokens += inputTokens;
-    window.totalOutputTokens += outputTokens;
-    window.totalMessages++;
+    setTotalCost(totalCost + messageCost);
+    setTotalInputTokens(totalInputTokens + inputTokens);
+    setTotalOutputTokens(totalOutputTokens + outputTokens);
+    setTotalMessages(totalMessages + 1);
+    updateStatsDisplay();
   }
   
   // Format to 4 decimal places

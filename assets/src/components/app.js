@@ -23,6 +23,59 @@ export let totalInputTokens = 0;
 export let totalOutputTokens = 0;
 export let totalMessages = 0;
 
+// Setter functions for mutable state
+export function setMessageChain(newMessageChain) {
+  messageChain = newMessageChain;
+}
+
+export function setCurrentHead(newCurrentHead) {
+  currentHead = newCurrentHead;
+}
+
+export function setCurrentChatId(newCurrentChatId) {
+  currentChatId = newCurrentChatId;
+}
+
+export function setChats(newChats) {
+  chats = newChats;
+}
+
+export function setModels(newModels) {
+  models = newModels;
+}
+
+export function setWs(newWs) {
+  ws = newWs;
+}
+
+export function setReconnectAttempts(newReconnectAttempts) {
+  reconnectAttempts = newReconnectAttempts;
+}
+
+export function setTotalCost(newTotalCost) {
+  totalCost = newTotalCost;
+}
+
+export function setLastUsedModelId(newLastUsedModelId) {
+  lastUsedModelId = newLastUsedModelId;
+}
+
+export function setIsWaitingForResponse(newIsWaitingForResponse) {
+  isWaitingForResponse = newIsWaitingForResponse;
+}
+
+export function setTotalInputTokens(newTotalInputTokens) {
+  totalInputTokens = newTotalInputTokens;
+}
+
+export function setTotalOutputTokens(newTotalOutputTokens) {
+  totalOutputTokens = newTotalOutputTokens;
+}
+
+export function setTotalMessages(newTotalMessages) {
+  totalMessages = newTotalMessages;
+}
+
 // Reset the state (useful for chat switching)
 export function resetState() {
   messageChain = [];
@@ -39,7 +92,8 @@ export function initializeApp() {
   initializeSidebars();
   
   // Connect to WebSocket
-  connectWebSocket();
+  const wsConnection = connectWebSocket();
+  setWs(wsConnection);
   
   console.log('Application initialization complete');
 }

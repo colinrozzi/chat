@@ -1,5 +1,9 @@
 // Chat component handling rendering and interaction
-import { messageChain, currentChatId, chats, currentHead } from '../app.js';
+import { 
+  messageChain, currentHead, currentChatId, chats, 
+  setMessageChain, setCurrentHead, setCurrentChatId,
+  setLastUsedModelId, setIsWaitingForResponse
+} from '../app.js';
 import { elements } from '../utils/elements.js';
 import { sortMessageChain } from '../utils/message-chain.js';
 import { formatMessageContent } from '../utils/formatters.js';
@@ -229,7 +233,10 @@ export function createNewChat(wsConnection) {
   };
   
   // Add to chats array and render with loading state
-  chats.push(tempChat);
+  const updatedChats = [...chats, tempChat];
+  import('../app.js').then(({ setChats }) => {
+    setChats(updatedChats);
+  });
   renderChatList();
   
   // Highlight the temporary chat
@@ -245,8 +252,10 @@ export function createNewChat(wsConnection) {
   }, wsConnection);
   
   // Reset message chain for new chat
-  messageChain.length = 0;
-  window.currentHead = null;
+  import('../app.js').then(({ setMessageChain, setCurrentHead }) => {
+    setMessageChain([]);
+    setCurrentHead(null);
+  });
   
   // Clear the messages display immediately
   elements.messagesContainer.innerHTML = renderEmptyState();
@@ -263,7 +272,10 @@ export function createNewChat(wsConnection) {
     const tempChatStillExists = chats.some(c => c.id === tempId);
     if (tempChatStillExists) {
       // Remove temporary chat from array
-      chats.splice(chats.findIndex(c => c.id === tempId), 1);
+      const updatedChats = chats.filter(c => c.id !== tempId);
+      import('../app.js').then(({ setChats }) => {
+        setChats(updatedChats);
+      });
       renderChatList();
       showError('Failed to create chat. Server did not respond.');
     }
@@ -302,9 +314,11 @@ export function switchChat(chatId, wsConnection) {
   }, wsConnection);
   
   // Reset message chain - will be reloaded from server
-  messageChain.length = 0;
-  window.currentHead = null;
-  window.lastUsedModelId = null;
+  import('../app.js').then(({ setMessageChain, setCurrentHead, setLastUsedModelId }) => {
+    setMessageChain([]);
+    setCurrentHead(null);
+    setLastUsedModelId(null);
+  });
   
   // Clear the messages display immediately
   elements.messagesContainer.innerHTML = renderEmptyState();
@@ -403,8 +417,11 @@ export function sendMessage(wsConnection) {
   };
   
   // Add to message chain and render immediately
-  messageChain.push(tempMessage);
-  console.log('Added temporary message to chain, new length:', messageChain.length);
+  const updatedMessageChain = [...messageChain, tempMessage];
+  import('../app.js').then(({ setMessageChain }) => {
+    setMessageChain(updatedMessageChain);
+  });
+  console.log('Added temporary message to chain, new length:', updatedMessageChain.length);
   renderMessages();
   scrollToBottom();
   
@@ -438,8 +455,10 @@ export function generateLlmResponse(wsConnection, modelId) {
   
   // Store this as the most recently used model
   if (modelId) {
-    window.lastUsedModelId = modelId;
-    console.log(`Set lastUsedModelId to: ${window.lastUsedModelId}`);
+    import('../app.js').then(({ setLastUsedModelId }) => {
+      setLastUsedModelId(modelId);
+      console.log(`Set lastUsedModelId to: ${modelId}`);
+    });
   }
   
   console.log('Generating LLM response:', {
@@ -450,7 +469,9 @@ export function generateLlmResponse(wsConnection, modelId) {
   });
   
   // Set waiting state
-  window.isWaitingForResponse = true;
+  import('../app.js').then(({ setIsWaitingForResponse }) => {
+    setIsWaitingForResponse(true);
+  });
   elements.sendButton.disabled = true;
   elements.generateButton.disabled = true;
   

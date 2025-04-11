@@ -1,7 +1,9 @@
 // Message handling service for WebSocket messages
 import { 
   messageChain, currentHead, currentChatId, chats, models,
-  lastUsedModelId, isWaitingForResponse
+  lastUsedModelId, isWaitingForResponse, 
+  setCurrentHead, setCurrentChatId, setChats, setModels,
+  setLastUsedModelId
 } from '../components/app.js';
 import { elements } from '../utils/elements.js';
 import { showError, showSuccess, updateCurrentChatName } from '../utils/ui.js';
@@ -58,7 +60,7 @@ export function handleWebSocketMessage(data, wsConnection) {
 // Handle head update messages
 function handleHeadUpdate(data, wsConnection) {
   if (data.current_chat_id && data.current_chat_id !== currentChatId) {
-    currentChatId = data.current_chat_id;
+    setCurrentChatId(data.current_chat_id);
     updateCurrentChatName();
     renderChatList();
   }
@@ -67,7 +69,7 @@ function handleHeadUpdate(data, wsConnection) {
     // Check if head has changed
     if (data.head !== currentHead) {
       console.log(`Head updated: ${currentHead} -> ${data.head}`);
-      currentHead = data.head;
+      setCurrentHead(data.head);
       elements.headId.textContent = `Head: ${data.head.substring(0, 8)}...`;
       requestMessage(data.head, wsConnection);
       
@@ -83,9 +85,9 @@ function handleHeadUpdate(data, wsConnection) {
 // Handle chats update
 function handleChatsUpdate(data) {
   if (data.chats) {
-    chats = data.chats;
+    setChats(data.chats);
     if (data.current_chat_id) {
-      currentChatId = data.current_chat_id;
+      setCurrentChatId(data.current_chat_id);
     }
     renderChatList();
     updateCurrentChatName();
@@ -98,36 +100,40 @@ function handleChatCreated(data) {
     console.log('Received chat_created event:', data.chat);
     
     // Remove any temporary chats first
-    chats = chats.filter(c => !c.isTemporary);
+    const updatedChats = chats.filter(c => !c.isTemporary);
     
     // Add to chats array if not already present
-    if (!chats.find(c => c.id === data.chat.id)) {
-      chats.push(data.chat);
+    if (!updatedChats.find(c => c.id === data.chat.id)) {
+      updatedChats.push(data.chat);
       console.log(`Added new chat to chats array: ${data.chat.id} - ${data.chat.name}`);
     } else {
       console.log(`Chat already exists in array, updating: ${data.chat.id}`);
       // Update existing chat with new data
-      const index = chats.findIndex(c => c.id === data.chat.id);
+      const index = updatedChats.findIndex(c => c.id === data.chat.id);
       if (index !== -1) {
-        chats[index] = { 
-          ...chats[index], 
+        updatedChats[index] = { 
+          ...updatedChats[index], 
           ...data.chat,
-          name: data.chat.name || chats[index].name, // Ensure name is preserved
-          icon: data.chat.icon !== undefined ? data.chat.icon : chats[index].icon
+          name: data.chat.name || updatedChats[index].name, // Ensure name is preserved
+          icon: data.chat.icon !== undefined ? data.chat.icon : updatedChats[index].icon
         };
       }
     }
     
+    // Update chats array
+    setChats(updatedChats);
+    
     // Update current chat ID
-    currentChatId = data.chat.id;
+    setCurrentChatId(data.chat.id);
     
     // Ensure the message display is cleared for the new chat
     if (messageChain.length > 0) {
-      messageChain = [];
-      currentHead = null;
-      elements.messagesContainer.innerHTML = renderEmptyState();
-      elements.headId.textContent = '';
-      elements.generateButton.disabled = true;
+      import('../components/app.js').then(({ resetState }) => {
+        resetState();
+        elements.messagesContainer.innerHTML = renderEmptyState();
+        elements.headId.textContent = '';
+        elements.generateButton.disabled = true;
+      });
     }
     
     // Hide loading overlay
@@ -149,24 +155,28 @@ function handleChatRenamed(data) {
   if (data.chat) {
     console.log('Received chat_renamed event:', data.chat);
     // Update chat in the array
-    const index = chats.findIndex(c => c.id === data.chat.id);
+    const updatedChats = [...chats];
+    const index = updatedChats.findIndex(c => c.id === data.chat.id);
     if (index !== -1) {
       // Store the old name for logging
-      const oldName = chats[index].name;
+      const oldName = updatedChats[index].name;
       
       // Properly preserve all existing properties while updating only what changed
-      chats[index] = { 
-        ...chats[index], 
-        name: data.chat.name || chats[index].name,
-        icon: data.chat.icon !== undefined ? data.chat.icon : chats[index].icon
+      updatedChats[index] = { 
+        ...updatedChats[index], 
+        name: data.chat.name || updatedChats[index].name,
+        icon: data.chat.icon !== undefined ? data.chat.icon : updatedChats[index].icon
       };
-      console.log(`Updated chat in array: ${chats[index].id} renamed from "${oldName}" to "${chats[index].name}"`);
+      console.log(`Updated chat in array: ${updatedChats[index].id} renamed from "${oldName}" to "${updatedChats[index].name}"`);
+      
+      // Update chats array
+      setChats(updatedChats);
       
       renderChatList();
       updateCurrentChatName();
       
       // Show success notification
-      showSuccess(`Chat renamed to "${chats[index].name}" successfully`);
+      showSuccess(`Chat renamed to "${updatedChats[index].name}" successfully`);
     } else {
       console.warn('Received rename event for non-existent chat ID:', data.chat.id);
       showError('Error: Chat not found');
@@ -181,7 +191,8 @@ function handleChatRenamed(data) {
 function handleChatDeleted(data) {
   if (data.chat_id) {
     // Remove chat from array
-    chats = chats.filter(c => c.id !== data.chat_id);
+    const updatedChats = chats.filter(c => c.id !== data.chat_id);
+    setChats(updatedChats);
     renderChatList();
     updateCurrentChatName();
   }
@@ -190,7 +201,7 @@ function handleChatDeleted(data) {
 // Handle models list
 function handleModelsList(data) {
   if (data.models) {
-    models = data.models;
+    setModels(data.models);
     populateModelSelector();
     // Update the model info in the sidebar
     updateModelInfo();
@@ -211,4 +222,17 @@ function handleError(data) {
   
   // Hide loading overlay if it's visible
   elements.loadingOverlay.classList.remove('visible');
+}
+
+// Helper function to get render empty state
+function renderEmptyState() {
+  return `
+    <div class="empty-state">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      <p>No messages yet</p>
+      <p class="text-sm">Start a conversation!</p>
+    </div>
+  `;
 }

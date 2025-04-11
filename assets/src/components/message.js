@@ -1,5 +1,9 @@
 // Message component for handling individual messages
-import { messageChain, totalCost, totalInputTokens, totalOutputTokens, totalMessages } from '../app.js';
+import { 
+  messageChain, totalCost, totalInputTokens, totalOutputTokens, totalMessages,
+  setMessageChain, setTotalCost, setTotalInputTokens, setTotalOutputTokens, 
+  setTotalMessages, setLastUsedModelId, setIsWaitingForResponse
+} from '../app.js';
 import { elements } from '../utils/elements.js';
 import { requestMessage } from '../services/websocket.js';
 import { renderMessages } from './chat.js';
@@ -18,7 +22,8 @@ export function handleNewMessage(message, wsConnection) {
   
   // Remove temporary message if it exists
   const tempMessagesCount = messageChain.filter(m => m.id.startsWith('temp-')).length;
-  messageChain = messageChain.filter(m => !m.id.startsWith('temp-'));
+  const filteredMessageChain = messageChain.filter(m => !m.id.startsWith('temp-'));
+  setMessageChain(filteredMessageChain);
   console.log(`Removed ${tempMessagesCount} temporary messages`);
   
   // Add to message chain if not already present
@@ -40,10 +45,11 @@ export function handleNewMessage(message, wsConnection) {
               
               const inputCost = (claude.usage.input_tokens / 1000000) * claude.input_cost_per_million_tokens;
               const outputCost = (claude.usage.output_tokens / 1000000) * claude.output_cost_per_million_tokens;
-              totalCost += (inputCost + outputCost);
-              totalInputTokens += claude.usage.input_tokens;
-              totalOutputTokens += claude.usage.output_tokens;
-              totalMessages++;
+              
+              setTotalCost(totalCost + (inputCost + outputCost));
+              setTotalInputTokens(totalInputTokens + claude.usage.input_tokens);
+              setTotalOutputTokens(totalOutputTokens + claude.usage.output_tokens);
+              setTotalMessages(totalMessages + 1);
               updateStatsDisplay();
           }
         } else {
@@ -54,8 +60,8 @@ export function handleNewMessage(message, wsConnection) {
         }
         
         // Store the model ID from the last assistant message
-        window.lastUsedModelId = claude.model;
-        console.log(`Stored last used model ID: ${window.lastUsedModelId}`);
+        setLastUsedModelId(claude.model);
+        console.log(`Stored last used model ID: ${claude.model}`);
       } else if (assistantMsg.Gemini) {
         const gemini = assistantMsg.Gemini;
         // Calculate cost based on model-specific pricing if available
@@ -67,10 +73,11 @@ export function handleNewMessage(message, wsConnection) {
                 
                 const inputCost = (gemini.usage.prompt_tokens / 1000000) * gemini.input_cost_per_million_tokens;
                 const outputCost = (gemini.usage.completion_tokens / 1000000) * gemini.output_cost_per_million_tokens;
-                totalCost += (inputCost + outputCost);
-                totalInputTokens += gemini.usage.prompt_tokens;
-                totalOutputTokens += gemini.usage.completion_tokens;
-                totalMessages++;
+                
+                setTotalCost(totalCost + (inputCost + outputCost));
+                setTotalInputTokens(totalInputTokens + gemini.usage.prompt_tokens);
+                setTotalOutputTokens(totalOutputTokens + gemini.usage.completion_tokens);
+                setTotalMessages(totalMessages + 1);
                 updateStatsDisplay();
             }
         } else {
@@ -81,8 +88,8 @@ export function handleNewMessage(message, wsConnection) {
         }
         
         // Store the model ID from the last assistant message
-        window.lastUsedModelId = gemini.model;
-        console.log(`Stored last used model ID: ${window.lastUsedModelId}`);
+        setLastUsedModelId(gemini.model);
+        console.log(`Stored last used model ID: ${gemini.model}`);
       } else if (assistantMsg.OpenRouter) {
         const openrouter = assistantMsg.OpenRouter;
         // Calculate cost based on model-specific pricing if available
@@ -94,16 +101,17 @@ export function handleNewMessage(message, wsConnection) {
                 
                 const inputCost = (openrouter.usage.prompt_tokens / 1000000) * openrouter.input_cost_per_million_tokens;
                 const outputCost = (openrouter.usage.completion_tokens / 1000000) * openrouter.output_cost_per_million_tokens;
-                totalCost += (inputCost + outputCost);
-                totalInputTokens += openrouter.usage.prompt_tokens;
-                totalOutputTokens += openrouter.usage.completion_tokens;
-                totalMessages++;
+                
+                setTotalCost(totalCost + (inputCost + outputCost));
+                setTotalInputTokens(totalInputTokens + openrouter.usage.prompt_tokens);
+                setTotalOutputTokens(totalOutputTokens + openrouter.usage.completion_tokens);
+                setTotalMessages(totalMessages + 1);
                 updateStatsDisplay();
             } else if (openrouter.usage.cost !== null) {
-                totalCost += openrouter.usage.cost;
-                totalInputTokens += openrouter.usage.prompt_tokens || 0;
-                totalOutputTokens += openrouter.usage.completion_tokens || 0;
-                totalMessages++;
+                setTotalCost(totalCost + openrouter.usage.cost);
+                setTotalInputTokens(totalInputTokens + (openrouter.usage.prompt_tokens || 0));
+                setTotalOutputTokens(totalOutputTokens + (openrouter.usage.completion_tokens || 0));
+                setTotalMessages(totalMessages + 1);
                 updateStatsDisplay();
             }
         } else {
@@ -114,8 +122,8 @@ export function handleNewMessage(message, wsConnection) {
         }
         
         // Store the model ID from the last assistant message
-        window.lastUsedModelId = openrouter.model;
-        console.log(`Stored last used model ID: ${window.lastUsedModelId}`);
+        setLastUsedModelId(openrouter.model);
+        console.log(`Stored last used model ID: ${openrouter.model}`);
       }
       
       // Update the selected model in the UI if it exists
@@ -123,7 +131,9 @@ export function handleNewMessage(message, wsConnection) {
         updateModelSelector();
       });
     }
-    messageChain.push(message);
+    
+    // Add the message to the chain
+    setMessageChain([...messageChain, message]);
   } else {
     console.log(`Message ${message.id} already exists in chain, skipping`);
   }
@@ -144,7 +154,7 @@ export function handleNewMessage(message, wsConnection) {
   }
 
   // Reset waiting state and remove typing indicator
-  window.isWaitingForResponse = false;
+  setIsWaitingForResponse(false);
   removeTypingIndicator();
   elements.sendButton.disabled = !elements.messageInput.value.trim();
   
