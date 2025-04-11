@@ -1,5 +1,10 @@
 // Find the last used model ID by scanning the message chain
 function findLastUsedModel() {
+    // Ensure window.messageChain exists
+    if (!window.messageChain) {
+        console.log('Creating window.messageChain');
+        window.messageChain = messageChain || [];
+    }
     // Use the sorted message chain to get messages in chronological order
     const sortedMessages = sortMessageChain();
     
@@ -50,7 +55,8 @@ function updateModelSelector() {
 }
 
 // State management
-let messageChain = [];
+window.messageChain = [];
+let messageChain = window.messageChain; // For backwards compatibility
 let currentHead = null;
 let currentChatId = null;
 let chats = [];
@@ -258,6 +264,7 @@ function handleWebSocketMessage(data) {
                 // Ensure the message display is cleared for the new chat
                 if (messageChain.length > 0) {
                     messageChain = [];
+                    window.messageChain = messageChain;
                     currentHead = null;
                     elements.messagesContainer.innerHTML = renderEmptyState();
                     elements.headId.textContent = '';
@@ -356,11 +363,17 @@ function handleNewMessage(message) {
     // Remove temporary message if it exists
     const tempMessagesCount = messageChain.filter(m => m.id.startsWith('temp-')).length;
     messageChain = messageChain.filter(m => !m.id.startsWith('temp-'));
+    // Keep window.messageChain in sync
+    window.messageChain = messageChain;
     console.log(`Removed ${tempMessagesCount} temporary messages`);
     
     // Add to message chain if not already present
     if (!messageChain.find(m => m.id === message.id)) {
     console.log(`Adding new message to chain: ${message.id}, parents: ${JSON.stringify(message.parents || [])}`);
+    // Make sure window.messageChain exists and is in sync
+    if (!window.messageChain) {
+        window.messageChain = messageChain;
+    }
     // Add the cost to the total only when a new message is received
     if (message.data && message.data.Chat && message.data.Chat.Assistant) {
     const assistantMsg = message.data.Chat.Assistant;
@@ -422,6 +435,8 @@ function handleNewMessage(message) {
                 updateModelSelector();
             }
             messageChain.push(message);
+            // Keep window.messageChain in sync
+            window.messageChain = messageChain;
         } else {
             console.log(`Message ${message.id} already exists in chain, skipping`);
         }
@@ -904,6 +919,13 @@ function formatMessageContent(content) {
 }
 
 function sortMessageChain() {
+    // Ensure messageChain is synchronized with window.messageChain
+    if (!window.messageChain) {
+        window.messageChain = messageChain || [];
+    } else if (window.messageChain !== messageChain) {
+        messageChain = window.messageChain;
+    }
+    
     console.log('Sorting message chain:', {
         chainLength: messageChain.length,
         currentHead: currentHead
@@ -1083,6 +1105,7 @@ function createNewChat() {
     
     // Reset message chain for new chat
     messageChain = [];
+    window.messageChain = messageChain;
     currentHead = null;
     
     // Clear the messages display immediately
@@ -1139,6 +1162,7 @@ function switchChat(chatId) {
     
     // Reset message chain - will be reloaded from server
     messageChain = [];
+    window.messageChain = messageChain;
     currentHead = null;
     
     // Reset lastUsedModelId so it will be determined from the new chat
@@ -1288,6 +1312,8 @@ function sendMessage() {
     
     // Add to message chain and render immediately
     messageChain.push(tempMessage);
+    // Keep window.messageChain in sync
+    window.messageChain = messageChain;
     console.log('Added temporary message to chain, new length:', messageChain.length);
     renderMessages();
     scrollToBottom();
