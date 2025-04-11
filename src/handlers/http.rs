@@ -23,7 +23,7 @@ pub fn handle_request(
     match path {
         "/index.html" => serve_file("index.html", "text/html", &mut state),
         "/styles.css" => serve_file("styles.css", "text/css", &mut state),
-        "/chat.js" => serve_file("chat.js", "application/javascript", &mut state),
+        "/chat.js" => serve_file("dist/chat.js", "application/javascript", &mut state),
         "/api/messages" => handle_messages_api(&req, &mut state),
         "/api/chats" => handle_chats_api(&req, &mut state),
         uri if uri.starts_with("/api/chats/") => handle_chat_detail_api(&req, &mut state),
