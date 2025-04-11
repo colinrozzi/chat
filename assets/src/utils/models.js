@@ -2,7 +2,8 @@
 import { 
   messageChain, models, lastUsedModelId, 
   totalCost, totalInputTokens, totalOutputTokens, totalMessages,
-  setTotalCost, setTotalInputTokens, setTotalOutputTokens, setTotalMessages
+  setTotalCost, setTotalInputTokens, setTotalOutputTokens, setTotalMessages,
+  setLastUsedModelId
 } from '../components/app.js';
 import { sortMessageChain } from './message-chain.js';
 import { updateStatsDisplay } from './ui.js';
@@ -33,9 +34,7 @@ export function findLastUsedModel() {
       
       if (model) {
         console.log(`Found last used model: ${model}`);
-        import('../components/app.js').then(({ setLastUsedModelId }) => {
-          setLastUsedModelId(model);
-        });
+        setLastUsedModelId(model);
         return model;
       }
     }

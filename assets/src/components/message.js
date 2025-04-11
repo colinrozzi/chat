@@ -3,7 +3,7 @@ import {
   messageChain, totalCost, totalInputTokens, totalOutputTokens, totalMessages,
   setMessageChain, setTotalCost, setTotalInputTokens, setTotalOutputTokens, 
   setTotalMessages, setLastUsedModelId, setIsWaitingForResponse
-} from '../app.js';
+} from './app.js';
 import { elements } from '../utils/elements.js';
 import { requestMessage } from '../services/websocket.js';
 import { renderMessages } from './chat.js';

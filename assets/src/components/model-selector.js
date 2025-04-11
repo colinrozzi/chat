@@ -1,5 +1,5 @@
 // Model selector component for selecting AI models
-import { models, lastUsedModelId } from '../app.js';
+import { models, lastUsedModelId } from './app.js';
 import { elements } from '../utils/elements.js';
 import { getModelMaxTokens, getModelPricing } from '../utils/models.js';
 

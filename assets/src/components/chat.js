@@ -3,7 +3,7 @@ import {
   messageChain, currentHead, currentChatId, chats, 
   setMessageChain, setCurrentHead, setCurrentChatId,
   setLastUsedModelId, setIsWaitingForResponse
-} from '../app.js';
+} from './app.js';
 import { elements } from '../utils/elements.js';
 import { sortMessageChain } from '../utils/message-chain.js';
 import { formatMessageContent } from '../utils/formatters.js';
@@ -234,7 +234,7 @@ export function createNewChat(wsConnection) {
   
   // Add to chats array and render with loading state
   const updatedChats = [...chats, tempChat];
-  import('../app.js').then(({ setChats }) => {
+  import('./app.js').then(({ setChats }) => {
     setChats(updatedChats);
   });
   renderChatList();
@@ -252,7 +252,7 @@ export function createNewChat(wsConnection) {
   }, wsConnection);
   
   // Reset message chain for new chat
-  import('../app.js').then(({ setMessageChain, setCurrentHead }) => {
+  import('./app.js').then(({ setMessageChain, setCurrentHead }) => {
     setMessageChain([]);
     setCurrentHead(null);
   });
@@ -273,7 +273,7 @@ export function createNewChat(wsConnection) {
     if (tempChatStillExists) {
       // Remove temporary chat from array
       const updatedChats = chats.filter(c => c.id !== tempId);
-      import('../app.js').then(({ setChats }) => {
+      import('./app.js').then(({ setChats }) => {
         setChats(updatedChats);
       });
       renderChatList();
@@ -314,7 +314,7 @@ export function switchChat(chatId, wsConnection) {
   }, wsConnection);
   
   // Reset message chain - will be reloaded from server
-  import('../app.js').then(({ setMessageChain, setCurrentHead, setLastUsedModelId }) => {
+  import('./app.js').then(({ setMessageChain, setCurrentHead, setLastUsedModelId }) => {
     setMessageChain([]);
     setCurrentHead(null);
     setLastUsedModelId(null);
@@ -418,7 +418,7 @@ export function sendMessage(wsConnection) {
   
   // Add to message chain and render immediately
   const updatedMessageChain = [...messageChain, tempMessage];
-  import('../app.js').then(({ setMessageChain }) => {
+  import('./app.js').then(({ setMessageChain }) => {
     setMessageChain(updatedMessageChain);
   });
   console.log('Added temporary message to chain, new length:', updatedMessageChain.length);
@@ -455,7 +455,7 @@ export function generateLlmResponse(wsConnection, modelId) {
   
   // Store this as the most recently used model
   if (modelId) {
-    import('../app.js').then(({ setLastUsedModelId }) => {
+    import('./app.js').then(({ setLastUsedModelId }) => {
       setLastUsedModelId(modelId);
       console.log(`Set lastUsedModelId to: ${modelId}`);
     });
@@ -469,7 +469,7 @@ export function generateLlmResponse(wsConnection, modelId) {
   });
   
   // Set waiting state
-  import('../app.js').then(({ setIsWaitingForResponse }) => {
+  import('./app.js').then(({ setIsWaitingForResponse }) => {
     setIsWaitingForResponse(true);
   });
   elements.sendButton.disabled = true;
