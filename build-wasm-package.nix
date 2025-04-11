@@ -26,19 +26,15 @@ stdenv.mkDerivation {
   nativeBuildInputs = nativeBuildInputs ++ [ cargo rustc git cacert ];
   buildInputs = buildInputs;
 
-  cargoDeps = cargoDeps;
-
   postUnpack = ''
     echo "== Setting up Cargo vendor directory =="
-    unpackFile "$cargoDeps"
-    cargoDepsCopy=$(stripHash $(basename $cargoDeps))
-    chmod -R +w "$cargoDepsCopy"
+
+    cp -r ${cargoDeps} ./vendor
+    chmod -R +w vendor
 
     mkdir -p .cargo
     substitute ${./fetchcargo-default-config.toml} .cargo/config \
-      --subst-var-by vendor "$(pwd)/$cargoDepsCopy"
-
-    export RUST_LOG=${logLevel}
+      --subst-var-by vendor "$(pwd)/vendor"
   '';
 
   buildPhase = if buildPhase != null then buildPhase else ''
