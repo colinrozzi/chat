@@ -19,8 +19,8 @@
         };
         
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
-          extensions = [ "rust-src" "rust-analyzer" ];
-          targets = [ "wasm32-unknown-unknown" ];
+          extensions = [ "rust-src" "rust-analyzer" "rustup" ];
+          targets = [ "wasm32-unknown-unknown" "wasm32-wasip1" ];
         };
 
       in
@@ -63,6 +63,7 @@
             export XDG_CACHE_HOME=$(mktemp -d)
             export CARGO_COMPONENT_CACHE_DIR=$(mktemp -d)
             export CARGO_NET_GIT_FETCH_WITH_CLI=true
+            export RUSTUP_HOME=$(mktemp -d)
             
             # Ensure SSL certificates are available
             export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
@@ -78,6 +79,7 @@
             
             # Build the WebAssembly component
             cargo component build --release --target wasm32-unknown-unknown
+            
           '';
 
           installPhase = ''
