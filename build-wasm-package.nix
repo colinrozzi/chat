@@ -41,7 +41,7 @@ stdenv.mkDerivation {
     export RUST_LOG=${logLevel}
   '';
 
-  buildPhase = buildPhase or ''
+  buildPhase = if buildPhase != null then buildPhase else ''
     echo "== Building WASM component =="
     export CARGO_HOME=$TMPDIR/cargo-home
     export RUSTUP_HOME=$TMPDIR/rustup-home
@@ -51,7 +51,7 @@ stdenv.mkDerivation {
       ${stdenv.lib.concatStringsSep " " cargoBuildFlags}
   '';
 
-  installPhase = installPhase or ''
+  installPhase = if installPhase != null then installPhase else ''
     echo "== Installing output files =="
     mkdir -p $out/lib
     cp target/wasm32-unknown-unknown/release/*.wasm $out/lib/
@@ -61,8 +61,8 @@ stdenv.mkDerivation {
 
   dontConfigure = true;
 
-  meta = {
-    description = "WASM component for ${pname}";
-    platforms = [ "x86_64-linux" "aarch64-linux" ];
-  };
+meta = {
+  description = "WASM component for ${pname}";
+  platforms = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
+};
 }
