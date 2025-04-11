@@ -58,29 +58,30 @@
           ];
 
           buildPhase = ''
-            # Set up cargo home
+            # Set up writable directories
             export CARGO_HOME=$(mktemp -d)
+            export XDG_CACHE_HOME=$(mktemp -d)
+            export CARGO_COMPONENT_CACHE_DIR=$(mktemp -d)
+            export CARGO_NET_GIT_FETCH_WITH_CLI=true
             
             # Ensure SSL certificates are available
             export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
             export NIX_SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
-
-            echo "installing cargo-component"
             
             # Install cargo-component
-            cargo install cargo-component
+            cargo install cargo-component 
 
-            echo "building chat actor"
+            echo $(cargo component --version)
+            
+            # Add cargo binary location to PATH
+            export PATH=$CARGO_HOME/bin:$PATH
             
             # Build the WebAssembly component
             cargo component build --release --target wasm32-unknown-unknown
-            
-
           '';
 
           installPhase = ''
             mkdir -p $out/lib
-            cp ./target/wasm32-unknown-unknown/release/chat.opt.wasm $out/lib/
             cp ./target/wasm32-unknown-unknown/release/chat.wasm $out/lib/
           '';
 
