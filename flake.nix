@@ -34,29 +34,45 @@
             wasmtime
             binaryen
             wasm-tools
-          ] ++ (with pkgs.rustPlatform; [
-            cargo-component
-          ]);
+          ];
 
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
         };
 
-        packages.default = pkgs.rustPlatform.buildRustPackage {
+        packages.default = pkgs.stdenv.mkDerivation {
           pname = "chat-actor";
           version = "0.1.0";
           src = ./.;
-          cargoLock.lockFile = ./Cargo.lock;
 
-          nativeBuildInputs = with pkgs; [ 
-            pkg-config 
+          nativeBuildInputs = with pkgs; [
+            rustToolchain
+            pkg-config
             wasm-tools
             binaryen
           ];
-          buildInputs = with pkgs; [ openssl ];
 
-          # Configure for wasm32 target
-          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_LINKER = "${pkgs.wasm-tools}/bin/wasm-tools";
-          cargoTarget = "wasm32-unknown-unknown";
+          buildPhase = ''
+            # Set up cargo home
+            export CARGO_HOME=$(mktemp -d)
+            
+            # Install cargo-component
+            cargo install cargo-component --version 0.4.0
+            
+            # Build the WebAssembly component
+            cargo component build --release --target wasm32-unknown-unknown
+            
+            # Optimize the Wasm binary
+            wasm-opt -Os ./target/wasm32-unknown-unknown/release/chat.wasm -o ./target/wasm32-unknown-unknown/release/chat.opt.wasm
+          '';
+
+          installPhase = ''
+            mkdir -p $out/lib
+            cp ./target/wasm32-unknown-unknown/release/chat.opt.wasm $out/lib/
+            cp ./target/wasm32-unknown-unknown/release/chat.wasm $out/lib/
+          '';
+
+          # Allow network access during build for cargo install
+          __noChroot = true;
         };
       });
 }
