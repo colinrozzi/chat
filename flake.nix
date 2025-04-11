@@ -107,8 +107,6 @@
             export XDG_CACHE_HOME=$TMPDIR/cache
             export CARGO_COMPONENT_CACHE_DIR=$TMPDIR/cargo-component-cache
             mkdir -p $CARGO_HOME $XDG_CACHE_HOME $CARGO_COMPONENT_CACHE_DIR
-
-            export RUSTUP_HOME=$(mktemp -d)
             
             # Create dist directory
             mkdir -p assets/dist
@@ -126,9 +124,6 @@
             # Ensure SSL certificates are available
             export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
             export NIX_SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
-
-            rustup toolchain install stable
-            rustup target add wasm32-wasip1
             
             # Build the WebAssembly component
             cargo component build --release --target wasm32-unknown-unknown
