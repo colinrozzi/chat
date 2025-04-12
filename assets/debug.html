@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat WebSocket Diagnostics</title>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            background-color: #1A1C23;
+            color: #F3F4F6;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #242731;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #F3F4F6;
+        }
+        .status-box {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: rgba(16, 185, 129, 0.1);
+            border: 1px solid #10B981;
+        }
+        .error {
+            background-color: rgba(239, 68, 68, 0.1);
+            border: 1px solid #EF4444;
+        }
+        .warning {
+            background-color: rgba(245, 158, 11, 0.1);
+            border: 1px solid #F59E0B;
+        }
+        button {
+            background-color: #6366F1;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #818CF8;
+        }
+        pre {
+            background-color: #2A2D39;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .port-input {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .port-input input {
+            padding: 8px;
+            margin-right: 10px;
+            background-color: #2A2D39;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            color: #F3F4F6;
+        }
+        .logger {
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #2A2D39;
+            border-radius: 5px;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 5px;
+        }
+        .timestamp {
+            color: #9CA3AF;
+            font-size: 0.8em;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chat WebSocket Diagnostics</h1>
+        
+        <div class="port-input">
+            <label for="wsPort">WebSocket Port:</label>
+            <input type="number" id="wsPort" value="8084">
+            <button id="updatePort">Update</button>
+        </div>
+        
+        <div>
+            <button id="testConnection">Test WebSocket Connection</button>
+            <button id="scanPorts">Scan Common Ports</button>
+            <button id="clearLogs">Clear Logs</button>
+        </div>
+        
+        <h2>Connection Status</h2>
+        <div id="connectionStatus" class="status-box warning">
+            Not tested yet. Click "Test WebSocket Connection" to begin.
+        </div>
+        
+        <h2>Browser Information</h2>
+        <pre id="browserInfo"></pre>
+        
+        <h2>Connection Logs</h2>
+        <div id="logger" class="logger"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up elements
+            const connectionStatus = document.getElementById('connectionStatus');
+            const browserInfo = document.getElementById('browserInfo');
+            const logger = document.getElementById('logger');
+            const wsPortInput = document.getElementById('wsPort');
+            const updatePortButton = document.getElementById('updatePort');
+            const testConnectionButton = document.getElementById('testConnection');
+            const scanPortsButton = document.getElementById('scanPorts');
+            const clearLogsButton = document.getElementById('clearLogs');
+            
+            // Initialize with default port from URL if available
+            if (window.location.port) {
+                wsPortInput.value = window.location.port;
+            }
+            
+            // Get browser information
+            const browserData = {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                vendor: navigator.vendor,
+                cookies: navigator.cookieEnabled,
+                language: navigator.language,
+                online: navigator.onLine,
+                url: window.location.href,
+                port: window.location.port || "(none)",
+                protocol: window.location.protocol,
+                host: window.location.host
+            };
+            
+            browserInfo.textContent = JSON.stringify(browserData, null, 2);
+            
+            // Logger function
+            function log(message, type = 'info') {
+                const logEntry = document.createElement('div');
+                logEntry.className = 'log-entry';
+                
+                const timestamp = document.createElement('span');
+                timestamp.className = 'timestamp';
+                timestamp.textContent = new Date().toLocaleTimeString();
+                
+                const content = document.createElement('span');
+                content.className = type;
+                content.textContent = message;
+                
+                logEntry.appendChild(timestamp);
+                logEntry.appendChild(content);
+                logger.appendChild(logEntry);
+                logger.scrollTop = logger.scrollHeight;
+            }
+            
+            // Update port
+            updatePortButton.addEventListener('click', function() {
+                const port = wsPortInput.value;
+                log(`Updated port to ${port}`);
+            });
+            
+            // Test WebSocket connection
+            testConnectionButton.addEventListener('click', function() {
+                const port = wsPortInput.value;
+                testWebSocketConnection(port);
+            });
+            
+            // Scan common ports
+            scanPortsButton.addEventListener('click', function() {
+                const commonPorts = [8080, 8081, 8082, 8083, 8084, 8085, 8086, 8087, 8088, 8089, 9000];
+                log(`Starting port scan on common websocket ports...`);
+                scanWebSocketPorts(commonPorts);
+            });
+            
+            // Clear logs
+            clearLogsButton.addEventListener('click', function() {
+                logger.innerHTML = '';
+                log('Logs cleared');
+            });
+            
+            // Test WebSocket connection
+            function testWebSocketConnection(port) {
+                connectionStatus.className = 'status-box warning';
+                connectionStatus.textContent = `Testing connection to ws://localhost:${port}/ws...`;
+                
+                log(`Testing WebSocket connection on port ${port}...`);
+                
+                try {
+                    const ws = new WebSocket(`ws://localhost:${port}/ws`);
+                    
+                    // Set timeout to handle connection failure
+                    const connectionTimeout = setTimeout(() => {
+                        if (ws.readyState !== WebSocket.OPEN) {
+                            connectionStatus.className = 'status-box error';
+                            connectionStatus.textContent = `Connection timeout on port ${port}. Make sure the server is running and the port is correct.`;
+                            log(`Connection timeout on port ${port}`, 'error');
+                            ws.close();
+                        }
+                    }, 5000);
+                    
+                    ws.onopen = function() {
+                        clearTimeout(connectionTimeout);
+                        connectionStatus.className = 'status-box success';
+                        connectionStatus.textContent = `Successfully connected to WebSocket server on port ${port}!`;
+                        log(`Connection successful on port ${port}`, 'success');
+                        
+                        // Try to send a basic message
+                        try {
+                            ws.send(JSON.stringify({ type: 'diagnostic_ping' }));
+                            log(`Sent diagnostic ping message`, 'info');
+                        } catch (err) {
+                            log(`Error sending message: ${err.message}`, 'error');
+                        }
+                        
+                        // Close after a short delay
+                        setTimeout(() => {
+                            try {
+                                ws.close();
+                                log(`Connection closed`, 'info');
+                            } catch (err) {
+                                log(`Error closing connection: ${err.message}`, 'error');
+                            }
+                        }, 2000);
+                    };
+                    
+                    ws.onmessage = function(event) {
+                        log(`Received message: ${event.data}`, 'success');
+                    };
+                    
+                    ws.onerror = function(error) {
+                        clearTimeout(connectionTimeout);
+                        connectionStatus.className = 'status-box error';
+                        connectionStatus.textContent = `Error connecting to WebSocket server on port ${port}. Make sure the server is running and the port is correct.`;
+                        log(`Connection error on port ${port}: ${error}`, 'error');
+                    };
+                    
+                    ws.onclose = function() {
+                        log(`WebSocket connection closed on port ${port}`, 'info');
+                    };
+                } catch (error) {
+                    connectionStatus.className = 'status-box error';
+                    connectionStatus.textContent = `Error creating WebSocket: ${error.message}`;
+                    log(`Error creating WebSocket: ${error.message}`, 'error');
+                }
+            }
+            
+            // Scan multiple ports
+            async function scanWebSocketPorts(ports) {
+                for (const port of ports) {
+                    log(`Checking port ${port}...`);
+                    
+                    try {
+                        const ws = new WebSocket(`ws://localhost:${port}/ws`);
+                        
+                        // Use a promise to handle connection attempt
+                        await new Promise((resolve) => {
+                            const timeout = setTimeout(() => {
+                                log(`Port ${port}: Connection timeout`, 'warning');
+                                ws.close();
+                                resolve();
+                            }, 1000);
+                            
+                            ws.onopen = function() {
+                                clearTimeout(timeout);
+                                log(`Port ${port}: Connection SUCCESSFUL ✓`, 'success');
+                                connectionStatus.className = 'status-box success';
+                                connectionStatus.textContent = `Found working WebSocket server on port ${port}!`;
+                                wsPortInput.value = port;
+                                
+                                // Close the connection
+                                setTimeout(() => {
+                                    ws.close();
+                                    resolve();
+                                }, 100);
+                            };
+                            
+                            ws.onerror = function() {
+                                clearTimeout(timeout);
+                                log(`Port ${port}: No WebSocket server`, 'error');
+                                resolve();
+                            };
+                        });
+                        
+                        // Small pause between connection attempts
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                        
+                    } catch (error) {
+                        log(`Error scanning port ${port}: ${error.message}`, 'error');
+                    }
+                }
+                
+                log('Port scan completed', 'info');
+            }
+            
+            // Initial log
+            log('Diagnostic tool loaded. Ready to test WebSocket connections.');
+        });
+    </script>
+</body>
+</html>

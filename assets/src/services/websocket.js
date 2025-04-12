@@ -10,8 +10,16 @@ export function connectWebSocket() {
   updateConnectionStatus('connecting');
   
   // Create a new WebSocket connection
-  // The {{WEBSOCKET_PORT}} is a placeholder that gets replaced by the server
-  const wsConnection = new WebSocket(`ws://localhost:{{WEBSOCKET_PORT}}/ws`);
+  // Try to get WebSocket port from the current URL or use a fallback value
+  let wsPort = 8084; // Default fallback port
+  
+  // Check if we can get the port from window.location
+  if (window.location && window.location.port) {
+    wsPort = window.location.port;
+  }
+  
+  console.log(`Attempting to connect to WebSocket on port ${wsPort}`);
+  const wsConnection = new WebSocket(`ws://localhost:${wsPort}/ws`);
   
   wsConnection.onopen = () => {
     console.log('WebSocket connected');
@@ -73,7 +81,13 @@ export function connectWebSocket() {
 
   wsConnection.onerror = (error) => {
     console.error('WebSocket error:', error);
-    showError('Connection error occurred');
+    console.error(`Failed to connect to WebSocket on port ${wsPort}`);
+    showError(`Connection error: Failed to connect on port ${wsPort}. Check your server is running.`);
+    
+    // Update UI to show disconnected state
+    updateConnectionStatus('disconnected');
+    elements.sendButton.disabled = true;
+    elements.generateButton.disabled = true;
   };
   
   // Return the WebSocket connection

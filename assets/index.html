@@ -180,8 +180,37 @@
             </svg>
         </button>
     </div>
-    <!-- Load bundled JavaScript file -->
-    <script src="chat.js"></script>
+    <!-- Prevent source map errors -->
+    <script>
+        // Suppress source map errors
+        window.addEventListener('error', function(event) {
+            if (event.filename && event.filename.endsWith('.map')) {
+                event.preventDefault();
+                console.warn('Source map not found, but application can continue:', event.filename);
+            }
+        }, true);
+    </script>
+    
+    <!-- Load bundled JavaScript file with error handling -->
+    <script src="chat.js" onerror="console.error('Failed to load main script.'); loadFallback();" onload="window.appInitialized = true;"></script>
+    
+    <!-- Fallback script that will execute if the main script fails to load or initialize -->
+    <script>
+        function loadFallback() {
+            console.log('Loading fallback script...');
+            const fallbackScript = document.createElement('script');
+            fallbackScript.src = 'fallback.js';
+            document.body.appendChild(fallbackScript);
+        }
+        
+        // If main script doesn't set appInitialized within 5 seconds, load fallback
+        setTimeout(function() {
+            if (!window.appInitialized) {
+                console.warn('Main script did not initialize within timeout period.');
+                loadFallback();
+            }
+        }, 5000);
+    </script>
 </body>
 
 </html>
