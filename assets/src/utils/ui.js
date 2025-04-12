@@ -73,7 +73,7 @@ export function showCopySuccess(message) {
 
 // Update current chat name in the UI
 export function updateCurrentChatName() {
-  const currentChat = chats.find(chat => chat.id === currentChatId);
+  const currentChat = window.chats.find(chat => chat.id === window.currentChatId);
   console.log('Updating current chat name:', currentChat);
   
   if (currentChat) {
@@ -86,8 +86,8 @@ export function updateCurrentChatName() {
     
     // Make the chat name editable
     elements.currentChatName.onclick = () => {
-      if (currentChatId) {
-        window.showRenameChat(currentChatId, elements.currentChatName.textContent);
+      if (window.currentChatId) {
+        window.showRenameChat(window.currentChatId, elements.currentChatName.textContent);
       }
     };
     
@@ -109,15 +109,15 @@ export function updateStatsDisplay() {
   
   // Update the stats in the controls sidebar
   if (elements.statsMessageCount) {
-    elements.statsMessageCount.textContent = totalMessages;
+    elements.statsMessageCount.textContent = window.totalMessages;
   }
   
   if (elements.statsTokenCount) {
-    elements.statsTokenCount.textContent = `${totalInputTokens} in / ${totalOutputTokens} out`;
+    elements.statsTokenCount.textContent = `${window.totalInputTokens} in / ${window.totalOutputTokens} out`;
   }
   
   if (elements.statsTotalCost) {
-    elements.statsTotalCost.textContent = `${totalCost.toFixed(4)}`;
+    elements.statsTotalCost.textContent = `${window.totalCost.toFixed(4)}`;
   }
 }
 
@@ -125,7 +125,7 @@ export function updateStatsDisplay() {
 export function updateTotalCostDisplay() {
   const costElement = document.querySelector('.cost-value');
   if (costElement) {
-    costElement.textContent = `${totalCost.toFixed(4)}`;
+    costElement.textContent = `${window.totalCost.toFixed(4)}`;
   }
 }
 

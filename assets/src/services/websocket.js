@@ -69,6 +69,16 @@ export function connectWebSocket() {
         });
       }
       
+      // Check if window variables are properly set before processing
+      if (data.type === 'head' || data.type === 'messages_updated') {
+        console.log('Window state before processing message:', { 
+          messageChain: window.messageChain ? 'defined' : 'undefined',
+          currentHead: window.currentHead !== undefined ? 'defined' : 'undefined',
+          chats: window.chats ? 'defined' : 'undefined',
+          models: window.models ? 'defined' : 'undefined'
+        });
+      }
+      
       // Handle the message
       handleWebSocketMessage(data, wsConnection);
       

@@ -59,7 +59,7 @@ export function handleWebSocketMessage(data, wsConnection) {
 
 // Handle head update messages
 function handleHeadUpdate(data, wsConnection) {
-  if (data.current_chat_id && data.current_chat_id !== currentChatId) {
+  if (data.current_chat_id && data.current_chat_id !== window.currentChatId) {
     setCurrentChatId(data.current_chat_id);
     updateCurrentChatName();
     renderChatList();
@@ -67,8 +67,8 @@ function handleHeadUpdate(data, wsConnection) {
   
   if (data.head) {
     // Check if head has changed
-    if (data.head !== currentHead) {
-      console.log(`Head updated: ${currentHead} -> ${data.head}`);
+    if (data.head !== window.currentHead) {
+      console.log(`Head updated: ${window.currentHead} -> ${data.head}`);
       setCurrentHead(data.head);
       elements.headId.textContent = `Head: ${data.head.substring(0, 8)}...`;
       requestMessage(data.head, wsConnection);
@@ -100,7 +100,7 @@ function handleChatCreated(data) {
     console.log('Received chat_created event:', data.chat);
     
     // Remove any temporary chats first
-    const updatedChats = chats.filter(c => !c.isTemporary);
+    const updatedChats = window.chats.filter(c => !c.isTemporary);
     
     // Add to chats array if not already present
     if (!updatedChats.find(c => c.id === data.chat.id)) {
@@ -127,7 +127,7 @@ function handleChatCreated(data) {
     setCurrentChatId(data.chat.id);
     
     // Ensure the message display is cleared for the new chat
-    if (messageChain.length > 0) {
+    if (window.messageChain.length > 0) {
       import('../components/app.js').then(({ resetState }) => {
         resetState();
         elements.messagesContainer.innerHTML = renderEmptyState();
@@ -155,7 +155,7 @@ function handleChatRenamed(data) {
   if (data.chat) {
     console.log('Received chat_renamed event:', data.chat);
     // Update chat in the array
-    const updatedChats = [...chats];
+    const updatedChats = [...window.chats];
     const index = updatedChats.findIndex(c => c.id === data.chat.id);
     if (index !== -1) {
       // Store the old name for logging
@@ -191,7 +191,7 @@ function handleChatRenamed(data) {
 function handleChatDeleted(data) {
   if (data.chat_id) {
     // Remove chat from array
-    const updatedChats = chats.filter(c => c.id !== data.chat_id);
+    const updatedChats = window.chats.filter(c => c.id !== data.chat_id);
     setChats(updatedChats);
     renderChatList();
     updateCurrentChatName();

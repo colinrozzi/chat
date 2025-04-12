@@ -295,6 +295,7 @@ impl OpenRouterClient {
 
         // Check if the response status is not 2xx (success)
         if http_response.status < 200 || http_response.status >= 300 {
+            log(&format!("OpenRouter response: {:?}", http_response));
             return Err(
                 format!("OpenRouter API error: HTTP status {}", http_response.status).into(),
             );
