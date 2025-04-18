@@ -20,7 +20,7 @@ pub struct ChildActor {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct State {
     pub id: String,
-    pub head: Option<String>, // Legacy, kept for backward compatibility
+    pub head: Option<String>,
     pub current_chat_id: Option<String>,
     pub claude_client: ClaudeClient,
     pub gemini_client: GeminiClient,
@@ -28,8 +28,6 @@ pub struct State {
     pub connected_clients: HashMap<String, bool>,
     pub store: MessageStore,
     pub server_id: u64,
-    pub children: HashMap<String, ChildActor>, // Global children (legacy)
-    pub actor_messages: HashMap<String, Vec<u8>>,
 }
 
 impl State {
@@ -56,8 +54,6 @@ impl State {
             connected_clients: HashMap::new(),
             store: MessageStore::new(store_id.clone()),
             server_id,
-            children: HashMap::new(),
-            actor_messages: HashMap::new(),
         };
 
         // Get the list of chats
@@ -96,7 +92,6 @@ impl State {
             }
         }
 
-        // For backward compatibility, also set the legacy head
         if state.head.is_none() && state.current_chat_id.is_some() {
             if let Ok(Some(chat_info)) = state
                 .store
