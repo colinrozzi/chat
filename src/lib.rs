@@ -40,7 +40,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 struct InitData {
     head: Option<String>,
-    websocket_port: u16,
     store_id: Option<String>,
     anthropic_api_key: String,
     gemini_api_key: String,
@@ -140,7 +139,10 @@ impl ActorGuest for Component {
         } else {
             "<empty>"
         };
-        log(&format!("OpenRouter API key starts with: {}...", openrouter_key_preview));
+        log(&format!(
+            "OpenRouter API key starts with: {}...",
+            openrouter_key_preview
+        ));
 
         // Initialize state with all API keys
         let initial_state = State::new(
