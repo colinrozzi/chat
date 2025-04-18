@@ -28,7 +28,6 @@ pub struct State {
     pub connected_clients: HashMap<String, bool>,
     pub store: MessageStore,
     pub server_id: u64,
-    pub websocket_port: u16, // Keep for backward compatibility
     pub children: HashMap<String, ChildActor>, // Global children (legacy)
     pub actor_messages: HashMap<String, Vec<u8>>,
 }
@@ -41,7 +40,6 @@ impl State {
         gemini_api_key: String,
         openrouter_api_key: String, // Add OpenRouter API key
         server_id: u64,
-        websocket_port: u16,
         head: Option<String>,
     ) -> Self {
         let mut state = Self {
@@ -50,11 +48,14 @@ impl State {
             current_chat_id: None,
             claude_client: ClaudeClient::new(anthropic_api_key.clone()),
             gemini_client: GeminiClient::new(gemini_api_key.clone()),
-            openrouter_client: OpenRouterClient::new(openrouter_api_key.clone(), Some("Chat Actor".to_string()), None), // Initialize OpenRouter client
+            openrouter_client: OpenRouterClient::new(
+                openrouter_api_key.clone(),
+                Some("Chat Actor".to_string()),
+                None,
+            ), // Initialize OpenRouter client
             connected_clients: HashMap::new(),
             store: MessageStore::new(store_id.clone()),
             server_id,
-            websocket_port,
             children: HashMap::new(),
             actor_messages: HashMap::new(),
         };
@@ -283,13 +284,13 @@ impl State {
         ));
     }
 
-    pub fn generate_llm_response(&mut self, model_id: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn generate_llm_response(
+        &mut self,
+        model_id: Option<String>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         log("[DEBUG] Getting messages for LLM response");
         let messages = self.get_anthropic_messages();
-        log(&format!(
-            "[DEBUG] Got {} messages",
-            messages.len()
-        ));
+        log(&format!("[DEBUG] Got {} messages", messages.len()));
 
         // Get current head as parent
         let mut parents = Vec::new();
@@ -302,16 +303,22 @@ impl State {
         }
 
         // Determine which provider to use based on model ID
-        let model = model_id.clone().unwrap_or_else(|| "meta-llama/llama-4-maverick:free".to_string());
+        let model = model_id
+            .clone()
+            .unwrap_or_else(|| "meta-llama/llama-4-maverick:free".to_string());
         let is_gemini = model.starts_with("gemini-");
-        let is_openrouter = model.contains("/") || model.starts_with("openai/") || 
-                           model.starts_with("anthropic/") || model.starts_with("mistral/") || 
-                           model.starts_with("meta-llama/") || model.starts_with("deepseek/") || 
-                           model.starts_with("openrouter/") || model.starts_with("qwen/") ||
-                           model.contains(":free") ||
-                           crate::api::openrouter::is_free_model(&model) ||
-                           crate::api::openrouter::is_llama4_maverick_free(&model);
-        
+        let is_openrouter = model.contains("/")
+            || model.starts_with("openai/")
+            || model.starts_with("anthropic/")
+            || model.starts_with("mistral/")
+            || model.starts_with("meta-llama/")
+            || model.starts_with("deepseek/")
+            || model.starts_with("openrouter/")
+            || model.starts_with("qwen/")
+            || model.contains(":free")
+            || crate::api::openrouter::is_free_model(&model)
+            || crate::api::openrouter::is_llama4_maverick_free(&model);
+
         // Log which model is being used (with enhanced detail)
         if let Some(model) = &model_id {
             log(&format!("[DEBUG] Using specified model: {}", model));

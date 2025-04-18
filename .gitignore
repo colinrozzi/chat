@@ -9,3 +9,4 @@ old_init.json
 stores.md
 .DS_Store
 /result
+node_modules

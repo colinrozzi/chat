@@ -50,7 +50,7 @@ struct InitData {
 
 struct Component;
 
-fn setup_http_server(_websocket_port: u16) -> Result<u64, String> {
+fn setup_http_server() -> Result<u64, String> {
     log("Setting up HTTP server");
 
     // Create server configuration for main HTTP server
@@ -130,7 +130,7 @@ impl ActorGuest for Component {
 
         // Set up the HTTP server
         log("Setting up HTTP server...");
-        let server_id = setup_http_server(init_data.websocket_port)?;
+        let server_id = setup_http_server()?;
         log("HTTP server set up successfully");
 
         // Log the OpenRouter API key (partially redacted for security)
@@ -152,7 +152,6 @@ impl ActorGuest for Component {
             init_data.gemini_api_key,
             init_data.openrouter_api_key, // Pass the OpenRouter API key
             server_id,
-            init_data.websocket_port,
             init_data.head,
         );
 
