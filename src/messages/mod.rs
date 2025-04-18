@@ -25,6 +25,7 @@ pub struct ModelInfo {
     pub display_name: String,
     pub max_tokens: u32,
     pub provider: Option<String>,
+    pub tools_enabled: bool,
     pub input_cost_per_million_tokens: Option<f64>,
     pub output_cost_per_million_tokens: Option<f64>,
 }

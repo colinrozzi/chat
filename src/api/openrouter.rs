@@ -1,6 +1,7 @@
 use crate::bindings::ntwk::theater::http_client::{send_http, HttpRequest};
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::messages::{Message, ModelInfo};
+use mcp_protocol::types::tool::Tool;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 
@@ -14,6 +15,8 @@ pub struct OpenRouterMessage {
 pub struct OpenRouterRequest {
     pub model: String,
     pub messages: Vec<OpenRouterMessage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Tool>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -104,6 +107,7 @@ impl OpenRouterClient {
         &self,
         messages: Vec<Message>,
         model_id: String,
+        available_tools: Option<Vec<Tool>>,
     ) -> Result<OpenRouterLlmMessage, Box<dyn std::error::Error>> {
         let model_info = self
             .model_configs
@@ -129,10 +133,17 @@ impl OpenRouterClient {
         // Construct the request URL
         let url = format!("{}/chat/completions", self.url.clone());
 
+        let tools = if model_info.tools_enabled {
+            available_tools
+        } else {
+            None
+        };
+
         // Create request body with model-specific parameters
         let request_body = OpenRouterRequest {
             model: model_id.clone(),
             messages: openrouter_messages,
+            tools,
         };
 
         // Prepare the request body - log it for debugging

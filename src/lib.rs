@@ -114,7 +114,10 @@ impl ActorGuest for Component {
         let id = params.0;
         let data = data.unwrap();
         log("Data unwrapped");
-        let init_data: InitData = serde_json::from_slice(&data).unwrap();
+        let init_data: InitData = serde_json::from_slice(&data).map_err(|e| {
+            log(&format!("Failed to deserialize init data: {}", e));
+            "Failed to deserialize init data".to_string()
+        })?;
         log("Init data deserialized");
         log(&format!("Init data: {:?}", init_data));
 
@@ -394,10 +397,10 @@ impl MessageServerClientGuest for Component {
 
     fn handle_request(
         state: Option<Vec<u8>>,
-        _params: (Vec<u8>,),
-    ) -> Result<(Option<Vec<u8>>, (Vec<u8>,)), String> {
+        _params: (String, Vec<u8>),
+    ) -> Result<(Option<Vec<u8>>, (Option<Vec<u8>>,)), String> {
         log("Handling message server client request");
-        Ok((state, (vec![],)))
+        Ok((state, (Some(vec![]),)))
     }
 
     fn handle_channel_open(

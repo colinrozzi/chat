@@ -4,11 +4,11 @@ use crate::mcp_server::{McpServer, McpServerConfig};
 use crate::messages::store::MessageStore;
 use crate::messages::{ChainEntry, ChatInfo, Message, MessageData, ModelInfo};
 
+use mcp_protocol::types::tool::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::error::Error;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChildActor {
@@ -293,8 +293,12 @@ impl State {
         // Determine which provider to use based on model ID
         let model = model_id.clone();
 
+        let tools = self.get_tools();
+
         // Call appropriate client
-        let result = self.openrouter_client.generate_response(messages, model_id);
+        let result = self
+            .openrouter_client
+            .generate_response(messages, model_id, tools);
 
         match result {
             Ok(assistant_msg) => {
@@ -546,5 +550,11 @@ impl State {
         } else {
             Err("Failed to list chats".to_string())
         }
+    }
+
+    fn get_tools(&self) -> Option<Vec<Tool>> {
+        // Placeholder for tool retrieval logic
+        // This should return a Vec<Tool> based on the current state
+        None
     }
 }
