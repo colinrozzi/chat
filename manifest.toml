@@ -1,7 +1,7 @@
 name = "chat"
 version = "0.1.0"
 description = "chat actor for LLM chat application using content-fs for storage"
-component_path = "/nix/store/x8nvcqcw9bj9rl7lb1hakymvj5y6y8ip-chat-actor-0.1.0/lib/chat.wasm"
+component_path = "/nix/store/980dpji25svqknpq8wcbsygblvfcqn16-chat-actor-0.1.0/lib/chat.wasm"
 init_state = "/Users/colinrozzi/work/actors/chat/init.json"
 
 [interface]
@@ -11,11 +11,6 @@ requires = []
 [[handlers]]
 type = "runtime"
 config = {}
-
-# We no longer need the filesystem handler since we're using runtime-content-fs!
-[[handlers]]
-type = "filesystem"
-config = { path = "/Users/colinrozzi/work/actors/chat/assets"}
 
 [[handlers]]
 type = "store"
