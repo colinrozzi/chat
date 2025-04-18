@@ -82,18 +82,14 @@ pub fn handle_message(
                         }
                         Some("generate_llm_response") => {
                             // Extract optional model ID from the message
-                            let model_id = if let Some(model) = command["model_id"].as_str() {
-                                Some(model.to_string())
+                            if let Some(model) = command["model_id"].as_str() {
+                                handle_generate_llm_response(&mut current_state, model.to_string())
                             } else {
-                                None
-                            };
-                            
-                            handle_generate_llm_response(&mut current_state, model_id)
+                                default_response(&current_state)
+                            }
                         }
-                        
-                        Some("list_models") => {
-                            handle_list_models(&current_state)
-                        }
+
+                        Some("list_models") => handle_list_models(&current_state),
                         Some("get_message") => {
                             if let Some(message_id) = command["message_id"].as_str() {
                                 handle_get_message(&mut current_state, message_id)
@@ -435,7 +431,7 @@ fn handle_send_message(
 
 fn handle_generate_llm_response(
     state: &mut State,
-    model_id: Option<String>,
+    model_id: String,
 ) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     match state.generate_llm_response(model_id) {
         Ok(_) => {
@@ -531,106 +527,22 @@ fn handle_get_head(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse
     ))
 }
 
-fn handle_list_models(
-    state: &State,
-) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
-    // Get Claude models
-    let claude_models = match state.claude_client.list_available_models() {
-        Ok(models) => models,
-        Err(e) => {
-            log(&format!("Failed to list Claude models: {}", e));
-            vec![] // Return empty list on error
-        }
-    };
-    
-    // Add provider field to Claude models if not already present
-    let claude_models_with_provider: Vec<Value> = claude_models
-        .iter()
-        .map(|model| {
-            json!({
-                "id": model.id,
-                "display_name": model.display_name,
-                "max_tokens": model.max_tokens,
-                "provider": model.provider.clone().unwrap_or_else(|| "claude".to_string())
-            })
-        })
-        .collect();
-    
-    // Get Gemini models
-    let gemini_models = match state.gemini_client.list_available_models() {
-        Ok(models) => models,
-        Err(e) => {
-            log(&format!("Failed to list Gemini models: {}", e));
-            vec![] // Return empty list on error
-        }
-    };
-    
-    // Add provider field to Gemini models if not already present
-    let gemini_models_with_provider: Vec<Value> = gemini_models
-        .iter()
-        .map(|model| {
-            json!({
-                "id": model.id,
-                "display_name": model.display_name,
-                "max_tokens": model.max_tokens,
-                "provider": model.provider.clone().unwrap_or_else(|| "gemini".to_string())
-            })
-        })
-        .collect();
-    
-    // Add more detailed logging
-    log("[DEBUG] Requesting models from OpenRouter");
+fn handle_list_models(state: &State) -> Result<(Option<Vec<u8>>, (WebsocketResponse,)), String> {
     // Get OpenRouter models
     let openrouter_models = match state.openrouter_client.list_available_models() {
         Ok(models) => {
-            log(&format!("[DEBUG] Successfully retrieved {} OpenRouter models", models.len()));
+            log(&format!(
+                "[DEBUG] Successfully retrieved {} OpenRouter models",
+                models.len()
+            ));
             models
         }
         Err(e) => {
             log(&format!("[ERROR] Failed to list OpenRouter models: {}", e));
-            // Add hardcoded models
-            log("[DEBUG] Adding hardcoded OpenRouter models");
-            vec![
-                crate::messages::ModelInfo {
-                    id: "meta-llama/llama-4-maverick:free".to_string(),
-                    display_name: "Llama 4 Maverick (free)".to_string(),
-                    max_tokens: 1000000, // 1 million token context
-                    provider: Some("openrouter".to_string()),
-                },
-                crate::messages::ModelInfo {
-                    id: "deepseek/deepseek-v3-base:free".to_string(),
-                    display_name: "DeepSeek V3 Base (free)".to_string(),
-                    max_tokens: 128000, // 128k context window
-                    provider: Some("openrouter".to_string()),
-                },
-                crate::messages::ModelInfo {
-                    id: "openrouter/quasar-alpha".to_string(),
-                    display_name: "OpenRouter Quasar Alpha".to_string(),
-                    max_tokens: 128000, // 128k context window
-                    provider: Some("openrouter".to_string()),
-                },
-                crate::messages::ModelInfo {
-                    id: "openrouter/optimus-alpha".to_string(),
-                    display_name: "OpenRouter Optimus Alpha".to_string(),
-                    max_tokens: 128000, // 128k context window
-                    provider: Some("openrouter".to_string()),
-                },
-                crate::messages::ModelInfo {
-                    id: "qwen/qwen2.5-vl-3b-instruct:free".to_string(),
-                    display_name: "Qwen 2.5 VL 3B Instruct (free)".to_string(),
-                    max_tokens: 32000, // 32k context window
-                    provider: Some("openrouter".to_string()),
-                },
-                crate::messages::ModelInfo {
-                    id: "qwen/qwen2.5-vl-32b-instruct:free".to_string(),
-                    display_name: "Qwen 2.5 VL 32B Instruct (free)".to_string(),
-                    max_tokens: 32000, // 32k context window
-                    provider: Some("openrouter".to_string()),
-                }
-            ]
+            return Err(format!("Failed to list OpenRouter models: {}", e));
         }
     };
-    
+
     // Add provider field to OpenRouter models if not already present
     let openrouter_models_with_provider: Vec<Value> = openrouter_models
         .iter()
@@ -643,27 +555,28 @@ fn handle_list_models(
             })
         })
         .collect();
-    
+
     // Combine all models
-    let all_models: Vec<Value> = [
-        claude_models_with_provider,
-        gemini_models_with_provider,
-        openrouter_models_with_provider,
-    ].concat();
-    
+    let all_models: Vec<Value> = [openrouter_models_with_provider].concat();
+
     // Log the combined models for debugging
-    log(&format!("[DEBUG] Total models available: {}", all_models.len()));
-    
+    log(&format!(
+        "[DEBUG] Total models available: {}",
+        all_models.len()
+    ));
+
     // Log each model for debugging
     for (i, model) in all_models.iter().enumerate() {
         // Log model details including the model ID for debugging
-        log(&format!("[DEBUG] Model {}: {} (provider: {}, id: {})",
+        log(&format!(
+            "[DEBUG] Model {}: {} (provider: {}, id: {})",
             i,
-            model["display_name"].as_str().unwrap_or("Unknown"), 
+            model["display_name"].as_str().unwrap_or("Unknown"),
             model["provider"].as_str().unwrap_or("Unknown"),
-            model["id"].as_str().unwrap_or("Unknown")));
+            model["id"].as_str().unwrap_or("Unknown")
+        ));
     }
-    
+
     Ok((
         Some(serde_json::to_vec(state).unwrap()),
         (WebsocketResponse {

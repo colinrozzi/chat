@@ -1,9 +1,8 @@
-use crate::api::claude::ClaudeClient;
-use crate::api::gemini::GeminiClient;
 use crate::api::openrouter::OpenRouterClient;
 use crate::bindings::ntwk::theater::runtime::log;
+use crate::mcp_server::{McpServer, McpServerConfig};
 use crate::messages::store::MessageStore;
-use crate::messages::{ChainEntry, ChatInfo, Message, MessageData};
+use crate::messages::{ChainEntry, ChatInfo, Message, MessageData, ModelInfo};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -22,38 +21,31 @@ pub struct State {
     pub id: String,
     pub head: Option<String>,
     pub current_chat_id: Option<String>,
-    pub claude_client: ClaudeClient,
-    pub gemini_client: GeminiClient,
-    pub openrouter_client: OpenRouterClient, // Add OpenRouter client
+    pub openrouter_client: OpenRouterClient,
     pub connected_clients: HashMap<String, bool>,
     pub store: MessageStore,
     pub server_id: u64,
+    pub mcp_servers: Vec<McpServer>,
 }
 
 impl State {
     pub fn new(
         id: String,
         store_id: String,
-        anthropic_api_key: String,
-        gemini_api_key: String,
-        openrouter_api_key: String, // Add OpenRouter API key
+        openrouter_api_key: String,
         server_id: u64,
-        head: Option<String>,
+        mcp_server_configs: Option<Vec<McpServerConfig>>,
+        model_configs: Vec<ModelInfo>,
     ) -> Self {
         let mut state = Self {
             id,
-            head,
+            head: None,
             current_chat_id: None,
-            claude_client: ClaudeClient::new(anthropic_api_key.clone()),
-            gemini_client: GeminiClient::new(gemini_api_key.clone()),
-            openrouter_client: OpenRouterClient::new(
-                openrouter_api_key.clone(),
-                Some("Chat Actor".to_string()),
-                None,
-            ), // Initialize OpenRouter client
+            openrouter_client: OpenRouterClient::new(openrouter_api_key.clone(), model_configs),
             connected_clients: HashMap::new(),
             store: MessageStore::new(store_id.clone()),
             server_id,
+            mcp_servers: Vec::new(),
         };
 
         // Get the list of chats
@@ -99,6 +91,17 @@ impl State {
             {
                 state.head = chat_info.head.clone();
             }
+        }
+
+        if let Some(mcp_server_configs) = mcp_server_configs {
+            log("Starting MCP servers");
+            for config in mcp_server_configs {
+                let mut mcp_server = McpServer::new(config);
+                mcp_server.start();
+                state.mcp_servers.push(mcp_server);
+            }
+        } else {
+            log("No MCP server configs provided");
         }
 
         state
@@ -196,17 +199,7 @@ impl State {
                 Err(e) => {
                     // Log the error but continue with a fallback chat ID
                     log(&format!("[ERROR] Failed to create a new chat: {}", e));
-
-                    // Create a fallback chat ID
-                    let fallback_id = format!(
-                        "{}",
-                        SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .unwrap()
-                            .as_secs()
-                    );
-                    log(&format!("[DEBUG] Using fallback chat ID: {}", fallback_id));
-                    self.current_chat_id = Some(fallback_id);
+                    self.current_chat_id = Some("fallback_chat_id".to_string());
                 }
             }
         }
@@ -281,7 +274,7 @@ impl State {
 
     pub fn generate_llm_response(
         &mut self,
-        model_id: Option<String>,
+        model_id: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
         log("[DEBUG] Getting messages for LLM response");
         let messages = self.get_anthropic_messages();
@@ -298,54 +291,10 @@ impl State {
         }
 
         // Determine which provider to use based on model ID
-        let model = model_id
-            .clone()
-            .unwrap_or_else(|| "meta-llama/llama-4-maverick:free".to_string());
-        let is_gemini = model.starts_with("gemini-");
-        let is_openrouter = model.contains("/")
-            || model.starts_with("openai/")
-            || model.starts_with("anthropic/")
-            || model.starts_with("mistral/")
-            || model.starts_with("meta-llama/")
-            || model.starts_with("deepseek/")
-            || model.starts_with("openrouter/")
-            || model.starts_with("qwen/")
-            || model.contains(":free")
-            || crate::api::openrouter::is_free_model(&model)
-            || crate::api::openrouter::is_llama4_maverick_free(&model);
-
-        // Log which model is being used (with enhanced detail)
-        if let Some(model) = &model_id {
-            log(&format!("[DEBUG] Using specified model: {}", model));
-            if crate::api::openrouter::is_free_model(model) {
-                log(&format!("[DEBUG] Model '{}' is a free model", model));
-            }
-        } else if is_gemini {
-            log("[DEBUG] Using default Gemini model (gemini-2.0-flash)");
-        } else if is_openrouter {
-            if crate::api::openrouter::is_llama4_maverick_free(&model) {
-                log("[DEBUG] Using Llama 4 Maverick free model via OpenRouter");
-            } else if model.starts_with("deepseek/") {
-                log(&format!("[DEBUG] Using DeepSeek model: {}", model));
-            } else if model.starts_with("qwen/") {
-                log(&format!("[DEBUG] Using Qwen model: {}", model));
-            } else if model.starts_with("openrouter/") {
-                log(&format!("[DEBUG] Using OpenRouter custom model: {}", model));
-            } else {
-                log(&format!("[DEBUG] Using OpenRouter model: {}", model));
-            }
-        } else {
-            log("[DEBUG] Using default Claude model (claude-3-7-sonnet-20250219)");
-        }
+        let model = model_id.clone();
 
         // Call appropriate client
-        let result = if is_gemini {
-            self.gemini_client.generate_response(messages, model_id)
-        } else if is_openrouter {
-            self.openrouter_client.generate_response(messages, model_id)
-        } else {
-            self.claude_client.generate_response(messages, model_id)
-        };
+        let result = self.openrouter_client.generate_response(messages, model_id);
 
         match result {
             Ok(assistant_msg) => {

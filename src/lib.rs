@@ -15,6 +15,7 @@ mod api;
 mod bindings;
 mod fs;
 mod handlers;
+mod mcp_server;
 mod messages;
 mod resources;
 mod state;
@@ -33,19 +34,20 @@ use bindings::ntwk::theater::message_server_host::send_on_channel;
 use bindings::ntwk::theater::runtime::log;
 use bindings::ntwk::theater::store;
 use bindings::ntwk::theater::websocket_types::{MessageType, WebsocketMessage};
+use mcp_server::McpServerConfig;
+use messages::ModelInfo;
 use state::State;
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct InitData {
-    head: Option<String>,
     store_id: Option<String>,
-    anthropic_api_key: String,
-    gemini_api_key: String,
-    openrouter_api_key: String, // Add OpenRouter API key field
+    openrouter_api_key: String,
+    model_configs: Vec<ModelInfo>,
     assets_store_id: Option<String>,
     assets_runtime_content_fs: Option<String>,
+    mcp_server_configs: Option<Vec<McpServerConfig>>,
 }
 
 struct Component;
@@ -148,11 +150,10 @@ impl ActorGuest for Component {
         let initial_state = State::new(
             id,
             store_id,
-            init_data.anthropic_api_key,
-            init_data.gemini_api_key,
             init_data.openrouter_api_key, // Pass the OpenRouter API key
             server_id,
-            init_data.head,
+            init_data.mcp_server_configs,
+            init_data.model_configs,
         );
 
         log("State initialized");
