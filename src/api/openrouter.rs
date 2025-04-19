@@ -44,6 +44,12 @@ impl OpenRouterClient {
         Ok(self.model_configs.clone())
     }
 
+    pub fn tools_enabled(&self, model_id: &str) -> bool {
+        self.model_configs
+            .iter()
+            .any(|model| model.id == model_id && model.tools_enabled)
+    }
+
     pub fn generate_response(
         &self,
         messages: Vec<Message>,

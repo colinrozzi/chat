@@ -294,7 +294,12 @@ impl State {
         }
 
         // Determine which provider to use based on model ID
-        let tools = self.get_tools();
+        let tools;
+        if self.openrouter_client.tools_enabled(&model_id) {
+            tools = self.get_tools();
+        } else {
+            tools = None;
+        }
 
         // Call appropriate client
         let result = self
@@ -565,6 +570,11 @@ impl State {
     fn get_tools(&self) -> Option<Vec<Tool>> {
         // Placeholder for tool retrieval logic
         // This should return a Vec<Tool> based on the current state
-        None
+        log("[DEBUG] Retrieving tools from MCP servers");
+        self.mcp_servers
+            .iter()
+            .flat_map(|server| server.get_tools())
+            .collect::<Vec<_>>()
+            .into()
     }
 }
