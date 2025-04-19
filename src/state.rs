@@ -353,14 +353,14 @@ impl State {
                     if let Some(last_msg) = messages.last() {
                         match (last_msg, &msg) {
                             (
-                                Message::User {
+                                Message::User(UserMessage {
                                     content: _last_content,
-                                },
-                                Message::User { content },
+                                }),
+                                Message::User(UserMessage { content }),
                             ) => {
-                                if let Some(Message::User {
+                                if let Some(Message::User(UserMessage {
                                     content: combined_content,
-                                }) = messages.last_mut()
+                                })) = messages.last_mut()
                                 {
                                     combined_content.push_str(&format!("\n{}", content));
                                     log(&format!("Updated chat message: {:?}", combined_content));
