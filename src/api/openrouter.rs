@@ -1,10 +1,9 @@
 use crate::bindings::ntwk::theater::http_client::{send_http, HttpRequest};
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::messages::{
-    openrouter::{OpenRouterMessage, OpenRouterRequest, OpenRouterResponse},
+    openrouter::{FunctionDefinition, OpenRouterMessage, OpenRouterRequest, OpenRouterResponse},
     AssistantMessage, Message, ModelInfo,
 };
-use mcp_protocol::types::tool::Tool;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 
@@ -54,7 +53,7 @@ impl OpenRouterClient {
         &self,
         messages: Vec<Message>,
         model_id: String,
-        available_tools: Option<Vec<Tool>>,
+        available_tools: Option<Vec<FunctionDefinition>>,
     ) -> Result<AssistantMessage, Box<dyn std::error::Error>> {
         let model_info = self
             .model_configs
@@ -122,7 +121,6 @@ impl OpenRouterClient {
         };
 
         log("Sending OpenRouter request...");
-        log(&format!("Request: {:?}", request));
 
         // Send the request
         let http_response =
@@ -133,6 +131,8 @@ impl OpenRouterClient {
             "OpenRouter response status: {}",
             http_response.status
         ));
+
+        log(&format!("OpenRouter response: {:?}", http_response));
 
         // Check if the response status is not 2xx (success)
         if http_response.status < 200 || http_response.status >= 300 {

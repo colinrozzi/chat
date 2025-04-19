@@ -3,6 +3,13 @@ use mcp_protocol::types::tool::Tool;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FunctionDefinition {
+    #[serde(rename = "type")]
+    pub _type: String,
+    pub function: Tool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OpenRouterMessage {
     pub role: String,
     pub content: String,
@@ -15,7 +22,7 @@ pub struct OpenRouterRequest {
     pub model: String,
     pub messages: Vec<OpenRouterMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Tool>>,
+    pub tools: Option<Vec<FunctionDefinition>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

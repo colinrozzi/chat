@@ -3,8 +3,8 @@ use crate::bindings::ntwk::theater::runtime::log;
 use crate::mcp_server::{McpServer, McpServerConfig};
 use crate::messages::store::MessageStore;
 use crate::messages::{
-    AssistantMessage, ChainEntry, ChatInfo, Message, MessageData, ModelInfo, ToolMessage,
-    UserMessage,
+    openrouter::FunctionDefinition, AssistantMessage, ChainEntry, ChatInfo, Message, MessageData,
+    ModelInfo, ToolMessage, UserMessage,
 };
 
 use mcp_protocol::types::tool::Tool;
@@ -567,7 +567,7 @@ impl State {
         }
     }
 
-    fn get_tools(&self) -> Option<Vec<Tool>> {
+    fn get_tools(&self) -> Option<Vec<FunctionDefinition>> {
         // Placeholder for tool retrieval logic
         // This should return a Vec<Tool> based on the current state
         log("[DEBUG] Retrieving tools from MCP servers");
