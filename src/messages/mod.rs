@@ -1,4 +1,7 @@
-use crate::api::openrouter::OpenRouterLlmMessage;
+pub mod openrouter;
+pub mod store;
+
+use openrouter::OpenRouterUsage;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -15,8 +18,32 @@ pub enum MessageData {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {
-    User { content: String },
-    Assistant(OpenRouterLlmMessage),
+    User(UserMessage),
+    Assistant(AssistantMessage),
+    Tool(ToolMessage),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UserMessage {
+    pub content: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AssistantMessage {
+    pub content: String,
+    pub id: String,
+    pub model: String,
+    pub finish_reason: String,
+    pub native_finish_reason: Option<String>,
+    pub usage: OpenRouterUsage,
+    pub input_cost_per_million_tokens: Option<f64>,
+    pub output_cost_per_million_tokens: Option<f64>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ToolMessage {
+    pub tool_call_id: String,
+    pub content: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -37,5 +64,3 @@ pub struct ChatInfo {
     pub head: Option<String>, // Head message ContentRef
     pub icon: Option<String>, // Optional icon identifier
 }
-
-pub mod store;

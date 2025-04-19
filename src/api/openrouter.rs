@@ -1,58 +1,12 @@
 use crate::bindings::ntwk::theater::http_client::{send_http, HttpRequest};
 use crate::bindings::ntwk::theater::runtime::log;
-use crate::messages::{Message, ModelInfo};
+use crate::messages::{
+    openrouter::{OpenRouterMessage, OpenRouterRequest, OpenRouterResponse},
+    AssistantMessage, Message, ModelInfo,
+};
 use mcp_protocol::types::tool::Tool;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct OpenRouterMessage {
-    pub role: String,
-    pub content: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct OpenRouterRequest {
-    pub model: String,
-    pub messages: Vec<OpenRouterMessage>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tools: Option<Vec<Tool>>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct OpenRouterChoice {
-    pub message: OpenRouterChoiceMessage,
-    pub finish_reason: String,
-    pub index: u32,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct OpenRouterChoiceMessage {
-    pub role: String,
-    pub content: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct OpenRouterUsage {
-    pub prompt_tokens: u32,
-    pub completion_tokens: u32,
-    pub total_tokens: u32,
-    pub native_prompt_tokens: Option<u32>,
-    pub native_completion_tokens: Option<u32>,
-    pub native_total_tokens: Option<u32>,
-    pub cost: Option<f64>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct OpenRouterResponse {
-    pub id: String,
-    pub model: String,
-    pub created: u64,
-    pub object: String,
-    pub choices: Vec<OpenRouterChoice>,
-    pub usage: OpenRouterUsage,
-    pub native_finish_reason: Option<String>,
-}
 
 // OpenRouter client implementation
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -60,19 +14,6 @@ pub struct OpenRouterClient {
     api_key: String,
     url: String,
     model_configs: Vec<ModelInfo>,
-}
-
-// Define OpenRouterMessage struct for the messages implementation
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct OpenRouterLlmMessage {
-    pub content: String,
-    pub id: String,
-    pub model: String,
-    pub finish_reason: String,
-    pub native_finish_reason: Option<String>,
-    pub usage: OpenRouterUsage,
-    pub input_cost_per_million_tokens: Option<f64>,
-    pub output_cost_per_million_tokens: Option<f64>,
 }
 
 impl OpenRouterClient {
@@ -108,7 +49,7 @@ impl OpenRouterClient {
         messages: Vec<Message>,
         model_id: String,
         available_tools: Option<Vec<Tool>>,
-    ) -> Result<OpenRouterLlmMessage, Box<dyn std::error::Error>> {
+    ) -> Result<AssistantMessage, Box<dyn std::error::Error>> {
         let model_info = self
             .model_configs
             .iter()
@@ -118,14 +59,21 @@ impl OpenRouterClient {
         // Convert our internal message format to OpenRouter format
         let openrouter_messages: Vec<OpenRouterMessage> = messages
             .iter()
-            .map(|msg| OpenRouterMessage {
-                role: match msg {
-                    Message::User { .. } => "user".to_string(),
-                    Message::Assistant(_) => "assistant".to_string(),
+            .map(|msg| match msg {
+                Message::User(msg) => OpenRouterMessage {
+                    role: "user".to_string(),
+                    content: msg.content.clone(),
+                    tool_call_id: None,
                 },
-                content: match msg {
-                    Message::User { content } => content.clone(),
-                    Message::Assistant(assistant_msg) => assistant_msg.content.clone(),
+                Message::Assistant(msg) => OpenRouterMessage {
+                    role: "assistant".to_string(),
+                    content: msg.content.clone(),
+                    tool_call_id: None,
+                },
+                Message::Tool(msg) => OpenRouterMessage {
+                    role: "tool".to_string(),
+                    content: msg.content.clone(),
+                    tool_call_id: Some(msg.tool_call_id.clone()),
                 },
             })
             .collect();
@@ -219,7 +167,7 @@ impl OpenRouterClient {
         let id = format!("{:x}", hasher.finalize());
 
         // Create our message
-        let openrouter_message = OpenRouterLlmMessage {
+        let openrouter_message = AssistantMessage {
             content,
             id,
             model: response.model.clone(),

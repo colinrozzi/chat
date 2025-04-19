@@ -2,7 +2,10 @@ use crate::api::openrouter::OpenRouterClient;
 use crate::bindings::ntwk::theater::runtime::log;
 use crate::mcp_server::{McpServer, McpServerConfig};
 use crate::messages::store::MessageStore;
-use crate::messages::{ChainEntry, ChatInfo, Message, MessageData, ModelInfo};
+use crate::messages::{
+    AssistantMessage, ChainEntry, ChatInfo, Message, MessageData, ModelInfo, ToolMessage,
+    UserMessage,
+};
 
 use mcp_protocol::types::tool::Tool;
 use serde::{Deserialize, Serialize};
@@ -239,9 +242,9 @@ impl State {
 
     pub fn add_user_message(&mut self, content: &str) {
         log("[DEBUG] Adding user message");
-        let msg = Message::User {
+        let msg = Message::User(UserMessage {
             content: content.to_string(),
-        };
+        });
 
         // Get current head as parent
         let mut parents = Vec::new();
@@ -291,8 +294,6 @@ impl State {
         }
 
         // Determine which provider to use based on model ID
-        let model = model_id.clone();
-
         let tools = self.get_tools();
 
         // Call appropriate client
@@ -305,10 +306,19 @@ impl State {
                 log(&format!("Generated completion: {:?}", assistant_msg));
 
                 // Add LLM response to chain with all parents
-                let message = Message::Assistant(assistant_msg);
-                self.add_to_chain(MessageData::Chat(message), parents);
+                self.add_to_chain(
+                    MessageData::Chat(Message::Assistant(assistant_msg.clone())),
+                    parents,
+                );
 
-                Ok(())
+                match assistant_msg.finish_reason.as_str() {
+                    "stop" => Ok(()),
+                    "tool_calls" => todo!(),
+                    "length" => todo!(),
+                    "content_filter" => todo!(),
+                    "error" => Err("llm request returned 200 with an error in the body".into()),
+                    _ => Err("unknown stop reason".into()),
+                }
             }
             Err(e) => {
                 log(&format!("Failed to generate completion: {}", e));
