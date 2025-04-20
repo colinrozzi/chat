@@ -29,11 +29,18 @@ pub struct UserMessage {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AssistantMessage {
+pub enum AssistantMessage {
+    Claude(ClaudeMessage),
+    Gemini(GeminiMessage),
+    OpenRouter(OpenRouterMessage),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct OpenRouterMessage {
     pub content: String,
     pub id: String,
     pub model: String,
-    pub finish_reason: String,
+    pub stop_reason: String,
     pub native_finish_reason: Option<String>,
     pub usage: OpenRouterUsage,
     pub input_cost_per_million_tokens: Option<f64>,

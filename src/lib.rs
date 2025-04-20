@@ -44,6 +44,8 @@ use serde::{Deserialize, Serialize};
 struct InitData {
     store_id: Option<String>,
     openrouter_api_key: String,
+    anthropic_api_key: String,
+    gemini_api_key: String,
     model_configs: Vec<ModelInfo>,
     assets_store_id: Option<String>,
     assets_runtime_content_fs: Option<String>,
