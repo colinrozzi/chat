@@ -1,7 +1,6 @@
 pub mod openrouter;
 pub mod store;
 
-use openrouter::OpenRouterUsage;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -23,6 +22,19 @@ pub enum Message {
     Tool(ToolMessage),
 }
 
+// Trait defining common behavior for LLM messages
+pub trait LlmMessage {
+    fn content(&self) -> &str;
+    fn model_id(&self) -> &str;
+    fn provider_name(&self) -> &str;
+    fn input_tokens(&self) -> u32;
+    fn output_tokens(&self) -> u32;
+    fn calculate_cost(&self) -> f64;
+    fn stop_reason(&self) -> &str;
+    fn message_id(&self) -> &str;
+    fn provider_data(&self) -> Option<serde_json::Value>;
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UserMessage {
     pub content: String,
@@ -31,8 +43,70 @@ pub struct UserMessage {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum AssistantMessage {
     Claude(ClaudeMessage),
-    Gemini(GeminiMessage),
     OpenRouter(OpenRouterMessage),
+}
+
+impl AssistantMessage {
+    pub fn content(&self) -> &str {
+        match self {
+            AssistantMessage::Claude(msg) => &msg.content,
+            AssistantMessage::OpenRouter(msg) => &msg.content,
+        }
+    }
+
+    pub fn model_id(&self) -> &str {
+        match self {
+            AssistantMessage::Claude(msg) => &msg.model,
+            AssistantMessage::OpenRouter(msg) => &msg.model,
+        }
+    }
+
+    pub fn provider_name(&self) -> &str {
+        match self {
+            AssistantMessage::Claude(_) => "claude",
+            AssistantMessage::OpenRouter(_) => "openrouter",
+        }
+    }
+
+    pub fn input_tokens(&self) -> u32 {
+        match self {
+            AssistantMessage::Claude(msg) => msg.usage.input_tokens,
+            AssistantMessage::OpenRouter(msg) => msg.usage.input_tokens,
+        }
+    }
+    pub fn output_tokens(&self) -> u32 {
+        match self {
+            AssistantMessage::Claude(msg) => msg.usage.output_tokens,
+            AssistantMessage::OpenRouter(msg) => msg.usage.output_tokens,
+        }
+    }
+
+    pub fn stop_reason(&self) -> &str {
+        match self {
+            AssistantMessage::Claude(msg) => &msg.stop_reason,
+            AssistantMessage::OpenRouter(msg) => msg.stop_reason.as_str(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Usage {
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+}
+
+// Claude-specific message implementation
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ClaudeMessage {
+    pub content: String,
+    pub id: String,
+    pub model: String,
+    pub stop_reason: String,
+    pub stop_sequence: Option<String>,
+    pub message_type: String,
+    pub usage: Usage,
+    pub input_cost_per_million_tokens: Option<f64>,
+    pub output_cost_per_million_tokens: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -42,7 +116,7 @@ pub struct OpenRouterMessage {
     pub model: String,
     pub stop_reason: String,
     pub native_finish_reason: Option<String>,
-    pub usage: OpenRouterUsage,
+    pub usage: Usage,
     pub input_cost_per_million_tokens: Option<f64>,
     pub output_cost_per_million_tokens: Option<f64>,
 }
@@ -70,4 +144,11 @@ pub struct ChatInfo {
     pub name: String,         // Display name
     pub head: Option<String>, // Head message ContentRef
     pub icon: Option<String>, // Optional icon identifier
+}
+
+// Implement conversion from ClaudeMessage to AssistantMessage
+impl From<ClaudeMessage> for AssistantMessage {
+    fn from(msg: ClaudeMessage) -> Self {
+        AssistantMessage::Claude(msg)
+    }
 }

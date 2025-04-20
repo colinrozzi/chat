@@ -316,7 +316,7 @@ impl State {
                     parents,
                 );
 
-                match assistant_msg.finish_reason.as_str() {
+                match assistant_msg.finish_reason().as_str() {
                     "stop" => Ok(()),
                     "tool_calls" => todo!(),
                     "length" => todo!(),

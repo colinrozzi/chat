@@ -1,6 +1,10 @@
+use crate::api::LlmApi;
 use crate::bindings::ntwk::theater::http_client::{send_http, HttpRequest};
 use crate::bindings::ntwk::theater::runtime::log;
-use crate::messages::{AssistantMessage, ClaudeMessage, LlmMessage, Message, ModelInfo};
+use crate::messages::{
+    AssistantMessage, ClaudeMessage, FunctionDefinition, LlmMessage, Message, ModelInfo, Usage,
+};
+use mcp_protocol::types::tool::Tool;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -77,88 +81,67 @@ pub fn get_model_pricing(model_id: &str) -> ModelPricing {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AnthropicMessage {
-    pub role: String,
-    pub content: String,
+pub enum AnthropicMessage {
+    ChatMessage {
+        role: String,
+        content: String,
+    },
+    ToolResult {
+        #[serde(rename = "type")]
+        _type: String,
+        tool_use_id: String,
+        content: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ClaudeClient {
     api_key: String,
+    model_configs: Vec<ModelInfo>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Usage {
-    pub input_tokens: u32,
-    pub output_tokens: u32,
-}
-
-impl ClaudeClient {
-    pub fn new(api_key: String) -> Self {
-        Self { api_key }
-    }
-
-    pub fn list_available_models(&self) -> Result<Vec<ModelInfo>, Box<dyn std::error::Error>> {
-        let request = HttpRequest {
-            method: "GET".to_string(),
-            uri: "https://api.anthropic.com/v1/models".to_string(),
-            headers: vec![
-                ("x-api-key".to_string(), self.api_key.clone()),
-                ("anthropic-version".to_string(), "2023-06-01".to_string()),
-            ],
-            body: None,
-        };
-
-        let http_response =
-            send_http(&request).map_err(|e| format!("HTTP request failed: {}", e))?;
-        let body = http_response.body.ok_or("No response body")?;
-        let models_response: Value = serde_json::from_slice(&body)?;
-
-        // Parse the models from the response
-        let mut models = Vec::new();
-        if let Some(data) = models_response.get("data").and_then(|d| d.as_array()) {
-            for model_data in data {
-                if let (Some(id), Some(display_name)) = (
-                    model_data.get("id").and_then(|v| v.as_str()),
-                    model_data.get("display_name").and_then(|v| v.as_str()),
-                ) {
-                    // Get max tokens based on model ID
-                    let max_tokens = get_model_max_tokens(id);
-
-                    models.push(ModelInfo {
-                        id: id.to_string(),
-                        display_name: display_name.to_string(),
-                        max_tokens,
-                        provider: Some("claude".to_string()),
-                    });
-                }
-            }
+impl LlmApi for ClaudeClient {
+    fn new(api_key: String, model_configs: Vec<ModelInfo>) -> Self {
+        Self {
+            api_key,
+            model_configs,
         }
-
-        Ok(models)
     }
 
-    pub fn generate_response(
+    fn tools_enabled(&self, model_id: &str) -> bool {
+        self.model_configs
+            .iter()
+            .any(|model| model.id == model_id && model.tools_enabled)
+    }
+
+    fn list_available_models(&self) -> Result<Vec<ModelInfo>, Box<dyn std::error::Error>> {
+        Ok(self.model_configs.clone())
+    }
+
+    fn generate_response(
         &self,
         messages: Vec<Message>,
-        model_id: Option<String>,
+        model_id: String,
+        available_tools: Option<Vec<Tool>>,
     ) -> Result<AssistantMessage, Box<dyn std::error::Error>> {
-        // Get the model ID
-        let model = model_id.unwrap_or_else(|| "claude-3-7-sonnet-20250219".to_string());
-
         // Get appropriate max_tokens for this model
-        let max_tokens = get_model_max_tokens(&model);
+        let max_tokens = get_model_max_tokens(&model_id);
 
         let anthropic_messages: Vec<AnthropicMessage> = messages
             .iter()
-            .map(|msg| AnthropicMessage {
-                role: match msg {
-                    Message::User { .. } => "user".to_string(),
-                    Message::Assistant(_) => "assistant".to_string(),
+            .map(|msg| match msg {
+                Message::User(msg) => AnthropicMessage::ChatMessage {
+                    role: "user".to_string(),
+                    content: msg.content.clone(),
                 },
-                content: match msg {
-                    Message::User { content } => content.clone(),
-                    Message::Assistant(assistant_msg) => assistant_msg.content().to_string(),
+                Message::Assistant(msg) => AnthropicMessage::ChatMessage {
+                    role: "assistant".to_string(),
+                    content: msg.content().clone().to_string(),
+                },
+                Message::Tool(msg) => AnthropicMessage::ToolResult {
+                    _type: "tool_result".to_string(),
+                    tool_use_id: msg.tool_call_id.clone(),
+                    content: msg.content.clone(),
                 },
             })
             .collect();
@@ -172,7 +155,7 @@ impl ClaudeClient {
                 ("anthropic-version".to_string(), "2023-06-01".to_string()),
             ],
             body: Some(serde_json::to_vec(&json!({
-                "model": model,
+                "model": model_id,
                 "max_tokens": max_tokens,
                 "messages": anthropic_messages,
             }))?),
@@ -239,5 +222,55 @@ impl ClaudeClient {
 
         // Wrap in the enum
         Ok(AssistantMessage::Claude(claude_message))
+    }
+}
+
+// Implementation of LlmMessage for ClaudeMessage
+impl LlmMessage for ClaudeMessage {
+    fn content(&self) -> &str {
+        &self.content
+    }
+
+    fn model_id(&self) -> &str {
+        &self.model
+    }
+
+    fn provider_name(&self) -> &str {
+        "claude"
+    }
+
+    fn input_tokens(&self) -> u32 {
+        self.usage.input_tokens
+    }
+
+    fn output_tokens(&self) -> u32 {
+        self.usage.output_tokens
+    }
+
+    fn calculate_cost(&self) -> f64 {
+        let input_cost = self.input_cost_per_million_tokens.unwrap_or(3.0)
+            * (self.usage.input_tokens as f64)
+            / 1_000_000.0;
+
+        let output_cost = self.output_cost_per_million_tokens.unwrap_or(15.0)
+            * (self.usage.output_tokens as f64)
+            / 1_000_000.0;
+
+        input_cost + output_cost
+    }
+
+    fn stop_reason(&self) -> &str {
+        &self.stop_reason
+    }
+
+    fn message_id(&self) -> &str {
+        &self.id
+    }
+
+    fn provider_data(&self) -> Option<serde_json::Value> {
+        Some(serde_json::json!({
+            "stop_sequence": self.stop_sequence,
+            "message_type": self.message_type
+        }))
     }
 }
